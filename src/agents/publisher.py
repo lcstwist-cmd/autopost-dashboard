@@ -226,8 +226,13 @@ def publish_telegram(queue: dict[str, Any], dry_run: bool = True) -> dict[str, A
 # --- X publisher (tweepy API v2) -------------------------------------------
 
 def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
-    """Post tweet + image via Twitter/X API v2 using tweepy."""
-    text       = queue["post_x"]
+    """Post tweet + image via Twitter/X API v2 using tweepy.
+
+    Image upload uses v1.1 media/upload (requires Basic plan or higher).
+    If image upload fails, falls back to text-only tweet so the post
+    still goes out even on restricted plans.
+    """
+    text:       str  = queue["post_x"]
     image_path: Path = queue["image_x"]
 
     if dry_run:
@@ -238,45 +243,100 @@ def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
     acc_token  = os.environ.get("X_ACCESS_TOKEN", "").strip()
     acc_secret = os.environ.get("X_ACCESS_TOKEN_SECRET", "").strip()
 
-    if not all([api_key, api_secret, acc_token, acc_secret]):
-        missing = [k for k, v in {
-            "X_API_KEY": api_key, "X_API_SECRET": api_secret,
-            "X_ACCESS_TOKEN": acc_token, "X_ACCESS_TOKEN_SECRET": acc_secret,
-        }.items() if not v]
-        return {"status": "error", "error": f"X API keys missing: {', '.join(missing)} — set them in Settings"}
+    missing = [k for k, v in {
+        "X_API_KEY":               api_key,
+        "X_API_SECRET":            api_secret,
+        "X_ACCESS_TOKEN":          acc_token,
+        "X_ACCESS_TOKEN_SECRET":   acc_secret,
+    }.items() if not v]
+    if missing:
+        return {
+            "status": "error",
+            "error": (
+                f"X API keys missing: {', '.join(missing)}. "
+                "Go to Settings → X / Twitter and fill in all 4 keys."
+            ),
+        }
 
     try:
         import tweepy
     except ImportError:
-        return {"status": "error", "error": "tweepy not installed"}
+        return {"status": "error", "error": "tweepy not installed — run: pip install tweepy"}
 
-    try:
-        # Upload image via API v1.1 (media upload only available on v1.1)
-        auth = tweepy.OAuth1UserHandler(api_key, api_secret, acc_token, acc_secret)
-        api_v1 = tweepy.API(auth)
-
-        media_id = None
-        if image_path and image_path.exists():
-            media = api_v1.media_upload(filename=str(image_path))
+    # ── Step 1: upload image via v1.1 ───────────────────────────────────────
+    # Requires Basic plan ($100/mo) or Elevated legacy access.
+    # Falls back to text-only if v1.1 is unavailable.
+    media_id = None
+    media_upload_note = ""
+    if image_path and image_path.exists():
+        try:
+            auth   = tweepy.OAuth1UserHandler(api_key, api_secret, acc_token, acc_secret)
+            api_v1 = tweepy.API(auth)
+            media  = api_v1.media_upload(filename=str(image_path))
             media_id = media.media_id
+        except Exception as exc:
+            media_upload_note = f"image skipped ({exc})"
+            print(f"[publisher] X image upload failed, posting text-only: {exc}")
 
-        # Post tweet via API v2
+    # ── Step 2: create tweet via v2 ─────────────────────────────────────────
+    try:
         client = tweepy.Client(
             consumer_key=api_key,
             consumer_secret=api_secret,
             access_token=acc_token,
             access_token_secret=acc_secret,
         )
-        kwargs: dict = {"text": text[:280]}
+        kwargs: dict = {"text": text}   # copywriter already keeps it ≤ 280
         if media_id:
             kwargs["media_ids"] = [str(media_id)]
+
         resp = client.create_tweet(**kwargs)
         tweet_id = resp.data["id"]
-        return {"status": "ok", "tweet_id": tweet_id,
-                "url": f"https://x.com/i/web/status/{tweet_id}"}
+        result: dict[str, Any] = {
+            "status":   "ok",
+            "tweet_id": tweet_id,
+            "url":      f"https://x.com/i/web/status/{tweet_id}",
+            "has_image": media_id is not None,
+        }
+        if media_upload_note:
+            result["note"] = media_upload_note
+        return result
 
+    except tweepy.errors.Unauthorized as exc:
+        return {
+            "status": "error",
+            "error": (
+                "X 401 Unauthorized — keys are wrong or expired. "
+                "Check API Key & Secret + Access Token & Secret in Settings. "
+                "Make sure your X app has Read+Write permission, then regenerate "
+                "the Access Token & Secret after changing permissions. "
+                f"Detail: {exc}"
+            ),
+        }
+    except tweepy.errors.Forbidden as exc:
+        return {
+            "status": "error",
+            "error": (
+                "X 403 Forbidden — your X developer account needs the Basic plan "
+                "($100/month) to post tweets via API. Free tier is read-only. "
+                "Or your Access Token was created before enabling Write permission — "
+                "regenerate it at developer.x.com → Your App → Keys and Tokens. "
+                f"Detail: {exc}"
+            ),
+        }
+    except tweepy.errors.BadRequest as exc:
+        return {
+            "status": "error",
+            "error": (
+                f"X 400 Bad Request — the tweet was rejected. "
+                f"Check that the post text is under 280 characters and contains no "
+                f"duplicate content. Detail: {exc}"
+            ),
+        }
+    except tweepy.errors.TweepyException as exc:
+        return {"status": "error", "error": f"X API error: {exc}"}
     except Exception as exc:
-        return {"status": "error", "error": str(exc)}
+        return {"status": "error", "error": f"X unexpected error: {exc}"}
 
 
 def _publish_x_playwright_unused(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
