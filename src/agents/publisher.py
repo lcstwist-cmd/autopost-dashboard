@@ -223,137 +223,74 @@ def publish_telegram(queue: dict[str, Any], dry_run: bool = True) -> dict[str, A
         return {"status": "error", "error": str(exc)}
 
 
-# --- X publisher (Playwright browser automation — no API needed) -----------
+# --- X publisher (tweepy API v2) -------------------------------------------
 
 def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
-    """Post tweet + image by automating the X web interface with Playwright.
-
-    Requires a prior manual login via x_login_helper.py to save session cookies.
-    Headless automation then reuses those cookies — no login form interaction needed.
-    """
+    """Post tweet + image via Twitter/X API v2 using tweepy."""
     text       = queue["post_x"]
     image_path: Path = queue["image_x"]
 
     if dry_run:
         return {"status": "dry_run", "text": text, "image": str(image_path)}
 
-    cookies_file = _HERE / ".x_browser_cookies.json"
-    if not cookies_file.exists():
-        return {
-            "status": "error",
-            "error": (
-                "No saved X session found. "
-                "Run: python src/agents/x_login_helper.py  (opens a browser, log in once)"
-            ),
-        }
+    api_key    = os.environ.get("X_API_KEY", "").strip()
+    api_secret = os.environ.get("X_API_SECRET", "").strip()
+    acc_token  = os.environ.get("X_ACCESS_TOKEN", "").strip()
+    acc_secret = os.environ.get("X_ACCESS_TOKEN_SECRET", "").strip()
+
+    if not all([api_key, api_secret, acc_token, acc_secret]):
+        missing = [k for k, v in {
+            "X_API_KEY": api_key, "X_API_SECRET": api_secret,
+            "X_ACCESS_TOKEN": acc_token, "X_ACCESS_TOKEN_SECRET": acc_secret,
+        }.items() if not v]
+        return {"status": "error", "error": f"X API keys missing: {', '.join(missing)} — set them in Settings"}
 
     try:
-        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+        import tweepy
+    except ImportError:
+        return {"status": "error", "error": "tweepy not installed"}
+
+    try:
+        # Upload image via API v1.1 (media upload only available on v1.1)
+        auth = tweepy.OAuth1UserHandler(api_key, api_secret, acc_token, acc_secret)
+        api_v1 = tweepy.API(auth)
+
+        media_id = None
+        if image_path and image_path.exists():
+            media = api_v1.media_upload(filename=str(image_path))
+            media_id = media.media_id
+
+        # Post tweet via API v2
+        client = tweepy.Client(
+            consumer_key=api_key,
+            consumer_secret=api_secret,
+            access_token=acc_token,
+            access_token_secret=acc_secret,
+        )
+        kwargs: dict = {"text": text[:280]}
+        if media_id:
+            kwargs["media_ids"] = [str(media_id)]
+        resp = client.create_tweet(**kwargs)
+        tweet_id = resp.data["id"]
+        return {"status": "ok", "tweet_id": tweet_id,
+                "url": f"https://x.com/i/web/status/{tweet_id}"}
+
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+def _publish_x_playwright_unused(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
+    """Legacy Playwright method — kept for reference, not used."""
+    if dry_run:
+        return {"status": "dry_run"}
+
+    try:
+        from playwright.sync_api import sync_playwright  # noqa: F401
     except ImportError:
         return {"status": "error",
                 "error": "playwright not installed — run: pip install playwright && playwright install chromium"}
 
-    import json as _json
-
-    try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
-            ctx = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                )
-            )
-            raw_cookies = _json.loads(cookies_file.read_text(encoding="utf-8"))
-            # Sanitize to Playwright-accepted fields only
-            clean_cookies = []
-            for c in raw_cookies:
-                cc: dict = {"name": c["name"], "value": c["value"]}
-                if c.get("domain"):
-                    cc["domain"] = c["domain"]
-                if c.get("path"):
-                    cc["path"] = c["path"]
-                if isinstance(c.get("secure"), bool):
-                    cc["secure"] = c["secure"]
-                if isinstance(c.get("httpOnly"), bool):
-                    cc["httpOnly"] = c["httpOnly"]
-                same = c.get("sameSite", "")
-                if same in ("Strict", "Lax", "None"):
-                    cc["sameSite"] = same
-                if isinstance(c.get("expires"), (int, float)) and c["expires"] > 0:
-                    cc["expires"] = float(c["expires"])
-                clean_cookies.append(cc)
-            ctx.add_cookies(clean_cookies)
-
-            page = ctx.new_page()
-            page.goto("https://x.com/home", wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_timeout(2000)
-
-            if "home" not in page.url:
-                browser.close()
-                return {
-                    "status": "error",
-                    "error": (
-                        f"Session expired (landed on {page.url!r}). "
-                        "Re-run: python src/agents/x_login_helper.py"
-                    ),
-                }
-
-            # Save refreshed cookies
-            cookies_file.write_text(_json.dumps(ctx.cookies(), ensure_ascii=False))
-
-            # Dismiss any popups/overlays (cookie consent, notifications, etc.)
-            for dismiss_sel in [
-                '[data-testid="twc-cc-mask"]',
-                '[data-testid="confirmationSheetConfirm"]',
-                '[aria-label="Close"]',
-            ]:
-                try:
-                    page.click(dismiss_sel, timeout=2000)
-                    page.wait_for_timeout(500)
-                except Exception:
-                    pass
-            # Press Escape to close any open dialogs
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(500)
-
-            # Click the compose / Post button
-            page.wait_for_selector('[data-testid="SideNav_NewTweet_Button"]', timeout=15000)
-            page.click('[data-testid="SideNav_NewTweet_Button"]')
-
-            # Type tweet text — press_sequentially fires real keyboard events for Draft.js
-            page.wait_for_selector('[data-testid="tweetTextarea_0"]', timeout=10000)
-            textarea = page.locator('[data-testid="tweetTextarea_0"]').first
-            textarea.click(force=True)
-            page.wait_for_timeout(300)
-            textarea.press_sequentially(text, delay=20)
-            page.wait_for_timeout(500)
-            # Dismiss any autocomplete dropdown that may block further clicks
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(300)
-
-            # Attach image via "Add photos or video" button
-            if image_path.exists():
-                with page.expect_file_chooser() as fc_info:
-                    page.locator('[aria-label="Add photos or video"]').first.click(force=True)
-                fc_info.value.set_files(str(image_path))
-                page.wait_for_selector('[data-testid="attachments"]', timeout=20000)
-
-            # Submit — modal uses "tweetButton", inline feed uses "tweetButtonInline"
-            for btn_sel in ['[data-testid="tweetButton"]', '[data-testid="tweetButtonInline"]']:
-                try:
-                    page.click(btn_sel, timeout=5000)
-                    break
-                except Exception:
-                    pass
-            page.wait_for_timeout(4000)
-
-            browser.close()
-            return {"status": "ok"}
-
-    except Exception as exc:  # noqa: BLE001
-        return {"status": "error", "error": str(exc)}
+    return {"status": "error", "error": "Legacy playwright method not active"}
 
 
 # --- Orchestrator -----------------------------------------------------------

@@ -87,14 +87,14 @@ def _inject_admin_settings():
             return
         s = get_user_settings(admins[0]["id"])
         mapping = {
-            "ANTHROPIC_API_KEY":   s.get("anthropic_key", ""),
-            "TELEGRAM_TOKEN":      s.get("telegram_token", ""),
-            "TELEGRAM_CHANNEL_ID": s.get("telegram_channel", ""),
-            "X_API_KEY":           s.get("x_api_key", ""),
-            "X_API_SECRET":        s.get("x_api_secret", ""),
-            "X_ACCESS_TOKEN":      s.get("x_access_token", ""),
-            "X_ACCESS_SECRET":     s.get("x_access_secret", ""),
-            "ELEVENLABS_API_KEY":  s.get("elevenlabs_key", ""),
+            "ANTHROPIC_API_KEY":     s.get("anthropic_key", ""),
+            "TELEGRAM_BOT_TOKEN":    s.get("telegram_token", ""),
+            "TELEGRAM_CHAT_ID":      s.get("telegram_channel", ""),
+            "X_API_KEY":             s.get("x_api_key", ""),
+            "X_API_SECRET":          s.get("x_api_secret", ""),
+            "X_ACCESS_TOKEN":        s.get("x_access_token", ""),
+            "X_ACCESS_TOKEN_SECRET": s.get("x_access_secret", ""),
+            "ELEVENLABS_API_KEY":    s.get("elevenlabs_key", ""),
         }
         for k, v in mapping.items():
             if v and not os.environ.get(k):

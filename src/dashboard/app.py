@@ -146,16 +146,17 @@ def _uqueue(request: Request) -> Path:
 def _uenv(settings: dict):
     """Temporarily set user's API keys in os.environ (single publisher thread)."""
     mapping = {
-        "TELEGRAM_TOKEN":      settings.get("telegram_token", ""),
-        "TELEGRAM_CHANNEL_ID": settings.get("telegram_channel", ""),
-        "X_API_KEY":           settings.get("x_api_key", ""),
-        "X_API_SECRET":        settings.get("x_api_secret", ""),
-        "X_ACCESS_TOKEN":      settings.get("x_access_token", ""),
-        "X_ACCESS_SECRET":     settings.get("x_access_secret", ""),
-        "DID_API_KEY":         settings.get("did_api_key", ""),
-        "DID_API_EMAIL":       settings.get("did_email", ""),
-        "ELEVENLABS_API_KEY":  settings.get("elevenlabs_key", ""),
-        "ANTHROPIC_API_KEY":   settings.get("anthropic_key", ""),
+        "TELEGRAM_BOT_TOKEN":      settings.get("telegram_token", ""),
+        "TELEGRAM_CHAT_ID":        settings.get("telegram_channel", ""),
+        "X_API_KEY":               settings.get("x_api_key", ""),
+        "X_API_SECRET":            settings.get("x_api_secret", ""),
+        "X_ACCESS_TOKEN":          settings.get("x_access_token", ""),
+        "X_ACCESS_TOKEN_SECRET":   settings.get("x_access_secret", ""),
+        "DID_API_KEY":             settings.get("did_api_key", ""),
+        "DID_API_EMAIL":           settings.get("did_email", ""),
+        "DID_PRESENTER_URL":       settings.get("did_presenter_url", ""),
+        "ELEVENLABS_API_KEY":      settings.get("elevenlabs_key", ""),
+        "ANTHROPIC_API_KEY":       settings.get("anthropic_key", ""),
     }
     old = {k: os.environ.get(k) for k in mapping}
     for k, v in mapping.items():
