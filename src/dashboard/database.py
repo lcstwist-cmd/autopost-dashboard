@@ -45,19 +45,20 @@ def init_db():
             created_at    TEXT    DEFAULT (datetime('now'))
         );
         CREATE TABLE IF NOT EXISTS user_settings (
-            user_id           INTEGER PRIMARY KEY REFERENCES users(id),
-            telegram_token    TEXT DEFAULT '',
-            telegram_channel  TEXT DEFAULT '',
-            x_api_key         TEXT DEFAULT '',
-            x_api_secret      TEXT DEFAULT '',
-            x_access_token    TEXT DEFAULT '',
-            x_access_secret   TEXT DEFAULT '',
+            user_id               INTEGER PRIMARY KEY REFERENCES users(id),
+            telegram_token        TEXT DEFAULT '',
+            telegram_channel      TEXT DEFAULT '',
+            x_api_key             TEXT DEFAULT '',
+            x_api_secret          TEXT DEFAULT '',
+            x_access_token        TEXT DEFAULT '',
+            x_access_secret       TEXT DEFAULT '',
+            make_x_webhook_url    TEXT DEFAULT '',
             did_api_key           TEXT DEFAULT '',
             did_email             TEXT DEFAULT '',
             did_presenter_url     TEXT DEFAULT '',
             elevenlabs_key        TEXT DEFAULT '',
             anthropic_key         TEXT DEFAULT '',
-            updated_at        TEXT DEFAULT (datetime('now'))
+            updated_at            TEXT DEFAULT (datetime('now'))
         );
         CREATE TABLE IF NOT EXISTS sessions (
             token      TEXT    PRIMARY KEY,
@@ -66,6 +67,20 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
         """)
+        # Migrate existing databases — add columns added after initial deploy
+        _migrate(c)
+
+
+def _migrate(c):
+    """Add new columns to existing databases without dropping data."""
+    new_cols = [
+        ("user_settings", "make_x_webhook_url", "TEXT DEFAULT ''"),
+    ]
+    for table, col, col_def in new_cols:
+        try:
+            c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+        except Exception:
+            pass  # column already exists
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +190,7 @@ def save_user_settings(user_id: int, **kwargs):
     fields = [
         "telegram_token", "telegram_channel",
         "x_api_key", "x_api_secret", "x_access_token", "x_access_secret",
+        "make_x_webhook_url",
         "did_api_key", "did_email", "did_presenter_url", "elevenlabs_key", "anthropic_key",
     ]
     data = {k: kwargs.get(k, "") for k in fields}
@@ -183,10 +199,12 @@ def save_user_settings(user_id: int, **kwargs):
             INSERT INTO user_settings
                 (user_id, telegram_token, telegram_channel,
                  x_api_key, x_api_secret, x_access_token, x_access_secret,
+                 make_x_webhook_url,
                  did_api_key, did_email, did_presenter_url, elevenlabs_key, anthropic_key, updated_at)
             VALUES
                 (:user_id, :telegram_token, :telegram_channel,
                  :x_api_key, :x_api_secret, :x_access_token, :x_access_secret,
+                 :make_x_webhook_url,
                  :did_api_key, :did_email, :did_presenter_url, :elevenlabs_key, :anthropic_key, datetime('now'))
             ON CONFLICT(user_id) DO UPDATE SET
                 telegram_token=excluded.telegram_token,
@@ -195,6 +213,7 @@ def save_user_settings(user_id: int, **kwargs):
                 x_api_secret=excluded.x_api_secret,
                 x_access_token=excluded.x_access_token,
                 x_access_secret=excluded.x_access_secret,
+                make_x_webhook_url=excluded.make_x_webhook_url,
                 did_api_key=excluded.did_api_key,
                 did_email=excluded.did_email,
                 did_presenter_url=excluded.did_presenter_url,

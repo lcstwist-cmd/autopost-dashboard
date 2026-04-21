@@ -223,6 +223,47 @@ def publish_telegram(queue: dict[str, Any], dry_run: bool = True) -> dict[str, A
         return {"status": "error", "error": str(exc)}
 
 
+# --- X via Make.com webhook (free, no API plan needed) ----------------------
+
+def _publish_x_makecom(text: str, image_path: Path, webhook_url: str) -> dict[str, Any]:
+    """POST to a Make.com Custom Webhook that posts to X.
+
+    Make.com setup (once, free at make.com):
+      1. New Scenario → Webhooks > Custom Webhook  (copy the URL to Settings)
+      2. Add module: Twitter (X) > Create a Tweet
+      3. Map: Text = {{1.text}}
+      4. (Optional for image) add Tools > Base64 Decode → Twitter > Upload Media
+         then pass media_id to Create a Tweet
+      5. Save & Activate
+    """
+    try:
+        import requests as _req
+    except ImportError:
+        return {"status": "error", "error": "requests not installed"}
+
+    payload: dict[str, Any] = {"text": text}
+
+    # Attach image as base64 so Make.com can optionally upload it
+    if image_path and image_path.exists():
+        try:
+            with open(image_path, "rb") as fh:
+                payload["image_base64"]  = base64.b64encode(fh.read()).decode()
+                payload["image_filename"] = image_path.name
+        except Exception:
+            pass  # image is optional
+
+    try:
+        resp = _req.post(webhook_url, json=payload, timeout=30)
+        if resp.status_code in (200, 204):
+            return {"status": "ok", "via": "make.com", "response": resp.text[:120]}
+        return {
+            "status": "error",
+            "error": f"Make.com webhook returned HTTP {resp.status_code}: {resp.text[:200]}",
+        }
+    except Exception as exc:
+        return {"status": "error", "error": f"Make.com request failed: {exc}"}
+
+
 # --- X publisher (tweepy API v2) -------------------------------------------
 
 def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
@@ -238,6 +279,12 @@ def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
     if dry_run:
         return {"status": "dry_run", "text": text, "image": str(image_path)}
 
+    # ── Make.com webhook (free, no X API plan needed) ────────────────────────
+    makecom_url = os.environ.get("MAKE_X_WEBHOOK_URL", "").strip()
+    if makecom_url:
+        return _publish_x_makecom(text, image_path, makecom_url)
+
+    # ── Direct tweepy (requires X Basic plan $100/mo for write access) ───────
     api_key    = os.environ.get("X_API_KEY", "").strip()
     api_secret = os.environ.get("X_API_SECRET", "").strip()
     acc_token  = os.environ.get("X_ACCESS_TOKEN", "").strip()
