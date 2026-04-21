@@ -109,7 +109,13 @@
         <h2 class="text-sm font-bold text-white uppercase tracking-wider">🎬 Quick Video Builder</h2>
         <p class="text-xs text-gray-500 mt-0.5">Generează automat MP4 (1080×1920) din cel mai recent slot</p>
       </div>
+      {% if slots %}{% set _l = slots[0] %}
+      <span id="qv-status-badge" class="text-xs px-2 py-1 rounded-full font-semibold {% if _l.has_reel_video %}badge-ok{% elif _l.has_reel_image and _l.has_reel_script %}badge-pub{% elif _l.has_reel_image %}badge-pub{% else %}badge-miss{% endif %}">
+        {% if _l.has_reel_video %}Video gata{% elif _l.has_reel_image and _l.has_reel_script %}Gata de build{% elif _l.has_reel_image %}Imagine gata{% else %}niciun slot gata{% endif %}
+      </span>
+      {% else %}
       <span id="qv-status-badge" class="text-xs px-2 py-1 rounded-full font-semibold badge-miss">niciun slot gata</span>
+      {% endif %}
     </div>
 
     {% if slots %}
@@ -329,31 +335,6 @@
 </div>
 
 <script>
-// ─── Logs ───────────────────────────────────────────────────────────────────
-async function refreshLogs() {
-  const res = await fetch('/api/logs?lines=60');
-  const data = await res.json();
-  const c = document.getElementById('log-container');
-  c.innerHTML = data.lines.map(l => {
-    const cls = l.includes('ERROR') ? 'log-error' : (l.includes('WARNING') ? 'log-warn' : 'log-info');
-    return `<div class="log-line ${cls}">${esc(l)}</div>`;
-  }).join('');
-  c.scrollTop = c.scrollHeight;
-}
-document.getElementById('log-container').scrollTop = 99999;
-// Auto-refresh bot status every 10s
-setInterval(async () => {
-  const r = await fetch('/api/bot-status');
-  const d = await r.json();
-  const dot = document.getElementById('bot-dot');
-  const label = document.getElementById('bot-label');
-  if (dot && label) {
-    dot.className = d.running ? 'dot-on' : 'dot-off';
-    label.textContent = 'Bot ' + (d.running ? 'ON' : 'OFF');
-    label.className = 'text-xs font-semibold ' + (d.running ? 'text-green-400' : 'text-gray-400');
-  }
-}, 10000);
-
 // ─── Search News ─────────────────────────────────────────────────────────────
 let _pendingStory = null;
 
