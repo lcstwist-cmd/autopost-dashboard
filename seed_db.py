@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -33,7 +34,9 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 def _hash(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260_000)
+    return f"{salt}:{h.hex()}"
 
 
 def main() -> None:
