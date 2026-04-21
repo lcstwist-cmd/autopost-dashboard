@@ -294,18 +294,53 @@
   </div>
   {% endif %}
 
-  <!-- Link to backoffice instead of inline logs -->
+  <!-- Admin controls -->
   {% if current_user.is_admin %}
-  <div class="card rounded-xl p-4 flex items-center justify-between">
-    <div>
-      <p class="text-sm font-semibold text-white">Backoffice Admin</p>
-      <p class="text-xs text-gray-500 mt-0.5">Control bot, view logs, manage users and system</p>
+  <div class="card rounded-xl p-5 mb-4">
+    <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">⚙ Admin Controls</p>
+    <div class="flex flex-wrap gap-3 items-center">
+
+      <!-- Manual pipeline triggers -->
+      <form method="post" action="/run-now/morning">
+        <button type="submit"
+          class="px-4 py-2 rounded-lg text-sm font-semibold"
+          style="background:#1e3a5f;color:#60a5fa;border:1px solid #2563eb;cursor:pointer;">
+          🌅 Run Morning Now
+        </button>
+      </form>
+      <form method="post" action="/run-now/evening">
+        <button type="submit"
+          class="px-4 py-2 rounded-lg text-sm font-semibold"
+          style="background:#3b1f5e;color:#c084fc;border:1px solid #7c3aed;cursor:pointer;">
+          🌇 Run Evening Now
+        </button>
+      </form>
+
+      <!-- Bot status + backoffice link -->
+      <div class="flex items-center gap-2 ml-auto">
+        <span class="w-2 h-2 rounded-full {{ 'bg-green-400' if bot.running else 'bg-gray-600' }}"></span>
+        <span class="text-xs {{ 'text-green-400' if bot.running else 'text-gray-500' }}">
+          Bot {{ 'ON' if bot.running else 'OFF' }}
+        </span>
+        {% if not bot.running %}
+        <form method="post" action="/bot/start" class="inline">
+          <button type="submit" class="text-xs px-3 py-1.5 rounded-lg font-semibold"
+            style="background:#064e3b;color:#34d399;border:1px solid #065f46;">▶ Start</button>
+        </form>
+        {% else %}
+        <form method="post" action="/bot/stop" class="inline">
+          <button type="submit" class="text-xs px-3 py-1.5 rounded-lg font-semibold"
+            style="background:#1c0a0a;color:#f87171;border:1px solid #7f1d1d;">⏹ Stop</button>
+        </form>
+        {% endif %}
+        <a href="/admin/backoffice"
+           class="text-xs px-3 py-1.5 rounded-lg font-semibold"
+           style="background:#1e3a5f;color:#60a5fa;border:1px solid #2563eb;">
+          Backoffice →
+        </a>
+      </div>
+
     </div>
-    <a href="/admin/backoffice"
-       class="px-5 py-2 rounded-lg text-sm font-semibold"
-       style="background:#1e3a5f;color:#60a5fa;border:1px solid #2563eb;">
-      Open Backoffice →
-    </a>
   </div>
   {% endif %}
 

@@ -903,7 +903,7 @@ async def generate_reel_scripts(request: Request, name: str):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-def _ensure_reel_assets(d: Path) -> str | None:
+def _ensure_reel_assets(d: Path, settings: dict | None = None) -> str | None:
     top2 = d / "top2.json"
     if not top2.exists():
         return "No top2.json — run pipeline first"
@@ -915,17 +915,21 @@ def _ensure_reel_assets(d: Path) -> str | None:
     if not stories:
         return "No stories in top2.json"
 
+    _s = settings or {}
+
     if not (d / "image_reel_1080x1920.png").exists():
         try:
             from src.agents.image_gen import render_all
-            render_all(stories[0], d, seed=42, sizes=["reel"])
+            with _uenv(_s):
+                render_all(stories[0], d, seed=42, sizes=["reel"])
         except Exception as exc:
             return f"Could not generate background image: {exc}"
 
     if not (d / "reel" / "01_script.txt").exists():
         try:
             from src.agents.reel_writer import write_package
-            write_package(stories[0], d / "reel")
+            with _uenv(_s):
+                write_package(stories[0], d / "reel")
         except Exception as exc:
             return f"Could not generate reel script: {exc}"
 
@@ -939,18 +943,22 @@ async def build_video_route(request: Request, name: str,
     if not d.exists():
         return JSONResponse({"error": f"Slot '{name}' not found"}, status_code=404)
 
+    settings = get_user_settings(request.state.user["id"])
     err = await asyncio.get_event_loop().run_in_executor(
-        _publish_executor, lambda: _ensure_reel_assets(d)
+        _publish_executor, lambda: _ensure_reel_assets(d, settings)
     )
     if err:
         return JSONResponse({"error": err}, status_code=400)
 
     try:
         from src.agents.video_builder import build_video
-        out_path = await asyncio.get_event_loop().run_in_executor(
-            _publish_executor,
-            lambda: build_video(d, use_elevenlabs=use_elevenlabs.lower() in ("true","1","yes")),
-        )
+        use_el = use_elevenlabs.lower() in ("true", "1", "yes")
+
+        def _run_build():
+            with _uenv(settings):
+                return build_video(d, use_elevenlabs=use_el)
+
+        out_path = await asyncio.get_event_loop().run_in_executor(_publish_executor, _run_build)
         size_mb = round(out_path.stat().st_size / 1_048_576, 1)
         return JSONResponse({"ok": True, "file": out_path.name, "size_mb": size_mb})
     except Exception as exc:
@@ -970,7 +978,7 @@ async def build_avatar_video_route(request: Request, name: str,
         return JSONResponse({"error": "D-ID API key not set — go to Settings"}, status_code=400)
 
     err = await asyncio.get_event_loop().run_in_executor(
-        _publish_executor, lambda: _ensure_reel_assets(d)
+        _publish_executor, lambda: _ensure_reel_assets(d, settings)
     )
     if err:
         return JSONResponse({"error": err}, status_code=400)

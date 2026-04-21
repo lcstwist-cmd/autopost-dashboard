@@ -75,6 +75,35 @@ def _today_cutoff_utc(hour_local: int) -> datetime:
     return cutoff_local.astimezone(timezone.utc)
 
 
+def _inject_admin_settings():
+    """Load first admin user's API keys into os.environ if not already set."""
+    try:
+        import sys
+        if str(_REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(_REPO_ROOT))
+        from src.dashboard.database import get_all_users, get_user_settings
+        admins = [u for u in get_all_users() if u.get("is_admin") and u.get("is_approved")]
+        if not admins:
+            return
+        s = get_user_settings(admins[0]["id"])
+        mapping = {
+            "ANTHROPIC_API_KEY":   s.get("anthropic_key", ""),
+            "TELEGRAM_TOKEN":      s.get("telegram_token", ""),
+            "TELEGRAM_CHANNEL_ID": s.get("telegram_channel", ""),
+            "X_API_KEY":           s.get("x_api_key", ""),
+            "X_API_SECRET":        s.get("x_api_secret", ""),
+            "X_ACCESS_TOKEN":      s.get("x_access_token", ""),
+            "X_ACCESS_SECRET":     s.get("x_access_secret", ""),
+            "ELEVENLABS_API_KEY":  s.get("elevenlabs_key", ""),
+        }
+        for k, v in mapping.items():
+            if v and not os.environ.get(k):
+                os.environ[k] = v
+        log.info(f"Loaded API keys from admin user: {admins[0]['email']}")
+    except Exception as exc:
+        log.warning(f"Could not load admin settings from DB: {exc}")
+
+
 def run_slot(slot: str, publish: bool = True) -> bool:
     """Run the full pipeline for one slot. Returns True on success."""
     import os
@@ -83,6 +112,8 @@ def run_slot(slot: str, publish: bool = True) -> bool:
     log.info("=" * 60)
     log.info(f"Starting slot: {slot.upper()}  (publish={publish})")
     log.info("=" * 60)
+
+    _inject_admin_settings()
 
     queue_root = Path(os.environ.get("AUTOPOST_QUEUE", str(_REPO_ROOT / "queue")))
 
