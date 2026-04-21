@@ -360,26 +360,110 @@ def _wrap_text(text: str, font, max_width: int, draw) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Background download
+# Fallback background generator (no network required)
 # ---------------------------------------------------------------------------
 
-def _download_background(prompt: str, width: int, height: int, seed: int):
+def _make_fallback_bg(width: int, height: int, mood: str) -> "Image.Image":
+    """Generate a dark gradient background with PIL when API is unavailable."""
+    from PIL import Image, ImageDraw
+    import math
+
+    base_colors = {
+        "bull":    [(10, 30, 15),  (5, 18, 8)],
+        "bear":    [(30, 8,  8),   (18, 4,  4)],
+        "neutral": [(8,  14, 30),  (4,  8,  20)],
+    }
+    top_c, bot_c = base_colors.get(mood, base_colors["neutral"])
+
+    img = Image.new("RGB", (width, height))
+    draw = ImageDraw.Draw(img)
+    for y in range(height):
+        t = y / height
+        r = int(top_c[0] + (bot_c[0] - top_c[0]) * t)
+        g = int(top_c[1] + (bot_c[1] - top_c[1]) * t)
+        b = int(top_c[2] + (bot_c[2] - top_c[2]) * t)
+        draw.line([(0, y), (width, y)], fill=(r, g, b))
+
+    # Grid lines for a "chart" aesthetic
+    accent = {"bull": (39, 201, 109), "bear": (220, 50, 50), "neutral": (42, 140, 255)}
+    ac = accent.get(mood, accent["neutral"])
+    grid_color = (ac[0] // 4, ac[1] // 4, ac[2] // 4)
+    step_x = width // 8
+    step_y = height // 10
+    for x in range(0, width, step_x):
+        draw.line([(x, 0), (x, height)], fill=grid_color, width=1)
+    for y in range(0, height, step_y):
+        draw.line([(0, y), (width, y)], fill=grid_color, width=1)
+
+    # Diagonal "chart line" for visual interest
+    pts = []
+    for i in range(20):
+        px = int(width * i / 19)
+        noise = math.sin(i * 1.3) * height * 0.08
+        py = int(height * 0.55 - height * 0.15 * (i / 19) + noise)
+        pts.append((px, py))
+    for i in range(len(pts) - 1):
+        draw.line([pts[i], pts[i + 1]], fill=ac, width=max(2, width // 300))
+
+    return img
+
+
+# ---------------------------------------------------------------------------
+# Background download  (with retry + fallback)
+# ---------------------------------------------------------------------------
+
+_POLLINATIONS_MODELS = ["flux", "flux-realism", "turbo"]
+
+
+def _download_background(prompt: str, width: int, height: int, seed: int,
+                         mood: str = "neutral"):
     try:
         import requests
     except ImportError:
         raise SystemExit("requests not installed: pip install requests")
     from PIL import Image
+    import time
 
     encoded = quote(prompt)
-    url = (
-        f"https://image.pollinations.ai/prompt/{encoded}"
-        f"?width={width}&height={height}&seed={seed}&nologo=true&model=flux"
+    delays = [5, 15, 30]  # seconds between retries
+
+    for attempt, model in enumerate(_POLLINATIONS_MODELS):
+        url = (
+            f"https://image.pollinations.ai/prompt/{encoded}"
+            f"?width={width}&height={height}&seed={seed + attempt}"
+            f"&nologo=true&model={model}&enhance=false"
+        )
+        print(f"[image_gen] Pollinations.ai attempt {attempt + 1}/3 (model={model})...",
+              file=sys.stderr)
+        try:
+            resp = requests.get(url, timeout=90)
+            if resp.status_code == 429:
+                wait = delays[min(attempt, len(delays) - 1)]
+                print(f"[image_gen] 429 rate-limit — waiting {wait}s before retry...",
+                      file=sys.stderr)
+                time.sleep(wait)
+                continue
+            if resp.status_code >= 500:
+                wait = delays[min(attempt, len(delays) - 1)]
+                print(f"[image_gen] {resp.status_code} server error — waiting {wait}s...",
+                      file=sys.stderr)
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            img = Image.open(BytesIO(resp.content)).convert("RGB")
+            return img.resize((width, height))
+        except Exception as exc:
+            print(f"[image_gen] attempt {attempt + 1} failed: {exc}", file=sys.stderr)
+            if attempt < len(_POLLINATIONS_MODELS) - 1:
+                time.sleep(delays[attempt])
+
+    # All retries exhausted — use PIL fallback so the pipeline keeps going
+    print(
+        "[image_gen] ⚠ Pollinations.ai unavailable after 3 attempts — "
+        "using local gradient fallback background",
+        file=sys.stderr,
     )
-    print(f"[image_gen] fetching background from Pollinations.ai ...", file=sys.stderr)
-    resp = requests.get(url, timeout=120)
-    resp.raise_for_status()
-    img = Image.open(BytesIO(resp.content)).convert("RGB")
-    return img.resize((width, height))
+    return _make_fallback_bg(width, height, mood)
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +508,7 @@ def render_card(
 
     # ── Background ──────────────────────────────────────────────────────────
     prompt = _pick_bg_prompt(mood, seed, custom_prompt, story=story)
-    bg = _download_background(prompt, width, height, seed)
+    bg = _download_background(prompt, width, height, seed, mood=mood)
 
     # ── Dark gradient overlay (bottom 60%) ──────────────────────────────────
     overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
