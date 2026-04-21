@@ -1,0 +1,133 @@
+{
+  "name": "CryptoAutoPost — X Metrics Puller",
+  "description": "Every 2 hours, reads recent tweet IDs from a Make.com Data Store, fetches public_metrics (impressions/likes/retweets) via the X API v2, and POSTs them to the local metrics receiver (src/agents/metrics_receiver.py) which writes queue/<date>_<slot>/metrics.json and rebuilds the analytics dashboard. Import this into Make.com via 'Create a new scenario' → 'Import blueprint'.",
+  "flow": [
+    {
+      "id": 1,
+      "module": "scheduler:Scheduler",
+      "version": 1,
+      "parameters": {
+        "scheduling": {
+          "type":     "interval",
+          "interval": 120,
+          "unit":     "minutes"
+        }
+      },
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": { "parameters": { "scheduling": { "label": "Every 2 hours" } } }
+      },
+      "_comment_timer": "Adjust interval to taste. X API v2 free tier allows ~1 read per 15s; this scenario stays well below that."
+    },
+    {
+      "id": 2,
+      "module": "datastore:SearchRecords",
+      "version": 1,
+      "parameters": {
+        "datastore": "CryptoAutoPost_Tweets",
+        "limit": 20
+      },
+      "mapper": {
+        "filter": {
+          "field":    "posted_at",
+          "operator": "gte",
+          "value":    "{{addDays(now; -3)}}"
+        },
+        "sort": {
+          "field":     "posted_at",
+          "direction": "desc"
+        }
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "restore": {
+          "parameters": {
+            "datastore": {
+              "data":  { "editable": "true" },
+              "label": "CryptoAutoPost_Tweets (create with columns: tweet_id, date, slot, posted_at)"
+            }
+          }
+        }
+      },
+      "_comment_datastore": "In Make.com → Data Stores → Add. Schema: tweet_id (text), date (text YYYY-MM-DD), slot (text), posted_at (date). Populate by adding a DataStore:AddRecord module to x_publisher.json after CreateATweet (see README)."
+    },
+    {
+      "id": 3,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true,
+        "useNewZLibDeCompress": true
+      },
+      "mapper": {
+        "url":       "https://api.twitter.com/2/tweets/{{2.tweet_id}}?tweet.fields=public_metrics,created_at",
+        "method":    "get",
+        "headers":   [
+          { "name": "Authorization", "value": "Bearer {{env.X_BEARER_TOKEN}}" }
+        ],
+        "parseResponse": true,
+        "timeout":   30
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0 }
+      },
+      "_comment_auth": "Paste your X API v2 App Bearer Token into Make's scenario variables as X_BEARER_TOKEN (read-only is enough). Or replace with an HTTP:OAuth2 module bound to your X connection."
+    },
+    {
+      "id": 4,
+      "module": "util:ComposeTransformer",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "value": "{{toString({ \"date\": 2.date, \"slot\": 2.slot, \"x\": { \"impressions\": 3.data.public_metrics.impression_count, \"likes\": 3.data.public_metrics.like_count, \"retweets\": 3.data.public_metrics.retweet_count, \"replies\": 3.data.public_metrics.reply_count } })}}"
+      },
+      "metadata": {
+        "designer": { "x": 900, "y": 0 }
+      },
+      "_comment_shape": "Builds the JSON body the receiver expects: {date, slot, x: {impressions, likes, retweets}}."
+    },
+    {
+      "id": 5,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true
+      },
+      "mapper": {
+        "url":     "{{env.METRICS_RECEIVER_URL}}/metrics",
+        "method":  "post",
+        "headers": [
+          { "name": "Authorization", "value": "Bearer {{env.METRICS_WEBHOOK_SECRET}}" },
+          { "name": "Content-Type",  "value": "application/json" }
+        ],
+        "bodyType": "raw",
+        "contentType": "application/json",
+        "data":    "{{4.value}}",
+        "parseResponse": true,
+        "timeout": 30
+      },
+      "metadata": {
+        "designer": { "x": 1200, "y": 0 }
+      },
+      "_comment_receiver": "Expose metrics_receiver.py over the internet (e.g. via `ngrok http 8787`) and paste the public URL as METRICS_RECEIVER_URL. The Bearer token must equal METRICS_WEBHOOK_SECRET in your .env."
+    }
+  ],
+  "metadata": {
+    "instant":     false,
+    "version":     1,
+    "scenario": {
+      "roundtrips":    1,
+      "maxErrors":     3,
+      "autoCommit":    true,
+      "autoCommitTriggerLast": true,
+      "sequential":    false,
+      "confidential":  false,
+      "dataloss":      false,
+      "dlq":           false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone":     "eu1.make.com",
+    "notes":    "Prerequisites: (1) create Data Store 'CryptoAutoPost_Tweets' with columns tweet_id|date|slot|posted_at; (2) scenario env vars X_BEARER_TOKEN + METRICS_RECEIVER_URL + METRICS_WEBHOOK_SECRET; (3) run metrics_receiver.py locally and expose with ngrok. To populate the Data Store, add a DataStore:AddRecord step to x_publisher.json (see make_blueprints/README.md)."
+  }
+}

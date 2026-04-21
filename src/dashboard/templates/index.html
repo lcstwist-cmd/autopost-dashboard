@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoPost Dashboard</title>
+<script src="/static/tailwind.js"></script>
+<style>
+  body { background: #0a0f1a; }
+  .card  { background: #111827; border: 1px solid #1f2937; }
+  .panel { background: #0d1423; border: 1px solid #1f2937; }
+  .slot-card:hover { border-color: #374151; }
+  .badge-ok   { background:rgba(52,211,153,.15);  color:#34d399; }
+  .badge-miss { background:rgba(107,114,128,.15); color:#6b7280; }
+  .badge-pub  { background:rgba(96,165,250,.15);  color:#60a5fa; }
+  .log-line   { font-family:monospace; font-size:12px; line-height:1.7; }
+  .log-error  { color:#f87171; }
+  .log-info   { color:#9ca3af; }
+  .log-warn   { color:#fbbf24; }
+  .spinner    { display:inline-block; width:16px; height:16px; border:2px solid #60a5fa;
+                border-top-color:transparent; border-radius:50%;
+                animation:spin .7s linear infinite; vertical-align:middle; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .btn        { padding:7px 16px; border-radius:8px; font-weight:600; font-size:13px;
+                cursor:pointer; border:none; transition:all .15s; }
+  .btn-blue   { background:#1d4ed8; color:#fff; }
+  .btn-blue:hover { background:#2563eb; }
+  .btn-gray   { background:#1f2937; color:#d1d5db; }
+  .btn-gray:hover { background:#374151; }
+  .btn-green  { background:#064e3b; color:#34d399; border:1px solid #065f46; }
+  .btn-green:hover { background:#065f46; }
+  .btn-red    { background:#1c0a0a; color:#f87171; border:1px solid #7f1d1d; }
+  .btn-red:hover { background:#7f1d1d; color:#fff; }
+  .btn-yellow { background:#1c1500; color:#fbbf24; border:1px solid #92400e; }
+  .btn-yellow:hover { background:#78350f; }
+  .story-card { background:#0d1423; border:1px solid #1f2937; border-radius:10px; padding:14px 16px; }
+  .story-card:hover { border-color:#374151; }
+  .dot-on  { width:9px; height:9px; border-radius:50%; background:#34d399;
+             display:inline-block; box-shadow:0 0 6px #34d399; animation:pulse 2s infinite; }
+  .dot-off { width:9px; height:9px; border-radius:50%; background:#6b7280; display:inline-block; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.5;} }
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
+  input[type=number] { background:#0a0f1a; border:1px solid #374151; color:#e5e7eb;
+                       border-radius:6px; padding:5px 10px; width:80px; font-size:13px; }
+</style>
+</head>
+<body class="text-gray-100 min-h-screen">
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header class="sticky top-0 z-10 border-b border-gray-800" style="background:#0d1423;">
+  <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+
+    <div class="flex items-center gap-3">
+      <span class="text-xl">⚡</span>
+      <span class="text-base font-bold text-white tracking-tight">AutoPost</span>
+      <span class="text-xs text-gray-500">EliteMarginDesk</span>
+    </div>
+
+    <div class="flex items-center gap-3">
+
+      <!-- BOT STATUS indicator (mini) -->
+      {% if current_user.is_admin %}
+      <a href="/admin/backoffice" class="flex items-center gap-1.5 px-3 py-1.5 card rounded-lg hover:border-gray-700 transition">
+        <span class="w-2 h-2 rounded-full {{ 'bg-green-400' if bot.running else 'bg-gray-600' }}"></span>
+        <span class="text-xs font-semibold {{ 'text-green-400' if bot.running else 'text-gray-500' }}">
+          Bot {{ 'ON' if bot.running else 'OFF' }}
+        </span>
+      </a>
+      {% endif %}
+
+      <button class="btn btn-green" onclick="document.getElementById('quick-video').scrollIntoView({behavior:'smooth'})">
+        🎬 Video
+      </button>
+
+      <!-- USER MENU -->
+      <div class="flex items-center gap-2 border-l border-gray-700 pl-3">
+        {% if current_user.is_admin and pending_count > 0 %}
+        <a href="/admin/users" class="flex items-center gap-1 text-xs text-yellow-400 font-bold px-2 py-1 rounded" style="background:#1a1400;border:1px solid #713f12;">
+          ⏳ {{ pending_count }} pending
+        </a>
+        {% endif %}
+        {% if current_user.is_admin %}
+        <a href="/admin/users" class="text-xs text-gray-500 hover:text-gray-300">👥 Users</a>
+        {% endif %}
+        <a href="/settings" class="text-xs text-gray-500 hover:text-gray-300">⚙ Settings</a>
+        <span class="text-xs text-gray-600">{{ current_user.display_name or current_user.email }}</span>
+        <form method="post" action="/logout">
+          <button type="submit" class="text-xs text-gray-600 hover:text-red-400 px-2 py-1 rounded border border-gray-800">Logout</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-7xl mx-auto px-6 py-6">
+
+  <!-- FLASH MESSAGES -->
+  {% if triggered %}
+  <div class="mb-4 px-4 py-3 rounded-lg text-sm badge-pub border border-blue-800">
+    ✅ Pipeline triggered in background — check logs for progress.
+  </div>
+  {% endif %}
+
+  <!-- ═══════════════ QUICK VIDEO ═══════════════ -->
+  <div id="quick-video" class="card rounded-xl p-5 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-sm font-bold text-white uppercase tracking-wider">🎬 Quick Video Builder</h2>
+        <p class="text-xs text-gray-500 mt-0.5">Generează automat MP4 (1080×1920) din cel mai recent slot</p>
+      </div>
+      <span id="qv-status-badge" class="text-xs px-2 py-1 rounded-full font-semibold badge-miss">niciun slot gata</span>
+    </div>
+
+    {% if slots %}
+    {% set latest = slots[0] %}
+    <div class="flex flex-col md:flex-row md:items-center gap-4">
+
+      <!-- Slot info -->
+      <div class="flex-1 min-w-0">
+        <p class="text-white text-sm font-semibold mb-1">{{ latest.name }}</p>
+        {% if latest.stories %}
+        <p class="text-xs text-gray-400 leading-relaxed truncate">📰 {{ latest.stories[0] }}</p>
+        {% endif %}
+        <div class="flex gap-2 mt-2">
+          <span class="{{ 'badge-ok' if latest.has_reel_image else 'badge-miss' }} text-xs px-2 py-0.5 rounded font-mono">
+            {{ '✓' if latest.has_reel_image else '✗' }} Imagine 9:16
+          </span>
+          <span class="{{ 'badge-ok' if latest.has_reel_script else 'badge-miss' }} text-xs px-2 py-0.5 rounded font-mono">
+            {{ '✓' if latest.has_reel_script else '✗' }} Script
+          </span>
+          <span class="{{ 'badge-ok' if latest.has_reel_video else 'badge-miss' }} text-xs px-2 py-0.5 rounded font-mono">
+            {{ '✓' if latest.has_reel_video else '✗' }} Video MP4
+          </span>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-wrap gap-2 items-center">
+        {% if latest.has_reel_image and latest.has_reel_script %}
+        <button onclick="quickBuildVideo('{{ latest.name }}')" id="qv-btn"
+          class="btn btn-green flex items-center gap-2">
+          🎬 MP4 simplu
+        </button>
+        <button onclick="quickBuildAvatarVideo('{{ latest.name }}')" id="qv-btn-avatar"
+          class="btn flex items-center gap-2" style="background:#1a2e1a;color:#4ade80;border:1px solid #166534;">
+          🧑 Avatar AI (D-ID)
+        </button>
+        {% elif not latest.has_reel_script %}
+        <button onclick="quickBuildWithReel('{{ latest.name }}')" id="qv-btn"
+          class="btn btn-yellow flex items-center gap-2">
+          ⚡ Generează Script + MP4
+        </button>
+        {% endif %}
+
+        {% if latest.has_reel_video %}
+        <a href="/video/{{ latest.name }}/reel_final.mp4" download
+           class="btn btn-gray flex items-center gap-2 text-sm">
+          ⬇ Descarcă MP4
+        </a>
+        <a href="/slot/{{ latest.name }}#video" class="text-xs text-blue-400 hover:text-blue-300 px-1">
+          Deschide slot →
+        </a>
+        {% else %}
+        <a href="/slot/{{ latest.name }}" class="text-xs text-gray-500 hover:text-gray-300 px-1">
+          Deschide slot →
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Spinner + result -->
+    <div id="qv-spinner" class="hidden mt-4 flex items-center gap-2 text-green-400 text-sm">
+      <span class="spinner"></span>Se generează video... (~30-60 secunde)
+    </div>
+    <div id="qv-error" class="hidden mt-3 text-red-400 text-sm"></div>
+    <div id="qv-result" class="hidden mt-4">
+      <div class="flex flex-col md:flex-row gap-4 items-start">
+        <div class="bg-black rounded-xl overflow-hidden" style="width:160px; flex-shrink:0;">
+          <video id="qv-player" controls playsinline
+            style="width:160px; aspect-ratio:9/16; object-fit:contain; background:#000;"></video>
+        </div>
+        <div class="flex flex-col gap-2 justify-center">
+          <p class="text-green-400 text-sm font-semibold">Video generat cu succes!</p>
+          <p id="qv-meta" class="text-xs text-gray-400"></p>
+          <a id="qv-download" href="#" download class="btn btn-gray text-sm inline-flex items-center gap-2">
+            ⬇ Descarcă reel_final.mp4
+          </a>
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+    <p class="text-gray-500 text-sm">Nu există slot-uri în queue. Rulează Morning sau Evening mai întâi.</p>
+    {% endif %}
+  </div>
+
+  <!-- ═══════════════ STATS ═══════════════ -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div class="card rounded-xl p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Queue Slots</p>
+      <p class="text-3xl font-bold text-white">{{ total }}</p>
+    </div>
+    <div class="card rounded-xl p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Published Today</p>
+      <p class="text-3xl font-bold text-green-400">{{ published_today }}</p>
+    </div>
+    <div class="card rounded-xl p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Morning Slot</p>
+      <p class="text-2xl font-bold text-gray-300">08:00</p>
+    </div>
+    <div class="card rounded-xl p-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Evening Slot</p>
+      <p class="text-2xl font-bold text-gray-300">18:00</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SEARCH NEWS ═══════════════ -->
+  <div class="card rounded-xl p-6 mb-8">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-sm font-bold text-white uppercase tracking-wider">🔍 Search News</h2>
+        <p class="text-xs text-gray-500 mt-0.5">Fetch & rank latest crypto stories, then generate a post instantly</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="text-xs text-gray-400">Last
+          <input type="number" id="hours-back" value="12" min="1" max="48"> hours
+        </label>
+        <button class="btn btn-blue" onclick="searchNews()">
+          <span id="search-btn-text">🔍 Search Now</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search results -->
+    <div id="search-status" class="text-sm text-gray-500 hidden"></div>
+    <div id="search-results" class="space-y-3 mt-2"></div>
+  </div>
+
+  <!-- ═══════════════ QUEUE GRID ═══════════════ -->
+  <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Scheduled Queue</h2>
+
+  {% if not slots %}
+  <div class="card rounded-xl p-12 text-center text-gray-500 mb-8">
+    No queue slots yet. Use "Search News" or run the pipeline to generate posts.
+  </div>
+  {% else %}
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-10">
+    {% for s in slots %}
+    <a href="/slot/{{ s.name }}"
+       class="card slot-card rounded-xl p-5 block transition" style="text-decoration:none;">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <p class="font-bold text-white text-sm">{{ s.name }}</p>
+          {% if s.story_count %}
+          <p class="text-xs text-gray-500 mt-0.5">{{ s.story_count }} candidates analyzed</p>
+          {% endif %}
+        </div>
+        {% if s.published %}
+        <span class="badge-pub text-xs px-2 py-0.5 rounded-full font-semibold">published</span>
+        {% else %}
+        <span class="badge-miss text-xs px-2 py-0.5 rounded-full font-semibold">pending</span>
+        {% endif %}
+      </div>
+
+      {% if s.stories %}
+      <p class="text-xs text-gray-300 mb-3 leading-relaxed">
+        📰 {{ s.stories[0] }}{% if s.stories|length > 1 %}
+        <br><span class="text-gray-500">+{{ s.stories|length - 1 }} more</span>{% endif %}
+      </p>
+      {% endif %}
+
+      {% if s.post_x_preview %}
+      <p class="text-xs text-gray-500 italic leading-relaxed border-t border-gray-800 pt-3">
+        {{ s.post_x_preview }}…
+      </p>
+      {% endif %}
+
+      <div class="flex gap-1.5 mt-3">
+        <span class="{{ 'badge-ok' if s.has_post_x else 'badge-miss' }} text-xs px-1.5 py-0.5 rounded font-mono">X</span>
+        <span class="{{ 'badge-ok' if s.has_post_tg else 'badge-miss' }} text-xs px-1.5 py-0.5 rounded font-mono">TG</span>
+        <span class="{{ 'badge-ok' if s.has_image_x else 'badge-miss' }} text-xs px-1.5 py-0.5 rounded font-mono">IMG</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Link to backoffice instead of inline logs -->
+  {% if current_user.is_admin %}
+  <div class="card rounded-xl p-4 flex items-center justify-between">
+    <div>
+      <p class="text-sm font-semibold text-white">Backoffice Admin</p>
+      <p class="text-xs text-gray-500 mt-0.5">Control bot, view logs, manage users and system</p>
+    </div>
+    <a href="/admin/backoffice"
+       class="px-5 py-2 rounded-lg text-sm font-semibold"
+       style="background:#1e3a5f;color:#60a5fa;border:1px solid #2563eb;">
+      Open Backoffice →
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- ═══════════════ GENERATE MODAL ═══════════════ -->
+<div id="gen-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden"
+     style="background:rgba(0,0,0,.7);">
+  <div class="card rounded-2xl p-6 w-full max-w-lg mx-4">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <p class="font-bold text-white text-sm">Generate Post</p>
+        <p id="gen-modal-title" class="text-xs text-gray-400 mt-1"></p>
+      </div>
+      <button onclick="closeGenModal()" class="text-gray-500 hover:text-white text-lg leading-none">&times;</button>
+    </div>
+    <label class="text-xs text-gray-400">Slot label <span class="text-gray-600">(optional)</span></label>
+    <input id="gen-slot-label" type="text" value="manual"
+           class="mt-1 mb-4 w-full px-3 py-2 rounded-lg text-sm"
+           style="background:#0a0f1a;border:1px solid #374151;color:#e5e7eb;">
+    <div class="flex gap-2">
+      <button class="btn btn-blue flex-1" onclick="doGenerate()">
+        <span id="gen-btn-text">⚡ Generate Post</span>
+      </button>
+      <button class="btn btn-gray" onclick="closeGenModal()">Cancel</button>
+    </div>
+    <div id="gen-error" class="text-red-400 text-xs mt-3 hidden"></div>
+  </div>
+</div>
+
+<script>
+// ─── Logs ───────────────────────────────────────────────────────────────────
+async function refreshLogs() {
+  const res = await fetch('/api/logs?lines=60');
+  const data = await res.json();
+  const c = document.getElementById('log-container');
+  c.innerHTML = data.lines.map(l => {
+    const cls = l.includes('ERROR') ? 'log-error' : (l.includes('WARNING') ? 'log-warn' : 'log-info');
+    return `<div class="log-line ${cls}">${esc(l)}</div>`;
+  }).join('');
+  c.scrollTop = c.scrollHeight;
+}
+document.getElementById('log-container').scrollTop = 99999;
+// Auto-refresh bot status every 10s
+setInterval(async () => {
+  const r = await fetch('/api/bot-status');
+  const d = await r.json();
+  const dot = document.getElementById('bot-dot');
+  const label = document.getElementById('bot-label');
+  if (dot && label) {
+    dot.className = d.running ? 'dot-on' : 'dot-off';
+    label.textContent = 'Bot ' + (d.running ? 'ON' : 'OFF');
+    label.className = 'text-xs font-semibold ' + (d.running ? 'text-green-400' : 'text-gray-400');
+  }
+}, 10000);
+
+// ─── Search News ─────────────────────────────────────────────────────────────
+let _pendingStory = null;
+
+async function searchNews() {
+  const hours = document.getElementById('hours-back').value || 12;
+  const btn = document.getElementById('search-btn-text');
+  const status = document.getElementById('search-status');
+  const results = document.getElementById('search-results');
+
+  btn.innerHTML = '<span class="spinner"></span>Searching…';
+  status.textContent = `Fetching news from the last ${hours} hours…`;
+  status.classList.remove('hidden');
+  results.innerHTML = '';
+
+  const form = new FormData();
+  form.append('hours_back', hours);
+
+  try {
+    const res = await fetch('/api/search-news', { method: 'POST', body: form });
+    const data = await res.json();
+    btn.textContent = '🔍 Search Now';
+    status.classList.add('hidden');
+
+    if (data.error) {
+      results.innerHTML = `<p class="text-red-400 text-sm">Error: ${esc(data.error)}</p>`;
+      return;
+    }
+
+    const stories = data.stories || [];
+    if (!stories.length) {
+      results.innerHTML = `<p class="text-gray-500 text-sm">No stories found for the last ${hours}h.</p>`;
+      return;
+    }
+
+    results.innerHTML = `
+      <p class="text-xs text-gray-500 mb-3">${stories.length} stories ranked from ${data.total} candidates</p>
+      ${stories.map((s, i) => `
+      <div class="story-card flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-bold text-blue-400">#${i+1}</span>
+            ${s.tickers.map(t => `<span class="text-xs px-1.5 py-0.5 rounded font-mono badge-ok">${esc(t)}</span>`).join('')}
+            <span class="text-xs text-gray-600">${esc(s.source)}</span>
+            ${s._score_total ? `<span class="text-xs text-gray-600">score: ${s._score_total}</span>` : ''}
+          </div>
+          <p class="text-sm text-gray-200 leading-snug mb-1 font-medium">${esc(s.title)}</p>
+          ${s.summary ? `<p class="text-xs text-gray-500 leading-relaxed">${esc(s.summary.slice(0, 200))}…</p>` : ''}
+          ${s._rationale ? `<p class="text-xs text-gray-600 italic mt-1">${esc(s._rationale)}</p>` : ''}
+          ${s.url ? `<a href="${s.url}" target="_blank" class="text-xs text-blue-500 hover:text-blue-400 mt-1 inline-block">🔗 Read article</a>` : ''}
+        </div>
+        <button class="btn btn-yellow flex-shrink-0" style="font-size:12px;padding:5px 12px;"
+                onclick="openGenModal(${i})">
+          ⚡ Generate
+        </button>
+      </div>`).join('')}`;
+
+    // Store stories for generate modal
+    window._searchStories = stories;
+
+  } catch (e) {
+    btn.textContent = '🔍 Search Now';
+    status.classList.add('hidden');
+    results.innerHTML = `<p class="text-red-400 text-sm">Network error: ${esc(e.message)}</p>`;
+  }
+}
+
+// ─── Generate Modal ──────────────────────────────────────────────────────────
+function openGenModal(idx) {
+  const story = (window._searchStories || [])[idx];
+  if (!story) return;
+  _pendingStory = story;
+  document.getElementById('gen-modal-title').textContent = story.title.slice(0, 80);
+  document.getElementById('gen-modal').classList.remove('hidden');
+  document.getElementById('gen-error').classList.add('hidden');
+}
+function closeGenModal() {
+  document.getElementById('gen-modal').classList.add('hidden');
+  _pendingStory = null;
+}
+async function doGenerate() {
+  if (!_pendingStory) return;
+  const label = document.getElementById('gen-slot-label').value || 'manual';
+  const btn = document.getElementById('gen-btn-text');
+  const errEl = document.getElementById('gen-error');
+  btn.innerHTML = '<span class="spinner"></span>Generating…';
+  errEl.classList.add('hidden');
+
+  const form = new FormData();
+  form.append('story_json', JSON.stringify(_pendingStory));
+  form.append('slot_suffix', label);
+
+  try {
+    const res = await fetch('/api/generate-from-story', { method: 'POST', body: form });
+    const data = await res.json();
+    btn.textContent = '⚡ Generate Post';
+    if (data.error) {
+      errEl.textContent = 'Error: ' + data.error;
+      errEl.classList.remove('hidden');
+    } else {
+      window.location.href = data.url;
+    }
+  } catch (e) {
+    btn.textContent = '⚡ Generate Post';
+    errEl.textContent = 'Network error: ' + e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+// Close modal on backdrop click
+document.getElementById('gen-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeGenModal();
+});
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Quick Video Builder ────────────────────────────────────────────────────
+async function quickBuildVideo(slotName) {
+  const btn     = document.getElementById('qv-btn');
+  const spinner = document.getElementById('qv-spinner');
+  const errEl   = document.getElementById('qv-error');
+  const resEl   = document.getElementById('qv-result');
+  const badge   = document.getElementById('qv-status-badge');
+
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  errEl.classList.add('hidden');
+  resEl.classList.add('hidden');
+
+  try {
+    const fd = new FormData();
+    fd.append('use_elevenlabs', 'false');
+    const r = await fetch(`/api/slot/${slotName}/build-video`, { method: 'POST', body: fd });
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || r.statusText);
+
+    const url = `/video/${slotName}/reel_final.mp4?t=${Date.now()}`;
+    document.getElementById('qv-player').src = url;
+    document.getElementById('qv-download').href = url;
+    document.getElementById('qv-meta').textContent = `reel_final.mp4 — ${data.size_mb} MB`;
+    badge.className = 'text-xs px-2 py-1 rounded-full font-semibold badge-ok';
+    badge.textContent = 'Video gata';
+    resEl.classList.remove('hidden');
+  } catch (e) {
+    errEl.textContent = 'Eroare: ' + e.message;
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+  }
+}
+
+async function quickBuildAvatarVideo(slotName) {
+  const btn     = document.getElementById('qv-btn-avatar');
+  const spinner = document.getElementById('qv-spinner');
+  const errEl   = document.getElementById('qv-error');
+  const resEl   = document.getElementById('qv-result');
+  const badge   = document.getElementById('qv-status-badge');
+
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  spinner.querySelector('p') && (spinner.querySelector('p').textContent = 'D-ID generează avatarul... (2-3 min)');
+  errEl.classList.add('hidden');
+  resEl.classList.add('hidden');
+
+  try {
+    const fd = new FormData();
+    fd.append('presenter', 'alex_suit');
+    const r = await fetch(`/api/slot/${slotName}/build-avatar-video`, { method: 'POST', body: fd });
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || r.statusText);
+
+    const url = `/video/${slotName}/reel_avatar.mp4?t=${Date.now()}`;
+    document.getElementById('qv-player').src = url;
+    document.getElementById('qv-download').href = url;
+    document.getElementById('qv-meta').textContent = `reel_avatar.mp4 — ${data.size_mb} MB`;
+    badge.className = 'text-xs px-2 py-1 rounded-full font-semibold badge-ok';
+    badge.textContent = 'Avatar gata';
+    resEl.classList.remove('hidden');
+  } catch (e) {
+    errEl.textContent = 'Eroare: ' + e.message;
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+  }
+}
+
+async function quickBuildWithReel(slotName) {
+  const btn     = document.getElementById('qv-btn');
+  const spinner = document.getElementById('qv-spinner');
+  const errEl   = document.getElementById('qv-error');
+
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  errEl.classList.add('hidden');
+  spinner.querySelector('span + span') && (spinner.querySelector('span + span').textContent = 'Generez script reel... ');
+
+  try {
+    // Step 1: generate reel scripts
+    const fd1 = new FormData();
+    const r1 = await fetch(`/api/slot/${slotName}/generate-reel`, { method: 'POST', body: fd1 });
+    if (!r1.ok) { const d = await r1.json(); throw new Error(d.error || r1.statusText); }
+    // Step 2: build video
+    await quickBuildVideo(slotName);
+  } catch (e) {
+    errEl.textContent = 'Eroare: ' + e.message;
+    errEl.classList.remove('hidden');
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+  }
+}
+</script>
+</body>
+</html>

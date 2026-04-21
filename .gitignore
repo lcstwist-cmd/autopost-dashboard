@@ -1,0 +1,40 @@
+# Environment & secrets
+.env
+*.env
+
+# Database (contains user passwords/keys — never commit)
+autopost.db
+autopost.db-shm
+autopost.db-wal
+
+# Queue data (user-generated content)
+queue/
+
+# Logs & runtime
+scheduler.log
+scheduler.pid
+dashboard.log
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+env/
+.venv/
+
+# Analytics / reports
+analytics/
+backtest_report.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

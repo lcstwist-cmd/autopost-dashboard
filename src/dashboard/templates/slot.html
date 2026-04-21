@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ name }} — AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<style>
+  body { background: #0a0f1a; }
+  .card { background: #111827; border: 1px solid #1f2937; }
+  .panel { background: #0d1423; border: 1px solid #1f2937; }
+  textarea { background: #0a0f1a; border: 1px solid #374151; color: #e5e7eb;
+             resize: vertical; font-family: ui-monospace, monospace; font-size: 13px;
+             line-height: 1.6; border-radius: 8px; padding: 12px; width: 100%; }
+  textarea:focus { outline: none; border-color: #3b82f6; }
+  .btn-primary   { background:#1d4ed8; color:#fff; padding:8px 18px; border-radius:8px;
+                   font-weight:600; font-size:14px; cursor:pointer; border:none;
+                   transition:background .15s; }
+  .btn-primary:hover { background:#2563eb; }
+  .btn-secondary { background:#1f2937; color:#d1d5db; padding:8px 18px; border-radius:8px;
+                   font-weight:600; font-size:14px; cursor:pointer; border:none;
+                   transition:background .15s; }
+  .btn-secondary:hover { background:#374151; }
+  .btn-ai        { background:#1a2e1a; color:#4ade80; padding:8px 18px; border-radius:8px;
+                   font-weight:600; font-size:14px; cursor:pointer; border:1px solid #166534;
+                   transition:all .15s; }
+  .btn-ai:hover  { background:#14532d; border-color:#22c55e; }
+  .btn-danger    { background:#1c0a0a; color:#f87171; padding:8px 18px; border-radius:8px;
+                   font-weight:600; font-size:14px; cursor:pointer; border:1px solid #7f1d1d;
+                   transition:all .15s; }
+  .btn-danger:hover { background:#7f1d1d; color:#fff; }
+  .btn-publish   { background:#064e3b; color:#34d399; padding:8px 18px; border-radius:8px;
+                   font-weight:600; font-size:14px; cursor:pointer; border:1px solid #065f46;
+                   transition:all .15s; }
+  .btn-publish:hover { background:#065f46; }
+  .char-count    { font-size: 12px; color: #6b7280; text-align: right; margin-top: 4px; }
+  .alert-ok      { background:rgba(52,211,153,.12); border:1px solid rgba(52,211,153,.3);
+                   color:#34d399; border-radius:8px; padding:10px 16px; font-size:14px; }
+  .alert-ai      { background:#0a1a0a; border:1px solid #166534; border-radius:8px;
+                   padding:12px 14px; margin-top:10px; }
+  .ai-spinner    { display:inline-block; width:14px; height:14px; border:2px solid #4ade80;
+                   border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .story-score   { font-size:11px; color:#6b7280; }
+  .score-bar     { height:4px; border-radius:2px; background:#1f2937; }
+  .score-fill    { height:4px; border-radius:2px; background:#3b82f6; }
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
+  .tab-active    { border-bottom:2px solid #3b82f6; color:#60a5fa; }
+  .tab-inactive  { border-bottom:2px solid transparent; color:#6b7280; }
+  .tab-inactive:hover { color:#9ca3af; }
+</style>
+</head>
+<body class="text-gray-100 min-h-screen">
+
+<!-- HEADER -->
+<header class="sticky top-0 z-10 border-b border-gray-800" style="background:#0d1423;">
+  <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-gray-400 hover:text-white text-sm">← Dashboard</a>
+      <span class="text-gray-700">/</span>
+      <span class="font-bold text-white">{{ name }}</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/settings" class="text-xs text-gray-500 hover:text-gray-300">⚙ Settings</a>
+      <form method="post" action="/logout">
+        <button type="submit" class="text-xs text-gray-600 hover:text-red-400 px-2 py-1 rounded border border-gray-800">Logout</button>
+      </form>
+      <form method="post" action="/slot/{{ name }}/delete">
+        <button type="submit" class="btn-danger" onclick="return confirm('Delete this slot permanently?')">
+          🗑 Delete
+        </button>
+      </form>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-5xl mx-auto px-6 py-6">
+
+  <!-- FLASH MESSAGES -->
+  {% if saved %}
+  <div class="alert-ok mb-4">✅ Saved successfully.</div>
+  {% endif %}
+  {% if regenerated %}
+  <div class="alert-ok mb-4">✅ Posts regenerated from template.</div>
+  {% endif %}
+  {% if published %}
+  <div class="alert-ok mb-4">✅ Published!</div>
+  {% endif %}
+
+  <!-- PUBLISH STATUS -->
+  {% if publish_log %}
+  <div class="card rounded-xl p-4 mb-6 text-sm">
+    <p class="text-gray-400 text-xs uppercase tracking-wider mb-2">Last Publish</p>
+    <div class="flex flex-wrap gap-3">
+      <span class="text-gray-500">{{ publish_log.timestamp[:19].replace('T',' ') if publish_log.timestamp else '' }}</span>
+      <span class="{{ 'text-green-400' if not publish_log.dry_run else 'text-gray-400' }}">
+        {{ '🔴 LIVE' if not publish_log.dry_run else '🔵 Dry-run' }}
+      </span>
+      {% for plat, res in (publish_log.results or {}).items() %}
+      <span class="{{ 'text-green-400' if res.status == 'ok' else 'text-red-400' }}">
+        {{ plat }}: {{ res.status }}{% if res.status == 'error' %} — {{ res.error }}{% endif %}
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- LEFT: Stories + Images -->
+    <div class="lg:col-span-1 space-y-4">
+
+      <!-- Stories -->
+      <div class="card rounded-xl p-4">
+        <p class="text-xs text-gray-400 uppercase tracking-wider mb-3">
+          Top Stories
+          {% if total_candidates %}
+          <span class="text-gray-600 normal-case ml-1">({{ total_candidates }} analyzed)</span>
+          {% endif %}
+        </p>
+        {% if stories %}
+          {% for s in stories %}
+          <div class="{% if not loop.first %}border-t border-gray-800 pt-3 mt-3{% endif %}">
+            <p class="text-sm text-gray-200 leading-snug mb-1">{{ s.title }}</p>
+            <div class="flex flex-wrap gap-2 text-xs text-gray-500">
+              <span>{{ s.source }}</span>
+              {% if s._score_total %}<span class="text-blue-400">score: {{ s._score_total }}</span>{% endif %}
+              {% if s.tickers %}<span class="text-yellow-400">{{ s.tickers | join(' ') }}</span>{% endif %}
+            </div>
+            {% if s._rationale %}
+            <p class="text-xs text-gray-600 mt-1 italic">{{ s._rationale }}</p>
+            {% endif %}
+            {% if s.url %}
+            <a href="{{ s.url }}" target="_blank" class="text-xs text-blue-500 hover:text-blue-400 mt-1 block">
+              🔗 Read article
+            </a>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-gray-500 text-sm">No story data found.</p>
+        {% endif %}
+      </div>
+
+      <!-- Regenerate posts -->
+      <form method="post" action="/slot/{{ name }}/regenerate">
+        <button type="submit" class="btn-secondary w-full">
+          🔄 Regenerate Posts from Template
+        </button>
+      </form>
+
+    </div>
+
+    <!-- RIGHT: Post editors -->
+    <div class="lg:col-span-2 space-y-6">
+
+      <!-- TABS -->
+      <!-- ═══ PUBLISH BAR — always visible ═══ -->
+      <div class="rounded-xl p-4 mb-2" style="background:#061a10;border:2px solid #065f46;">
+        <div class="flex flex-wrap items-center gap-3">
+
+          <!-- Platform toggles -->
+          <div class="flex gap-2">
+            <button id="btn-plat-telegram" onclick="togglePlatform('telegram')"
+              class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border-2 transition"
+              style="background:#0d1e35;border-color:#2563eb;color:#60a5fa;">
+              ✈ Telegram
+            </button>
+            <button id="btn-plat-x" onclick="togglePlatform('x')"
+              class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border-2 transition"
+              style="background:#0d1e35;border-color:#2563eb;color:#60a5fa;">
+              ✖ X
+            </button>
+          </div>
+
+          <div class="w-px h-8 bg-gray-700"></div>
+
+          <!-- Variant -->
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs text-gray-500">Varianta:</span>
+            <button id="vbtn-auto" onclick="setVariant('auto')"
+              class="px-2.5 py-1.5 rounded-lg text-xs font-bold border transition"
+              style="background:#1e3a5f;border-color:#2563eb;color:#93c5fd;">Auto</button>
+            <button id="vbtn-A" onclick="setVariant('A')"
+              class="px-2.5 py-1.5 rounded-lg text-xs font-bold border transition"
+              style="background:#0a0f1a;border-color:#374151;color:#6b7280;">A</button>
+            <button id="vbtn-B" onclick="setVariant('B')"
+              class="px-2.5 py-1.5 rounded-lg text-xs font-bold border transition"
+              style="background:#0a0f1a;border-color:#374151;color:#6b7280;">B</button>
+          </div>
+
+          <div class="w-px h-8 bg-gray-700"></div>
+
+          <!-- Dry-run toggle -->
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <div onclick="toggleDryRun()" id="dry-toggle"
+                 class="w-9 h-5 rounded-full relative transition-colors duration-200 cursor-pointer"
+                 style="background:#374151;">
+              <div id="dry-thumb" class="w-4 h-4 bg-white rounded-full absolute top-0.5 left-0.5 transition-transform duration-200 pointer-events-none"></div>
+            </div>
+            <span id="dry-label" class="text-xs text-gray-400">Simulare</span>
+          </label>
+
+          <!-- PUBLISH BUTTON -->
+          <button onclick="doPublish()" id="pub-btn"
+                  class="ml-auto px-6 py-2.5 rounded-xl font-bold text-sm transition"
+                  style="background:#059669;color:#fff;border:none;cursor:pointer;">
+            🚀 Publică acum
+          </button>
+        </div>
+
+        <!-- Result -->
+        <div id="pub-result" style="display:none;" class="mt-3 pt-3 border-t border-green-900">
+          <div id="pub-result-inner"></div>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="flex gap-0 border-b border-gray-800 mb-0 overflow-x-auto">
+        <button onclick="showTab('x')"   id="tab-x"   class="tab-active   px-4 py-2 text-sm font-medium transition whitespace-nowrap">✖ X Post A</button>
+        <button onclick="showTab('x_b')" id="tab-x_b" class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap">✖ X Post B</button>
+        <button onclick="showTab('tg')"  id="tab-tg"  class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap">✈ Telegram</button>
+        <button onclick="showTab('img')"    id="tab-img"    class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap">🖼 Images</button>
+        <button onclick="showTab('avatar')" id="tab-avatar" class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap">🤖 Avatar</button>
+        <button onclick="showTab('video')"  id="tab-video"  class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap">🎬 Video</button>
+      </div>
+
+      <!-- X POST A -->
+      <div id="panel-x">
+        <div class="panel rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-semibold text-gray-300">X / Twitter — Variant A <span class="text-xs text-gray-500">(factual hook)</span></p>
+          </div>
+          <form method="post" action="/slot/{{ name }}/save-x" id="form-x">
+            <input type="hidden" name="variant" value="a">
+            <textarea id="ta-x" name="content" rows="14"
+                      oninput="updateCount('ta-x','cnt-x')">{{ post_x }}</textarea>
+            <p class="char-count" id="cnt-x"></p>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <button type="submit" class="btn-primary">💾 Save</button>
+              <button type="button" class="btn-ai" onclick="openAI('x')">✨ Rewrite with AI</button>
+            </div>
+          </form>
+          <!-- AI Panel A -->
+          <div id="ai-x" class="ai-spinner-panel" style="display:none;">
+            <div class="alert-ai mt-3">
+              <p class="text-xs text-green-400 font-semibold mb-2">✨ AI Rewrite — Variant A</p>
+              <textarea id="ai-instructions-x" rows="2" placeholder="Optional instructions... (e.g. 'more aggressive tone', 'focus on price impact')"
+                        style="font-size:12px;"></textarea>
+              <div class="flex gap-2 mt-2">
+                <button class="btn-ai" onclick="runAI('x')">Generate</button>
+                <button class="btn-secondary" onclick="closeAI('x')" style="padding:6px 14px;font-size:13px;">Cancel</button>
+              </div>
+              <div id="ai-result-x" style="display:none;" class="mt-3">
+                <textarea id="ai-text-x" rows="10" style="font-size:12px;"></textarea>
+                <div class="flex gap-2 mt-2">
+                  <button class="btn-primary" onclick="applyAI('x')" style="font-size:13px;padding:6px 14px;">✅ Use this</button>
+                  <button class="btn-secondary" onclick="runAI('x')" style="font-size:13px;padding:6px 14px;">↻ Retry</button>
+                </div>
+              </div>
+              <div id="ai-loading-x" style="display:none;" class="flex items-center gap-2 mt-2 text-green-400 text-sm">
+                <div class="ai-spinner"></div> Generating…
+              </div>
+              <div id="ai-error-x" class="mt-2 text-red-400 text-sm" style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- X POST B -->
+      <div id="panel-x_b" style="display:none;">
+        <div class="panel rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-semibold text-gray-300">X / Twitter — Variant B <span class="text-xs text-gray-500">(question hook)</span></p>
+          </div>
+          <form method="post" action="/slot/{{ name }}/save-x" id="form-x_b">
+            <input type="hidden" name="variant" value="b">
+            <textarea id="ta-x_b" name="content" rows="14"
+                      oninput="updateCount('ta-x_b','cnt-x_b')">{{ post_x_b }}</textarea>
+            <p class="char-count" id="cnt-x_b"></p>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <button type="submit" class="btn-primary">💾 Save</button>
+              <button type="button" class="btn-ai" onclick="openAI('x_b')">✨ Rewrite with AI</button>
+            </div>
+          </form>
+          <div id="ai-x_b" style="display:none;">
+            <div class="alert-ai mt-3">
+              <p class="text-xs text-green-400 font-semibold mb-2">✨ AI Rewrite — Variant B</p>
+              <textarea id="ai-instructions-x_b" rows="2" placeholder="Optional instructions…" style="font-size:12px;"></textarea>
+              <div class="flex gap-2 mt-2">
+                <button class="btn-ai" onclick="runAI('x_b')">Generate</button>
+                <button class="btn-secondary" onclick="closeAI('x_b')" style="padding:6px 14px;font-size:13px;">Cancel</button>
+              </div>
+              <div id="ai-result-x_b" style="display:none;" class="mt-3">
+                <textarea id="ai-text-x_b" rows="10" style="font-size:12px;"></textarea>
+                <div class="flex gap-2 mt-2">
+                  <button class="btn-primary" onclick="applyAI('x_b')" style="font-size:13px;padding:6px 14px;">✅ Use this</button>
+                  <button class="btn-secondary" onclick="runAI('x_b')" style="font-size:13px;padding:6px 14px;">↻ Retry</button>
+                </div>
+              </div>
+              <div id="ai-loading-x_b" style="display:none;" class="flex items-center gap-2 mt-2 text-green-400 text-sm">
+                <div class="ai-spinner"></div> Generating…
+              </div>
+              <div id="ai-error-x_b" class="mt-2 text-red-400 text-sm" style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMAGES PANEL -->
+      <div id="panel-img" style="display:none;">
+        <div class="panel rounded-xl p-5 space-y-6">
+          <p class="text-sm font-semibold text-gray-300">Image Editor</p>
+
+          <!-- Controls shared between both sizes -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-lg" style="background:#0a0f1a;border:1px solid #374151;">
+            <div>
+              <label class="text-xs text-gray-400 block mb-1">Mood</label>
+              <select id="img-mood" class="w-full rounded-lg px-3 py-2 text-sm"
+                      style="background:#111827;border:1px solid #374151;color:#e5e7eb;">
+                <option value="auto">Auto (from story)</option>
+                <option value="bull">Bull 📈</option>
+                <option value="bear">Bear 🚨</option>
+                <option value="neutral">Neutral 📰</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-400 block mb-1">Seed <span class="text-gray-600">(−1 = random)</span></label>
+              <input id="img-seed" type="number" value="-1" min="-1" max="99999"
+                     class="w-full rounded-lg px-3 py-2 text-sm"
+                     style="background:#111827;border:1px solid #374151;color:#e5e7eb;width:100%;">
+            </div>
+            <div>
+              <label class="text-xs text-gray-400 block mb-1">Target</label>
+              <select id="img-target" class="w-full rounded-lg px-3 py-2 text-sm"
+                      style="background:#111827;border:1px solid #374151;color:#e5e7eb;">
+                <option value="both">Both (X + Telegram)</option>
+                <option value="x">X only (1200×675)</option>
+                <option value="tg">Telegram only (1080×1080)</option>
+              </select>
+            </div>
+            <div class="sm:col-span-3">
+              <label class="text-xs text-gray-400 block mb-1">Custom background prompt <span class="text-gray-600">(optional — overrides default)</span></label>
+              <input id="img-prompt" type="text" placeholder="e.g. dark futuristic city skyline, golden bitcoin symbol, neon lights, cinematic..."
+                     class="w-full rounded-lg px-3 py-2 text-sm"
+                     style="background:#111827;border:1px solid #374151;color:#e5e7eb;">
+            </div>
+            <div class="sm:col-span-3 flex gap-2">
+              <button class="btn-ai flex-1" onclick="regenImage()">
+                <span id="regen-btn-text">🎨 Regenerate Image</span>
+              </button>
+              <span id="regen-status" class="text-xs text-gray-500 self-center hidden"></span>
+            </div>
+            <div id="regen-error" class="sm:col-span-3 text-red-400 text-xs hidden"></div>
+          </div>
+
+          <!-- Upload section -->
+          <div class="p-4 rounded-lg" style="background:#0a0f1a;border:1px solid #374151;">
+            <p class="text-xs text-gray-400 font-semibold mb-3 uppercase tracking-wider">Upload Custom Image</p>
+            <p class="text-xs text-gray-500 mb-3">Upload your own PNG/JPG. Will be automatically resized to both X (1200×675) and Telegram (1080×1080) formats.</p>
+            <div class="flex flex-wrap items-center gap-3">
+              <select id="upload-target" class="rounded-lg px-3 py-2 text-sm"
+                      style="background:#111827;border:1px solid #374151;color:#e5e7eb;">
+                <option value="both">Both sizes</option>
+                <option value="x">X only</option>
+                <option value="tg">Telegram only</option>
+              </select>
+              <label class="btn-secondary cursor-pointer" style="padding:8px 16px;font-size:13px;font-weight:600;border-radius:8px;">
+                📂 Choose file
+                <input type="file" id="upload-file" accept="image/*" class="hidden" onchange="uploadImage()">
+              </label>
+              <span id="upload-status" class="text-xs text-gray-500"></span>
+            </div>
+            <div id="upload-error" class="text-red-400 text-xs mt-2 hidden"></div>
+          </div>
+
+          <!-- Image previews -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider">X — 1200×675</p>
+                <a id="dl-x" href="/image/{{ name }}/image_x_1200x675.png" download
+                   class="text-xs text-blue-400 hover:text-blue-300">⬇ Download</a>
+              </div>
+              {% if has_image_x %}
+              <img id="preview-x" src="/image/{{ name }}/image_x_1200x675.png?t={{ name }}"
+                   class="rounded-lg w-full border border-gray-800" alt="X image">
+              {% else %}
+              <div id="preview-x" class="rounded-lg w-full flex items-center justify-center text-gray-600 text-sm"
+                   style="background:#0a0f1a;border:1px dashed #374151;aspect-ratio:16/9;">
+                No image yet
+              </div>
+              {% endif %}
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Telegram — 1080×1080</p>
+                <a id="dl-tg" href="/image/{{ name }}/image_tg_1080x1080.png" download
+                   class="text-xs text-blue-400 hover:text-blue-300">⬇ Download</a>
+              </div>
+              {% if has_image_tg %}
+              <img id="preview-tg" src="/image/{{ name }}/image_tg_1080x1080.png?t={{ name }}"
+                   class="rounded-lg w-full border border-gray-800" alt="TG image">
+              {% else %}
+              <div id="preview-tg" class="rounded-lg w-full flex items-center justify-center text-gray-600 text-sm"
+                   style="background:#0a0f1a;border:1px dashed #374151;aspect-ratio:1/1;">
+                No image yet
+              </div>
+              {% endif %}
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- PUBLISH PANEL -->
+      <div id="panel-pub" style="display:none;">
+        <div class="panel rounded-xl p-6 space-y-5">
+
+          <div>
+            <p class="text-sm font-bold text-white mb-1">Publish Post</p>
+            <p class="text-xs text-gray-500">Seleaza platformele, varianta si apasa Publish.</p>
+          </div>
+
+          <!-- Platforms -->
+          <div>
+            <p class="text-xs text-gray-400 uppercase tracking-wider mb-3 font-semibold">Platforme</p>
+            <div class="grid grid-cols-2 gap-3">
+              <label id="lbl-telegram" class="flex items-center gap-3 p-4 rounded-xl cursor-pointer border-2 border-blue-600 transition"
+                     style="background:#0d1e35;" onclick="togglePlatform('telegram')">
+                <input type="checkbox" id="chk-telegram" checked class="hidden">
+                <span class="text-2xl">✈</span>
+                <div>
+                  <p class="font-bold text-sm text-white">Telegram</p>
+                  <p class="text-xs text-gray-400">@elitemargindesk</p>
+                </div>
+                <span id="chk-telegram-icon" class="ml-auto text-blue-400 text-lg">✓</span>
+              </label>
+              <label id="lbl-x" class="flex items-center gap-3 p-4 rounded-xl cursor-pointer border-2 border-blue-600 transition"
+                     style="background:#0d1e35;" onclick="togglePlatform('x')">
+                <input type="checkbox" id="chk-x" checked class="hidden">
+                <span class="text-2xl">✖</span>
+                <div>
+                  <p class="font-bold text-sm text-white">X / Twitter</p>
+                  <p class="text-xs text-gray-400">@ELITEMARGINDESK</p>
+                </div>
+                <span id="chk-x-icon" class="ml-auto text-blue-400 text-lg">✓</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- X Variant + Dry-run -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs text-gray-400 uppercase tracking-wider mb-2 font-semibold">Varianta X</p>
+              <div class="flex gap-2">
+                {% for v, label in [('auto','Auto'), ('A','A — Factual'), ('B','B — Hook')] %}
+                <button onclick="setVariant('{{ v }}')" id="var-btn-{{ v }}"
+                        class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition
+                               {{ 'border-blue-500 text-blue-300' if v == 'auto' else 'border-gray-700 text-gray-400' }}"
+                        style="background:#0a0f1a;">{{ label }}</button>
+                {% endfor %}
+              </div>
+              <input type="hidden" id="selected-variant" value="auto">
+            </div>
+            <div>
+              <p class="text-xs text-gray-400 uppercase tracking-wider mb-2 font-semibold">Mod</p>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <div onclick="toggleDryRun()" id="dry-toggle"
+                     class="w-10 h-5 rounded-full relative transition-colors duration-200"
+                     style="background:#374151;">
+                  <div id="dry-thumb" class="w-4 h-4 bg-white rounded-full absolute top-0.5 left-0.5 transition-transform duration-200"></div>
+                </div>
+                <span id="dry-label" class="text-sm text-gray-400">Dry-run</span>
+              </label>
+              <p class="text-xs text-gray-600 mt-1">Dezactivat = postare reala</p>
+            </div>
+          </div>
+
+          <!-- Preview rezumat -->
+          <div class="p-4 rounded-lg text-xs" style="background:#0a0f1a;border:1px solid #374151;">
+            <p class="text-gray-500 mb-2 font-semibold uppercase tracking-wider">Preview postare X</p>
+            <p class="text-gray-300 leading-relaxed whitespace-pre-wrap" id="pub-preview-text" style="max-height:120px;overflow:hidden;">{{ post_x[:300] }}{% if post_x|length > 300 %}…{% endif %}</p>
+          </div>
+
+          <!-- Publish button -->
+          <button onclick="doPublish()" id="pub-btn"
+                  class="w-full py-3 rounded-xl font-bold text-base transition"
+                  style="background:#065f46;color:#34d399;border:2px solid #059669;">
+            🚀 Publică acum
+          </button>
+
+          <!-- Result -->
+          <div id="pub-result" style="display:none;" class="rounded-xl overflow-hidden border border-gray-700">
+            <div id="pub-result-inner" class="p-5 space-y-3"></div>
+          </div>
+
+          <!-- Previous publish log -->
+          {% if publish_log %}
+          <div class="pt-4 border-t border-gray-800">
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">Ultima publicare</p>
+            <div class="text-xs space-y-1">
+              <p class="text-gray-500">{{ publish_log.timestamp[:19].replace('T',' ') if publish_log.timestamp else '' }}
+                — <span class="{{ 'text-red-400' if not publish_log.dry_run else 'text-gray-500' }}">
+                  {{ 'LIVE' if not publish_log.dry_run else 'dry-run' }}
+                </span>
+                — varianta <span class="text-blue-400">{{ publish_log.variant or '?' }}</span>
+              </p>
+              {% for plat, res in (publish_log.results or {}).items() %}
+              <p class="{{ 'text-green-400' if res.status == 'ok' else 'text-red-400' }}">
+                {{ plat }}: {{ res.status }}{% if res.get('error') %} — {{ res.error }}{% endif %}
+              </p>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+
+      <!-- TELEGRAM -->
+      <div id="panel-tg" style="display:none;">
+        <div class="panel rounded-xl p-5">
+          <p class="text-sm font-semibold text-gray-300 mb-3">Telegram Post</p>
+          <form method="post" action="/slot/{{ name }}/save-tg" id="form-tg">
+            <textarea id="ta-tg" name="content" rows="14"
+                      oninput="updateCount('ta-tg','cnt-tg')">{{ post_tg }}</textarea>
+            <p class="char-count" id="cnt-tg"></p>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <button type="submit" class="btn-primary">💾 Save</button>
+              <button type="button" class="btn-ai" onclick="openAI('tg')">✨ Rewrite with AI</button>
+            </div>
+          </form>
+          <div id="ai-tg" style="display:none;">
+            <div class="alert-ai mt-3">
+              <p class="text-xs text-green-400 font-semibold mb-2">✨ AI Rewrite — Telegram</p>
+              <textarea id="ai-instructions-tg" rows="2" placeholder="Optional instructions…" style="font-size:12px;"></textarea>
+              <div class="flex gap-2 mt-2">
+                <button class="btn-ai" onclick="runAI('tg')">Generate</button>
+                <button class="btn-secondary" onclick="closeAI('tg')" style="padding:6px 14px;font-size:13px;">Cancel</button>
+              </div>
+              <div id="ai-result-tg" style="display:none;" class="mt-3">
+                <textarea id="ai-text-tg" rows="10" style="font-size:12px;"></textarea>
+                <div class="flex gap-2 mt-2">
+                  <button class="btn-primary" onclick="applyAI('tg')" style="font-size:13px;padding:6px 14px;">✅ Use this</button>
+                  <button class="btn-secondary" onclick="runAI('tg')" style="font-size:13px;padding:6px 14px;">↻ Retry</button>
+                </div>
+              </div>
+              <div id="ai-loading-tg" style="display:none;" class="flex items-center gap-2 mt-2 text-green-400 text-sm">
+                <div class="ai-spinner"></div> Generating…
+              </div>
+              <div id="ai-error-tg" class="mt-2 text-red-400 text-sm" style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AVATAR PANEL -->
+      <div id="panel-avatar" style="display:none;">
+        <div class="panel rounded-xl p-5">
+          <h3 class="text-white font-bold text-base mb-1">🤖 AI Avatar Video Package</h3>
+          <p class="text-gray-400 text-sm mb-4">Generează script 30s + 60s pentru HeyGen/ElevenLabs + metadata optimizată per platformă (TikTok · Reels · Shorts).</p>
+
+          <!-- Generate button -->
+          <div class="flex items-center gap-3 mb-5">
+            <button onclick="generateAvatar()" id="btn-avatar"
+              class="btn-primary flex items-center gap-2">
+              🎬 Generează Script Avatar
+            </button>
+            <label class="flex items-center gap-2 text-gray-400 text-sm cursor-pointer">
+              <input type="checkbox" id="avatar-llm" class="accent-green-500">
+              ✨ Îmbunătățit cu AI (Claude)
+            </label>
+            <span id="avatar-spinner" style="display:none" class="text-green-400 text-sm flex items-center gap-2">
+              <div class="ai-spinner"></div> Generez…
+            </span>
+          </div>
+
+          <div id="avatar-result" style="display:none;">
+            <!-- Mood badge -->
+            <div class="flex items-center gap-2 mb-4">
+              <span id="avatar-mood-badge" class="px-3 py-1 rounded-full text-xs font-bold"></span>
+              <span class="text-gray-400 text-xs">sentiment detectat automat din titlul știrii</span>
+            </div>
+
+            <!-- Hook preview -->
+            <div class="rounded-lg p-3 mb-4" style="background:#0d1f0d;border:1px solid #1a3a1a;">
+              <div class="text-gray-500 text-xs mb-1">HOOK (primele 3 secunde)</div>
+              <div id="avatar-hook" class="text-white text-sm font-medium"></div>
+            </div>
+
+            <!-- Scripts accordion -->
+            <div class="space-y-3 mb-5">
+              <details class="rounded-lg overflow-hidden" style="background:#111827;border:1px solid #1f2937;">
+                <summary class="px-4 py-3 cursor-pointer text-white text-sm font-medium hover:bg-gray-800 list-none flex items-center justify-between">
+                  <span>📄 Script 30 secunde</span>
+                  <span class="text-gray-500 text-xs">↓ click să vezi</span>
+                </summary>
+                <div class="px-4 py-3">
+                  <pre id="script-30" class="text-gray-300 text-xs whitespace-pre-wrap font-mono leading-relaxed"></pre>
+                </div>
+              </details>
+              <details class="rounded-lg overflow-hidden" style="background:#111827;border:1px solid #1f2937;">
+                <summary class="px-4 py-3 cursor-pointer text-white text-sm font-medium hover:bg-gray-800 list-none flex items-center justify-between">
+                  <span>📄 Script 60 secunde (YouTube Shorts)</span>
+                  <span class="text-gray-500 text-xs">↓ click să vezi</span>
+                </summary>
+                <div class="px-4 py-3">
+                  <pre id="script-60" class="text-gray-300 text-xs whitespace-pre-wrap font-mono leading-relaxed"></pre>
+                </div>
+              </details>
+            </div>
+
+            <!-- Platform cards -->
+            <h4 class="text-white font-semibold text-sm mb-3">📲 Optimizare algoritm per platformă</h4>
+            <div class="grid gap-3" id="platform-cards">
+              <!-- Filled by JS -->
+            </div>
+
+            <!-- Download links -->
+            <div class="mt-5 pt-4" style="border-top:1px solid #1f2937;">
+              <div class="text-gray-400 text-xs mb-2">Fișiere generate în <code class="text-green-400">queue/{{ name }}/avatar/</code>:</div>
+              <div id="avatar-files" class="flex flex-wrap gap-2"></div>
+            </div>
+          </div>
+
+          <div id="avatar-error" class="text-red-400 text-sm mt-3" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- VIDEO PANEL -->
+      <div id="panel-video" style="display:none;">
+        <div class="panel rounded-xl p-5">
+          <h3 class="text-white font-bold text-base mb-1">🧑 Avatar AI Video Generator</h3>
+          <p class="text-gray-400 text-sm mb-4">
+            Un singur buton: generează automat <strong class="text-white">script + imagine 9:16 + avatar D-ID</strong>.<br>
+            Rezultat: <span class="text-green-400">reel_avatar.mp4</span> (1080×1920, ready for TikTok / Reels / Shorts).
+          </p>
+
+          <!-- Presenter selector -->
+          <div class="mb-4">
+            <label class="text-xs text-gray-400 block mb-2 font-semibold uppercase tracking-wider">Avatar prezentator</label>
+            <select id="avatar-presenter" class="text-sm rounded-lg px-3 py-2 w-full"
+              style="background:#0a0f1a;border:1px solid #374151;color:#e5e7eb;max-width:360px;">
+              <optgroup label="Barbati">
+                <option value="alex_suit">Alex — costum negru (recomandat)</option>
+                <option value="william">William — camasa neagra</option>
+                <option value="arran">Arran — sacou bej</option>
+                <option value="alex_casual">Alex — camasa casual</option>
+                <option value="darren">Darren</option>
+                <option value="ethan">Ethan</option>
+                <option value="lucas">Lucas</option>
+                <option value="jaimie">Jaimie</option>
+              </optgroup>
+              <optgroup label="Femei">
+                <option value="anita">Anita — profesionala</option>
+                <option value="diana">Diana — profesionala</option>
+                <option value="sophia">Sophia</option>
+                <option value="lana">Lana</option>
+                <option value="amber">Amber</option>
+                <option value="flora">Flora</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <!-- ONE BIG BUTTON -->
+          <button onclick="buildAvatarVideo()" id="btn-avatar-video"
+            class="w-full py-4 rounded-xl font-bold text-base transition mb-2"
+            style="background:#065f46;color:#34d399;border:2px solid #059669;cursor:pointer;font-size:16px;">
+            🧑 Generează Script + Imagine + Avatar AI
+          </button>
+          <p class="text-xs text-gray-600 mb-4">~2-3 minute • 1 credit D-ID • totul automat</p>
+
+          <!-- Spinner with step indicator -->
+          <div id="video-spinner" style="display:none;" class="rounded-lg p-4 mb-4" style="background:#0a1a0a;border:1px solid #166534;">
+            <div class="flex items-center gap-3 text-green-400 text-sm font-medium">
+              <div class="ai-spinner"></div>
+              <span id="video-spinner-text">Se pregătește...</span>
+            </div>
+            <div id="video-steps" class="mt-3 space-y-1 text-xs text-gray-500">
+              <div id="step-script"  class="flex items-center gap-2"><span id="step-script-icon">⏳</span> Script reel</div>
+              <div id="step-image"   class="flex items-center gap-2"><span id="step-image-icon">⏳</span> Imagine fundal 9:16</div>
+              <div id="step-did"     class="flex items-center gap-2"><span id="step-did-icon">⏳</span> Avatar D-ID (polling...)</div>
+              <div id="step-compose" class="flex items-center gap-2"><span id="step-compose-icon">⏳</span> Compozitie finala</div>
+            </div>
+          </div>
+
+          <!-- Result -->
+          <div id="video-result" style="display:none;">
+            <div class="bg-black rounded-xl overflow-hidden mb-4" style="max-width:360px;">
+              <video id="video-player" controls playsinline
+                style="width:100%; aspect-ratio:9/16; object-fit:contain; background:#000;">
+              </video>
+            </div>
+            <div id="video-meta" class="text-xs text-green-400 font-semibold mb-3"></div>
+            <a id="video-download" href="#" download
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+              style="background:#1f2937;color:#d1d5db;border:1px solid #374151;">
+              ⬇ Descarcă MP4
+            </a>
+          </div>
+
+          <!-- Previous video -->
+          {% if reel_video %}
+          <div class="mt-4 pt-4 border-t border-gray-800">
+            <p class="text-xs text-gray-500 mb-2">Video generat anterior:</p>
+            <div class="bg-black rounded-xl overflow-hidden mb-3" style="max-width:360px;">
+              <video controls playsinline
+                style="width:100%; aspect-ratio:9/16; object-fit:contain; background:#000;"
+                src="/video/{{ name }}/reel_avatar.mp4"></video>
+            </div>
+            <a href="/video/{{ name }}/reel_avatar.mp4" download
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+              style="background:#1f2937;color:#d1d5db;border:1px solid #374151;">
+              ⬇ Descarcă reel_avatar.mp4
+            </a>
+          </div>
+          {% endif %}
+
+          <!-- Fallback: basic MP4 (no avatar) -->
+          <details class="mt-5">
+            <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-400">
+              ▸ Generează MP4 simplu (fara avatar, mai rapid)
+            </summary>
+            <div class="mt-3 flex flex-wrap items-center gap-3">
+              <button onclick="buildVideo()" id="btn-video"
+                class="px-4 py-2 rounded-lg text-sm font-semibold"
+                style="background:#1f2937;color:#d1d5db;border:1px solid #374151;cursor:pointer;">
+                🎬 Generează MP4 simplu
+              </button>
+              <label class="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                <input type="checkbox" id="video-elevenlabs" class="accent-green-500">
+                ElevenLabs TTS
+              </label>
+            </div>
+          </details>
+
+          <div id="video-error" class="text-red-400 text-sm mt-3" style="display:none;"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const SLOT = "{{ name }}";
+
+// --- Tabs ---
+function showTab(id) {
+  ['x','x_b','tg','img','avatar','video'].forEach(t => {
+    document.getElementById('panel-' + t).style.display = t === id ? '' : 'none';
+    const tab = document.getElementById('tab-' + t);
+    tab.className = tab.className.replace(/tab-active|tab-inactive/g,'');
+    tab.className += ' ' + (t === id ? 'tab-active' : 'tab-inactive');
+  });
+}
+
+// --- Char counter ---
+function updateCount(taId, cntId) {
+  const ta = document.getElementById(taId);
+  const el = document.getElementById(cntId);
+  if (!ta || !el) return;
+  const len = ta.value.length;
+  el.textContent = len + ' characters';
+  el.style.color = len > 24000 ? '#f87171' : '#6b7280';
+}
+
+// Init counts on load
+['x','x_b','tg'].forEach(id => {
+  updateCount('ta-' + id, 'cnt-' + id);
+});
+
+// --- AI Rewrite ---
+function openAI(platform) {
+  document.getElementById('ai-' + platform).style.display = '';
+}
+function closeAI(platform) {
+  document.getElementById('ai-' + platform).style.display = 'none';
+  document.getElementById('ai-result-' + platform).style.display = 'none';
+  document.getElementById('ai-error-' + platform).style.display = 'none';
+}
+
+async function runAI(platform) {
+  const instructions = document.getElementById('ai-instructions-' + platform).value;
+  const loading = document.getElementById('ai-loading-' + platform);
+  const resultDiv = document.getElementById('ai-result-' + platform);
+  const errorDiv = document.getElementById('ai-error-' + platform);
+
+  loading.style.display = 'flex';
+  resultDiv.style.display = 'none';
+  errorDiv.style.display = 'none';
+
+  const form = new FormData();
+  form.append('platform', platform);
+  form.append('instructions', instructions);
+
+  try {
+    const res = await fetch(`/api/slot/${SLOT}/ai-rewrite`, {
+      method: 'POST', body: form
+    });
+    const data = await res.json();
+    loading.style.display = 'none';
+    if (data.error) {
+      errorDiv.textContent = '❌ ' + data.error;
+      errorDiv.style.display = '';
+    } else {
+      document.getElementById('ai-text-' + platform).value = data.text;
+      resultDiv.style.display = '';
+    }
+  } catch (e) {
+    loading.style.display = 'none';
+    errorDiv.textContent = '❌ Network error: ' + e.message;
+    errorDiv.style.display = '';
+  }
+}
+
+// --- Publish bar ---
+let _dryRun = false;
+const _platforms = new Set(['telegram', 'x']);
+let _variant = 'auto';
+
+function togglePlatform(p) {
+  if (_platforms.has(p)) _platforms.delete(p); else _platforms.add(p);
+  const on = _platforms.has(p);
+  const btn = document.getElementById('btn-plat-' + p);
+  btn.style.borderColor = on ? '#2563eb' : '#374151';
+  btn.style.background  = on ? '#0d1e35' : '#0a0f1a';
+  btn.style.color       = on ? '#60a5fa' : '#6b7280';
+}
+
+function setVariant(v) {
+  _variant = v;
+  ['auto','A','B'].forEach(vv => {
+    const b = document.getElementById('vbtn-' + vv);
+    if (!b) return;
+    const on = vv === v;
+    b.style.background   = on ? '#1e3a5f' : '#0a0f1a';
+    b.style.borderColor  = on ? '#2563eb'  : '#374151';
+    b.style.color        = on ? '#93c5fd'  : '#6b7280';
+  });
+}
+
+function toggleDryRun() {
+  _dryRun = !_dryRun;
+  document.getElementById('dry-toggle').style.background = _dryRun ? '#3b82f6' : '#374151';
+  document.getElementById('dry-thumb').style.transform   = _dryRun ? 'translateX(16px)' : 'translateX(0)';
+  const lbl = document.getElementById('dry-label');
+  lbl.textContent = _dryRun ? 'Simulare ON' : 'Simulare';
+  lbl.style.color = _dryRun ? '#93c5fd' : '#9ca3af';
+  const pubBtn = document.getElementById('pub-btn');
+  pubBtn.style.background = _dryRun ? '#1e3a5f' : '#059669';
+  pubBtn.textContent = _dryRun ? '🔵 Simulează' : '🚀 Publică acum';
+}
+
+async function doPublish() {
+  if (_platforms.size === 0) { alert('Selecteaza cel putin o platforma!'); return; }
+  const btn        = document.getElementById('pub-btn');
+  const resultBox  = document.getElementById('pub-result');
+  const resultInner= document.getElementById('pub-result-inner');
+
+  if (!_dryRun && !confirm(`Publici LIVE pe: ${[..._platforms].join(' + ')} ?\nVarianta X: ${_variant}`)) return;
+
+  btn.textContent = '⏳ Se trimite…';
+  btn.disabled = true;
+  resultBox.style.display = 'none';
+
+  const form = new FormData();
+  form.append('platforms', [..._platforms].join(','));
+  form.append('variant',   _variant === 'auto' ? '' : _variant);
+  form.append('dry_run',   _dryRun ? 'true' : 'false');
+
+  try {
+    const res  = await fetch(`/api/slot/${SLOT}/publish-live`, { method:'POST', body:form });
+    const data = await res.json();
+
+    btn.textContent = _dryRun ? '🔵 Simulează' : '🚀 Publică acum';
+    btn.disabled = false;
+
+    if (data.error) {
+      resultInner.innerHTML = `<p style="color:#f87171;font-weight:600;">❌ ${esc(data.error)}</p>`;
+      resultBox.style.display = '';
+      return;
+    }
+    if (data.status === 'blocked') {
+      const errs = (data.errors||[]).map(e=>`<li>${esc(e)}</li>`).join('');
+      resultInner.innerHTML = `<p style="color:#fbbf24;font-weight:600;">⚠️ Blocat:</p><ul style="color:#fde68a;font-size:12px;padding-left:16px;">${errs}</ul>`;
+      resultBox.style.display = '';
+      return;
+    }
+
+    let html = `<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
+      <strong style="color:${_dryRun?'#60a5fa':'#34d399'}">${_dryRun?'🔵 SIMULARE':'🟢 PUBLICAT'}</strong>
+      <span style="color:#6b7280;font-size:12px;">${data.timestamp?data.timestamp.slice(0,19).replace('T',' '):''}</span>
+      <span style="color:#6b7280;font-size:12px;">varianta: <strong style="color:#93c5fd">${data.variant||'?'}</strong></span>
+    </div>`;
+    for (const [plat, r] of Object.entries(data.results||{})) {
+      const ok = r.status==='ok'||r.status==='dry_run';
+      html += `<div style="display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:8px;background:#0a0f1a;border:1px solid ${ok?'#065f46':'#7f1d1d'};margin-bottom:6px;">
+        <span style="font-size:18px">${r.status==='ok'?'✅':r.status==='dry_run'?'🔵':'❌'}</span>
+        <div>
+          <strong style="color:${ok?'#34d399':'#f87171'};font-size:13px;">${plat.toUpperCase()} — ${r.status}</strong>
+          ${r.error?`<p style="color:#fca5a5;font-size:12px;margin-top:4px;">${esc(r.error)}</p>`:''}
+          ${r.message_id?`<p style="color:#6b7280;font-size:11px;margin-top:2px;">id: ${r.message_id}</p>`:''}
+        </div>
+      </div>`;
+    }
+    resultInner.innerHTML = html;
+    resultBox.style.display = '';
+  } catch(e) {
+    btn.textContent = _dryRun ? '🔵 Simulează' : '🚀 Publică acum';
+    btn.disabled = false;
+    resultInner.innerHTML = `<p style="color:#f87171;">❌ ${esc(e.message)}</p>`;
+    resultBox.style.display = '';
+  }
+}
+
+// --- Image regenerate ---
+async function regenImage() {
+  const mood   = document.getElementById('img-mood').value;
+  const seed   = document.getElementById('img-seed').value;
+  const target = document.getElementById('img-target').value;
+  const prompt = document.getElementById('img-prompt').value;
+  const btn    = document.getElementById('regen-btn-text');
+  const status = document.getElementById('regen-status');
+  const errEl  = document.getElementById('regen-error');
+
+  btn.innerHTML = '<span class="ai-spinner"></span> Generating… (30-60s)';
+  status.classList.remove('hidden');
+  status.textContent = 'Downloading from Pollinations.ai…';
+  errEl.classList.add('hidden');
+
+  const form = new FormData();
+  form.append('mood', mood);
+  form.append('seed', seed);
+  form.append('target', target);
+  form.append('custom_prompt', prompt);
+
+  try {
+    const res = await fetch(`/api/slot/${SLOT}/regenerate-image`, { method:'POST', body:form });
+    const data = await res.json();
+    btn.textContent = '🎨 Regenerate Image';
+    status.classList.add('hidden');
+    if (data.error) {
+      errEl.textContent = '❌ ' + data.error;
+      errEl.classList.remove('hidden');
+    } else {
+      // Reload previews with cache-buster
+      const ts = Date.now();
+      if (data.files.includes('image_x_1200x675.png')) {
+        const el = document.getElementById('preview-x');
+        if (el && el.tagName === 'IMG') el.src = `/image/${SLOT}/image_x_1200x675.png?t=${ts}`;
+      }
+      if (data.files.includes('image_tg_1080x1080.png')) {
+        const el = document.getElementById('preview-tg');
+        if (el && el.tagName === 'IMG') el.src = `/image/${SLOT}/image_tg_1080x1080.png?t=${ts}`;
+      }
+      status.classList.remove('hidden');
+      status.textContent = `✅ Done — seed ${data.seed}, mood: ${data.mood}`;
+      setTimeout(() => status.classList.add('hidden'), 5000);
+    }
+  } catch (e) {
+    btn.textContent = '🎨 Regenerate Image';
+    status.classList.add('hidden');
+    errEl.textContent = '❌ Network error: ' + e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+// --- Image upload ---
+async function uploadImage() {
+  const fileInput = document.getElementById('upload-file');
+  const target    = document.getElementById('upload-target').value;
+  const statusEl  = document.getElementById('upload-status');
+  const errEl     = document.getElementById('upload-error');
+  if (!fileInput.files.length) return;
+
+  statusEl.textContent = 'Uploading & resizing…';
+  errEl.classList.add('hidden');
+
+  const form = new FormData();
+  form.append('file', fileInput.files[0]);
+  form.append('target', target);
+
+  try {
+    const res = await fetch(`/api/slot/${SLOT}/upload-image`, { method:'POST', body:form });
+    const data = await res.json();
+    if (data.error) {
+      errEl.textContent = '❌ ' + data.error;
+      errEl.classList.remove('hidden');
+      statusEl.textContent = '';
+    } else {
+      const ts = Date.now();
+      if (data.saved.includes('image_x_1200x675.png')) {
+        const el = document.getElementById('preview-x');
+        if (el) {
+          el.outerHTML = `<img id="preview-x" src="/image/${SLOT}/image_x_1200x675.png?t=${ts}" class="rounded-lg w-full border border-gray-800" alt="X image">`;
+        }
+      }
+      if (data.saved.includes('image_tg_1080x1080.png')) {
+        const el = document.getElementById('preview-tg');
+        if (el) {
+          el.outerHTML = `<img id="preview-tg" src="/image/${SLOT}/image_tg_1080x1080.png?t=${ts}" class="rounded-lg w-full border border-gray-800" alt="TG image">`;
+        }
+      }
+      statusEl.textContent = `✅ Saved: ${data.saved.join(', ')}`;
+      fileInput.value = '';
+    }
+  } catch (e) {
+    errEl.textContent = '❌ Network error: ' + e.message;
+    errEl.classList.remove('hidden');
+    statusEl.textContent = '';
+  }
+}
+
+function applyAI(platform) {
+  const newText = document.getElementById('ai-text-' + platform).value;
+  // Map platform -> textarea id
+  const taMap = { 'x': 'ta-x', 'x_b': 'ta-x_b', 'tg': 'ta-tg' };
+  const cntMap = { 'x': 'cnt-x', 'x_b': 'cnt-x_b', 'tg': 'cnt-tg' };
+  document.getElementById(taMap[platform]).value = newText;
+  updateCount(taMap[platform], cntMap[platform]);
+  closeAI(platform);
+  // Show a hint to save
+  const form = document.getElementById('form-' + platform);
+  if (form) {
+    const hint = document.createElement('p');
+    hint.style.cssText = 'color:#4ade80;font-size:12px;margin-top:6px;';
+    hint.textContent = '✅ AI text applied — click Save to keep it.';
+    form.appendChild(hint);
+    setTimeout(() => hint.remove(), 4000);
+  }
+}
+
+// --- Step indicator helpers ---
+function _setStep(id, state) {
+  const icons = {pending:'⏳', active:'🔄', done:'✅', error:'❌'};
+  const colors = {pending:'#6b7280', active:'#4ade80', done:'#34d399', error:'#f87171'};
+  const el = document.getElementById('step-' + id);
+  const ic = document.getElementById('step-' + id + '-icon');
+  if (!el || !ic) return;
+  ic.textContent = icons[state] || '⏳';
+  el.style.color = colors[state] || '#6b7280';
+}
+
+// --- Video builder (basic, no avatar) ---
+async function buildVideo() {
+  const btn     = document.getElementById('btn-video');
+  const spinner = document.getElementById('video-spinner');
+  const errEl   = document.getElementById('video-error');
+  const resEl   = document.getElementById('video-result');
+  const useel   = document.getElementById('video-elevenlabs').checked;
+
+  btn.disabled = true;
+  spinner.style.display = '';
+  document.getElementById('video-spinner-text').textContent = 'Se generează video...';
+  errEl.style.display = 'none';
+  resEl.style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('use_elevenlabs', useel ? 'true' : 'false');
+    const r = await fetch(`/api/slot/${SLOT}/build-video`, {method:'POST', body:fd});
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || r.statusText);
+
+    const url = `/video/${SLOT}/reel_final.mp4?t=${Date.now()}`;
+    document.getElementById('video-player').src = url;
+    document.getElementById('video-download').href = url;
+    document.getElementById('video-meta').textContent = `reel_final.mp4 — ${data.size_mb} MB`;
+    resEl.style.display = '';
+  } catch(e) {
+    errEl.textContent = '❌ ' + e.message;
+    errEl.style.display = '';
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+
+// --- ONE BUTTON: Script + Imagine + Avatar D-ID ---
+async function buildAvatarVideo() {
+  const btn       = document.getElementById('btn-avatar-video');
+  const spinner   = document.getElementById('video-spinner');
+  const stText    = document.getElementById('video-spinner-text');
+  const errEl     = document.getElementById('video-error');
+  const resEl     = document.getElementById('video-result');
+  const presenter = document.getElementById('avatar-presenter').value;
+
+  btn.disabled = true;
+  spinner.style.display = '';
+  errEl.style.display = 'none';
+  resEl.style.display = 'none';
+
+  // Reset steps
+  ['script','image','did','compose'].forEach(s => _setStep(s, 'pending'));
+
+  // Animate steps — server does everything, we just show progress visually
+  stText.textContent = 'Generez script...';
+  _setStep('script', 'active');
+  await new Promise(r => setTimeout(r, 800));
+  _setStep('script', 'done');
+
+  stText.textContent = 'Generez imagine fundal...';
+  _setStep('image', 'active');
+  await new Promise(r => setTimeout(r, 800));
+  _setStep('image', 'done');
+
+  stText.textContent = 'Trimit la D-ID... (2-3 min)';
+  _setStep('did', 'active');
+
+  try {
+    const fd = new FormData();
+    fd.append('presenter', presenter);
+    const r = await fetch(`/api/slot/${SLOT}/build-avatar-video`, {method:'POST', body:fd});
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || r.statusText);
+
+    _setStep('did', 'done');
+    _setStep('compose', 'done');
+    stText.textContent = 'Gata!';
+
+    const url = `/video/${SLOT}/reel_avatar.mp4?t=${Date.now()}`;
+    document.getElementById('video-player').src = url;
+    document.getElementById('video-download').href = url;
+    document.getElementById('video-meta').textContent = `✅ reel_avatar.mp4 — ${data.size_mb} MB`;
+    resEl.style.display = '';
+  } catch(e) {
+    _setStep('did', 'error');
+    errEl.textContent = '❌ ' + e.message;
+    errEl.style.display = '';
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { spinner.style.display = 'none'; }, 1500);
+  }
+}
+
+// --- Avatar generator ---
+async function generateAvatar() {
+  const btn     = document.getElementById('btn-avatar');
+  const spinner = document.getElementById('avatar-spinner');
+  const errEl   = document.getElementById('avatar-error');
+  const resEl   = document.getElementById('avatar-result');
+  const useLlm  = document.getElementById('avatar-llm').checked;
+
+  btn.disabled = true;
+  spinner.style.display = '';
+  errEl.style.display   = 'none';
+  resEl.style.display   = 'none';
+
+  const fd = new FormData();
+  fd.append('use_llm', useLlm ? 'true' : 'false');
+
+  try {
+    const r    = await fetch(`/api/slot/${SLOT}/generate-avatar`, {method:'POST', body:fd});
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || 'Unknown error');
+
+    // Mood badge
+    const moodColors = {bear:'#dc2626', bull:'#16a34a', neutral:'#2563eb'};
+    const moodLabels = {bear:'🐻 BEARISH', bull:'🐂 BULLISH', neutral:'📊 NEUTRAL'};
+    const badge = document.getElementById('avatar-mood-badge');
+    badge.textContent  = moodLabels[data.mood] || data.mood;
+    badge.style.background = moodColors[data.mood] || '#374151';
+    badge.style.color  = '#fff';
+
+    // Hook
+    document.getElementById('avatar-hook').textContent = data.hook || '—';
+
+    // Load script files
+    try {
+      const s30r = await fetch(`/avatar-file/${SLOT}/script_30s.txt`);
+      if (s30r.ok) document.getElementById('script-30').textContent = await s30r.text();
+      const s60r = await fetch(`/avatar-file/${SLOT}/script_60s.txt`);
+      if (s60r.ok) document.getElementById('script-60').textContent = await s60r.text();
+      const cutsR = await fetch(`/avatar-file/${SLOT}/platform_cuts.json`);
+      if (cutsR.ok) renderPlatformCards(await cutsR.json());
+    } catch(e) {}
+
+    // File badges
+    const filesDiv = document.getElementById('avatar-files');
+    filesDiv.innerHTML = '';
+    (data.files || []).forEach(f => {
+      const a = document.createElement('a');
+      a.href  = `/avatar-file/${SLOT}/${f}`;
+      a.target = '_blank';
+      a.className = 'px-2 py-1 rounded text-xs font-mono text-green-400 hover:text-white';
+      a.style.background = '#0d1f0d';
+      a.style.border = '1px solid #166534';
+      a.textContent = f;
+      filesDiv.appendChild(a);
+    });
+
+    resEl.style.display = '';
+  } catch(e) {
+    errEl.textContent    = '✗ ' + e.message;
+    errEl.style.display  = '';
+  } finally {
+    btn.disabled        = false;
+    spinner.style.display = 'none';
+  }
+}
+
+function renderPlatformCards(cuts) {
+  const container = document.getElementById('platform-cards');
+  if (!container) return;
+  const platforms = {
+    tiktok:           {icon:'🎵', label:'TikTok',            color:'#1a1a2e', border:'#e91e63'},
+    instagram_reels:  {icon:'📸', label:'Instagram Reels',   color:'#1a1020', border:'#c13584'},
+    youtube_shorts:   {icon:'▶️', label:'YouTube Shorts',    color:'#1a0a0a', border:'#ff0000'},
+  };
+  container.innerHTML = '';
+  for (const [key, meta] of Object.entries(platforms)) {
+    const data = cuts[key];
+    if (!data) continue;
+    const notes = (data.algorithm_notes || []).slice(0, 4);
+    const card = document.createElement('div');
+    card.style.cssText = `background:${meta.color};border:1px solid ${meta.border};border-radius:12px;padding:16px;`;
+    card.innerHTML = `
+      <div class="flex items-center gap-2 mb-3">
+        <span style="font-size:18px">${meta.icon}</span>
+        <span class="text-white font-bold text-sm">${meta.label}</span>
+        <span class="ml-auto text-xs px-2 py-1 rounded-full" style="background:${meta.border}22;color:${meta.border}">
+          ${data.recommended_length_seconds}s
+        </span>
+      </div>
+      <div class="text-gray-300 text-xs mb-3 leading-relaxed">
+        ${notes.map(n => `<div class="mb-1">• ${n}</div>`).join('')}
+      </div>
+      ${data.hashtags ? `<div class="flex flex-wrap gap-1">${data.hashtags.map(h=>`<span class="px-2 py-0.5 rounded text-xs" style="background:#ffffff11;color:#9ca3af">${h}</span>`).join('')}</div>` : ''}
+      ${data.optimal_post_time ? `<div class="mt-2 text-xs" style="color:${meta.border}">⏰ Postează la: ${data.optimal_post_time}</div>` : ''}
+    `;
+    container.appendChild(card);
+  }
+}
+</script>
+</body>
+</html>

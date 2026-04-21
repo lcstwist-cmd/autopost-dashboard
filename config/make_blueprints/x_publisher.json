@@ -1,0 +1,133 @@
+{
+  "name": "EliteMarginDesk — X AutoPost",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "data": { "editable": "true" },
+              "label": "EliteMarginDesk X Webhook"
+            }
+          }
+        },
+        "expect": [
+          { "name": "text",         "type": "text", "label": "Tweet text" },
+          { "name": "image_base64", "type": "text", "label": "Image base64" },
+          { "name": "image_name",   "type": "text", "label": "Image filename" },
+          { "name": "image_mime",   "type": "text", "label": "Image MIME type" }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "util:SetVariables",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "variables": [
+          {
+            "name": "image_binary",
+            "value": "{{toBinary(1.image_base64, `base64`)}}"
+          }
+        ],
+        "scope": "roundtrip"
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "restore": {
+          "expect": { "scope": { "label": "One cycle" } }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "twitter:UploadMedia",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": ""
+      },
+      "mapper": {
+        "media": "{{2.image_binary}}",
+        "mediaType": "{{1.image_mime}}",
+        "category": "tweet_image"
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0 },
+        "restore": {
+          "parameters": {
+            "__IMTCONN__": {
+              "data": { "scoped": "true", "connection": "twitter" },
+              "label": "X connection"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "twitter:CreateATweet",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": ""
+      },
+      "mapper": {
+        "status": "{{1.text}}",
+        "mediaIds": "{{3.mediaId}}"
+      },
+      "metadata": {
+        "designer": { "x": 900, "y": 0 },
+        "restore": {
+          "parameters": {
+            "__IMTCONN__": {
+              "data": { "scoped": "true", "connection": "twitter" },
+              "label": "X connection"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "gateway:WebhookRespond",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "status": "200",
+        "body": "{\"ok\": true, \"tweet_id\": \"{{4.id}}\"}",
+        "headers": [
+          { "key": "Content-Type", "value": "application/json" }
+        ]
+      },
+      "metadata": {
+        "designer": { "x": 1200, "y": 0 }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "eu1.make.com"
+  }
+}

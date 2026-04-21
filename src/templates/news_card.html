@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>News Card</title>
+<!--
+  Crypto AutoPost — News Card Template
+
+  URL params (all optional, URL-decoded):
+    mood      = bear | bull | neutral        (default: neutral)
+    size      = x | tg                        (x=1200x675, tg=1080x1080; default: x)
+    headline  = main headline text            (required)
+    subhead   = smaller supporting text
+    pill1..3  = up to 3 pill-shaped tags (bottom row)
+    ticker    = BTC | ETH | SOL | ...         (shown as watermark)
+    date      = footer date (default: today)
+    brand     = footer brand text             (default: @CryptoAutoPost)
+    kicker    = overline label (e.g. "SECURITY ALERT", "MARKET UPDATE")
+
+  Render via Playwright, wkhtmltoimage, or just open in the browser and screenshot.
+-->
+<style>
+  :root {
+    --bg-from: #0a0f1a;
+    --bg-to:   #151a2b;
+    --accent:  #2a8cff;
+    --accent-soft: #2a8cff22;
+    --text-main: #f4f6fb;
+    --text-muted: #8a93a8;
+    --pill-bg: rgba(255,255,255,0.06);
+    --pill-border: rgba(255,255,255,0.12);
+  }
+  html[data-mood="bear"] {
+    --bg-from: #1a0505;
+    --bg-to:   #2b0a0a;
+    --accent:  #ff4444;
+    --accent-soft: #ff444422;
+  }
+  html[data-mood="bull"] {
+    --bg-from: #031a14;
+    --bg-to:   #0a2b22;
+    --accent:  #c9a54a;
+    --accent-soft: #c9a54a22;
+  }
+  html[data-mood="neutral"] {
+    --bg-from: #05102a;
+    --bg-to:   #0a1f4a;
+    --accent:  #4ea1ff;
+    --accent-soft: #4ea1ff22;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+  /* size presets — set by data-size */
+  html[data-size="x"] .card  { width: 1200px; height: 675px; }
+  html[data-size="tg"] .card { width: 1080px; height: 1080px; }
+
+  body {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+    background: #000;
+  }
+  .card {
+    position: relative;
+    background: linear-gradient(135deg, var(--bg-from) 0%, var(--bg-to) 100%);
+    color: var(--text-main);
+    padding: 64px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* glow */
+  .card::before {
+    content: "";
+    position: absolute;
+    top: -200px; right: -200px;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, var(--accent-soft), transparent 70%);
+    filter: blur(40px);
+    pointer-events: none;
+  }
+  /* subtle grid */
+  .card::after {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+  }
+
+  .kicker {
+    position: relative; z-index: 2;
+    font-size: 16px; font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 18px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .kicker::before {
+    content: ""; display: inline-block;
+    width: 28px; height: 2px;
+    background: var(--accent);
+  }
+
+  html[data-size="tg"] .headline { font-size: 92px; line-height: 1.05; }
+  .headline {
+    position: relative; z-index: 2;
+    font-size: 68px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    max-width: 95%;
+  }
+  .headline .accent { color: var(--accent); }
+
+  .subhead {
+    position: relative; z-index: 2;
+    font-size: 28px;
+    color: var(--text-muted);
+    margin-top: 22px;
+    line-height: 1.35;
+    max-width: 85%;
+  }
+  html[data-size="tg"] .subhead { font-size: 36px; }
+
+  .pills {
+    position: relative; z-index: 2;
+    display: flex; flex-wrap: wrap; gap: 12px;
+    margin-top: 36px;
+  }
+  .pill {
+    padding: 10px 20px;
+    background: var(--pill-bg);
+    border: 1px solid var(--pill-border);
+    border-radius: 999px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-main);
+    backdrop-filter: blur(4px);
+  }
+  html[data-size="tg"] .pill { font-size: 22px; padding: 14px 26px; }
+
+  .footer {
+    position: relative; z-index: 2;
+    display: flex; justify-content: space-between; align-items: end;
+    margin-top: auto;
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+  .footer .brand { font-weight: 600; color: var(--text-main); }
+
+  .ticker-watermark {
+    position: absolute; right: 48px; bottom: 96px;
+    font-size: 220px; font-weight: 900;
+    color: var(--accent);
+    opacity: 0.06;
+    letter-spacing: -0.05em;
+    z-index: 1; pointer-events: none;
+    line-height: 1;
+  }
+  html[data-size="tg"] .ticker-watermark { font-size: 320px; bottom: 160px; }
+
+  .disclaimer {
+    position: relative; z-index: 2;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div>
+      <div class="kicker" id="kicker"></div>
+      <h1 class="headline" id="headline"></h1>
+      <p class="subhead" id="subhead"></p>
+      <div class="pills" id="pills"></div>
+    </div>
+    <div class="ticker-watermark" id="ticker"></div>
+    <div class="footer">
+      <span class="brand" id="brand"></span>
+      <span id="date"></span>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const p = new URLSearchParams(location.search);
+  const setText = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.textContent = v; };
+  const get = (k, d = "") => (p.get(k) ?? d);
+
+  // Defaults
+  document.documentElement.dataset.mood = get("mood", "neutral");
+  document.documentElement.dataset.size = get("size", "x");
+
+  const today = new Date().toISOString().slice(0, 10);
+  setText("kicker",   get("kicker",   "Crypto Update"));
+  setText("headline", get("headline", "Headline goes here"));
+  setText("subhead",  get("subhead",  ""));
+  setText("ticker",   get("ticker",   ""));
+  setText("date",     get("date",     today));
+  setText("brand",    get("brand",    "@CryptoAutoPost"));
+
+  const pillsEl = document.getElementById("pills");
+  ["pill1","pill2","pill3"].forEach(k => {
+    const v = p.get(k);
+    if (!v) return;
+    const el = document.createElement("span");
+    el.className = "pill";
+    el.textContent = v;
+    pillsEl.appendChild(el);
+  });
+
+  // If headline is known too long, try auto-shrinking once
+  const h = document.getElementById("headline");
+  if (h && h.scrollHeight > h.clientHeight * 1.2) {
+    h.style.fontSize = "52px";
+  }
+
+  // Signal ready (Playwright waits for this attribute)
+  document.documentElement.dataset.ready = "1";
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backoffice — AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<style>
+  body { background: #0a0f1a; }
+  .card  { background: #111827; border: 1px solid #1f2937; }
+  .stat-card { background: #0d1423; border: 1px solid #1f2937; border-radius: 16px; padding: 20px; }
+  .log-line  { font-family: monospace; font-size: 11px; line-height: 1.8; }
+  .log-error { color: #f87171; }
+  .log-warn  { color: #fbbf24; }
+  .log-info  { color: #6b7280; }
+  .log-ok    { color: #34d399; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid #60a5fa;
+             border-top-color:transparent; border-radius:50%;
+             animation:spin .7s linear infinite; }
+  .section-title { font-size:11px; color:#6b7280; text-transform:uppercase;
+                   letter-spacing:.08em; font-weight:700; }
+</style>
+</head>
+<body class="text-gray-100 min-h-screen">
+
+<header class="sticky top-0 z-10 border-b border-gray-800" style="background:#0d1423;">
+  <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-gray-400 hover:text-white text-sm">← Dashboard</a>
+      <span class="text-gray-700">/</span>
+      <span class="font-bold text-white">⚙ Backoffice</span>
+      <span class="text-xs text-yellow-400 font-bold px-2 py-0.5 rounded" style="background:#1a1400;border:1px solid #713f12;">ADMIN</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/admin/users" class="text-xs text-gray-500 hover:text-gray-300">
+        👥 Users
+        {% if pending_count > 0 %}
+        <span class="ml-1 text-yellow-400 font-bold">({{ pending_count }})</span>
+        {% endif %}
+      </a>
+      <a href="/settings" class="text-xs text-gray-500 hover:text-gray-300">⚙ Settings</a>
+      <form method="post" action="/logout">
+        <button type="submit" class="text-xs text-gray-600 hover:text-red-400 px-2 py-1 rounded border border-gray-800">Logout</button>
+      </form>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-6xl mx-auto px-6 py-8 space-y-8">
+
+  <!-- ═══ SYSTEM STATS ═══ -->
+  <div>
+    <p class="section-title mb-4">System Overview</p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="stat-card">
+        <p class="text-2xl font-bold text-white">{{ stats.total_users }}</p>
+        <p class="text-xs text-gray-500 mt-1">Total Users</p>
+      </div>
+      <div class="stat-card">
+        <p class="text-2xl font-bold {{ 'text-yellow-400' if stats.pending_users > 0 else 'text-gray-500' }}">{{ stats.pending_users }}</p>
+        <p class="text-xs text-gray-500 mt-1">Pending Approval</p>
+      </div>
+      <div class="stat-card">
+        <p class="text-2xl font-bold text-blue-400">{{ stats.total_slots }}</p>
+        <p class="text-xs text-gray-500 mt-1">Total Slots (all users)</p>
+      </div>
+      <div class="stat-card">
+        <p class="text-2xl font-bold text-green-400">{{ stats.published_today }}</p>
+        <p class="text-xs text-gray-500 mt-1">Published Today</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+    <!-- ═══ BOT CONTROL ═══ -->
+    <div>
+      <p class="section-title mb-4">Scheduler Bot</p>
+      <div class="card rounded-2xl p-6 space-y-5">
+
+        <!-- Status -->
+        <div class="flex items-center gap-4 p-4 rounded-xl" style="background:#0a0f1a;border:1px solid #374151;">
+          <div class="w-4 h-4 rounded-full {{ 'bg-green-400 shadow-lg' if bot.running else 'bg-gray-600' }}"
+               style="{{ 'box-shadow:0 0 8px #34d399' if bot.running else '' }}"></div>
+          <div>
+            <p class="font-bold text-sm {{ 'text-green-400' if bot.running else 'text-gray-400' }}">
+              Bot {{ 'RUNNING' if bot.running else 'STOPPED' }}
+            </p>
+            <p class="text-xs text-gray-600">
+              {% if bot.running %}PID: {{ bot.pid }} — running since startup{% else %}Not started{% endif %}
+            </p>
+          </div>
+          <div class="ml-auto">
+            {% if bot.running %}
+            <form method="post" action="/bot/stop">
+              <button type="submit" onclick="return confirm('Stop the scheduler?')"
+                class="px-4 py-2 rounded-lg text-sm font-semibold"
+                style="background:#1c0a0a;color:#f87171;border:1px solid #7f1d1d;cursor:pointer;">
+                ⏹ Stop Bot
+              </button>
+            </form>
+            {% else %}
+            <form method="post" action="/bot/start">
+              <button type="submit"
+                class="px-4 py-2 rounded-lg text-sm font-semibold"
+                style="background:#064e3b;color:#34d399;border:1px solid #065f46;cursor:pointer;">
+                ▶ Start Bot
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Schedule info -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 rounded-lg" style="background:#0d1e35;border:1px solid #1e3a5f;">
+            <p class="text-xs text-blue-400 font-bold mb-1">🌅 Morning Slot</p>
+            <p class="text-sm text-white font-semibold">08:00 GMT+2</p>
+            <p class="text-xs text-gray-500">News before 08:00</p>
+          </div>
+          <div class="p-3 rounded-lg" style="background:#1a0d35;border:1px solid #3b1f5e;">
+            <p class="text-xs text-purple-400 font-bold mb-1">🌇 Evening Slot</p>
+            <p class="text-sm text-white font-semibold">18:00 GMT+2</p>
+            <p class="text-xs text-gray-500">News 08:00–18:00</p>
+          </div>
+        </div>
+
+        <!-- Manual triggers -->
+        <div>
+          <p class="text-xs text-gray-500 mb-3 font-semibold uppercase tracking-wider">Manual Trigger</p>
+          <div class="flex gap-2">
+            <form method="post" action="/run-now/morning" class="flex-1">
+              <button type="submit"
+                class="w-full py-2.5 rounded-lg text-sm font-semibold"
+                style="background:#1e3a5f;color:#60a5fa;border:1px solid #2563eb;cursor:pointer;">
+                ▶ Run Morning Now
+              </button>
+            </form>
+            <form method="post" action="/run-now/evening" class="flex-1">
+              <button type="submit"
+                class="w-full py-2.5 rounded-lg text-sm font-semibold"
+                style="background:#3b1f5e;color:#c084fc;border:1px solid #7c3aed;cursor:pointer;">
+                ▶ Run Evening Now
+              </button>
+            </form>
+          </div>
+          <p class="text-xs text-gray-600 mt-2">Triggers run the pipeline in background using admin credentials from .env</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ USER ACTIVITY ═══ -->
+    <div>
+      <p class="section-title mb-4">User Activity</p>
+      <div class="card rounded-2xl overflow-hidden">
+        {% for u in all_users %}
+        <div class="flex items-center justify-between px-5 py-3 {% if not loop.first %}border-t border-gray-800{% endif %}">
+          <div class="flex items-center gap-3">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                 style="background:#1e3a5f;color:#60a5fa;">
+              {{ (u.display_name or u.email)[0].upper() }}
+            </div>
+            <div>
+              <p class="text-sm text-white font-medium">{{ u.display_name or u.email.split('@')[0] }}</p>
+              <p class="text-xs text-gray-600">{{ u.email }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 text-right">
+            <div>
+              <p class="text-sm font-bold text-blue-400">{{ u.slot_count }}</p>
+              <p class="text-xs text-gray-600">slots</p>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-green-400">{{ u.published_count }}</p>
+              <p class="text-xs text-gray-600">published</p>
+            </div>
+            <span class="text-xs px-2 py-0.5 rounded {{ 'text-green-400' if u.is_approved else 'text-yellow-400' }}"
+                  style="background:{{ '#0a1a0a' if u.is_approved else '#1a1400' }}">
+              {{ 'Active' if u.is_approved else 'Pending' }}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ LIVE LOGS ═══ -->
+  <div>
+    <div class="flex items-center justify-between mb-3">
+      <p class="section-title">Scheduler Logs</p>
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+          <input type="checkbox" id="auto-refresh" checked class="accent-blue-500">
+          Auto-refresh (5s)
+        </label>
+        <button onclick="loadLogs()" class="text-xs text-blue-400 hover:text-blue-300">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="card rounded-2xl p-4 overflow-auto font-mono" style="max-height:400px;" id="log-box">
+      {% for line in log_tail %}
+      <div class="log-line {% if 'ERROR' in line %}log-error{% elif 'WARNING' in line %}log-warn{% elif 'OK' in line or 'completed' in line %}log-ok{% else %}log-info{% endif %}">{{ line }}</div>
+      {% endfor %}
+      {% if not log_tail %}<p class="text-gray-600 text-sm">No logs yet.</p>{% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+async function loadLogs() {
+  const box = document.getElementById('log-box');
+  try {
+    const r = await fetch('/api/logs?lines=80');
+    const data = await r.json();
+    const lines = data.lines || [];
+    box.innerHTML = lines.map(l => {
+      const cls = l.includes('ERROR') ? 'log-error'
+                : l.includes('WARNING') ? 'log-warn'
+                : (l.includes('OK') || l.includes('completed')) ? 'log-ok'
+                : 'log-info';
+      return `<div class="log-line ${cls}">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>`;
+    }).join('') || '<p class="text-gray-600 text-sm">No logs yet.</p>';
+    box.scrollTop = box.scrollHeight;
+  } catch(e) { console.error(e); }
+}
+
+// Auto-refresh
+let _timer;
+function setupAutoRefresh() {
+  clearInterval(_timer);
+  if (document.getElementById('auto-refresh').checked) {
+    _timer = setInterval(loadLogs, 5000);
+  }
+}
+document.getElementById('auto-refresh').addEventListener('change', setupAutoRefresh);
+setupAutoRefresh();
+
+// Scroll logs to bottom on load
+document.getElementById('log-box').scrollTop = document.getElementById('log-box').scrollHeight;
+</script>
+</body>
+</html>

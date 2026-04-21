@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Users — AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<style>
+  body { background: #0a0f1a; }
+  .card { background: #111827; border: 1px solid #1f2937; }
+</style>
+</head>
+<body class="text-gray-100 min-h-screen">
+
+<header class="sticky top-0 z-10 border-b border-gray-800" style="background:#0d1423;">
+  <div class="max-w-4xl mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-gray-400 hover:text-white text-sm">← Dashboard</a>
+      <span class="text-gray-700">/</span>
+      <span class="font-bold text-white">Admin — Users</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/admin/backoffice" class="text-xs text-gray-500 hover:text-gray-300">⚙ Backoffice</a>
+      <span class="text-xs text-yellow-400 font-bold px-2 py-1 rounded" style="background:#1a1400;border:1px solid #713f12;">ADMIN</span>
+      <form method="post" action="/logout">
+        <button type="submit" class="text-xs text-gray-500 hover:text-red-400 px-3 py-1 rounded border border-gray-700">Logout</button>
+      </form>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-4xl mx-auto px-6 py-8">
+
+  {% if msg %}
+  <div class="mb-6 px-4 py-3 rounded-lg text-sm text-green-400" style="background:#0a1a0a;border:1px solid #166534;">
+    {{ msg }}
+  </div>
+  {% endif %}
+
+  <!-- Pending approvals -->
+  <div class="mb-8">
+    <h2 class="text-lg font-bold text-white mb-1">Pending Approvals</h2>
+    <p class="text-gray-500 text-sm mb-4">These users registered and are waiting for your approval.</p>
+
+    {% if pending %}
+    <div class="card rounded-2xl overflow-hidden">
+      {% for u in pending %}
+      <div class="flex items-center justify-between px-5 py-4 {% if not loop.first %}border-t border-gray-800{% endif %}">
+        <div>
+          <p class="text-white font-medium text-sm">{{ u.display_name or u.email }}</p>
+          <p class="text-gray-500 text-xs">{{ u.email }}</p>
+          <p class="text-gray-600 text-xs">Registered: {{ u.created_at[:16].replace('T',' ') }}</p>
+        </div>
+        <div class="flex gap-2">
+          <form method="post" action="/admin/users/{{ u.id }}/approve">
+            <button type="submit"
+              class="px-4 py-2 rounded-lg text-sm font-semibold"
+              style="background:#065f46;color:#34d399;border:1px solid #059669;cursor:pointer;">
+              ✅ Approve
+            </button>
+          </form>
+          <form method="post" action="/admin/users/{{ u.id }}/reject"
+            onsubmit="return confirm('Delete this user permanently?')">
+            <button type="submit"
+              class="px-4 py-2 rounded-lg text-sm font-semibold"
+              style="background:#1c0a0a;color:#f87171;border:1px solid #7f1d1d;cursor:pointer;">
+              ✕ Reject
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card rounded-2xl px-5 py-8 text-center text-gray-500 text-sm">
+      No pending registrations.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- All users -->
+  <div>
+    <h2 class="text-lg font-bold text-white mb-1">All Users</h2>
+    <p class="text-gray-500 text-sm mb-4">{{ all_users | length }} total users.</p>
+
+    <div class="card rounded-2xl overflow-hidden">
+      {% for u in all_users %}
+      <div class="flex items-center justify-between px-5 py-4 {% if not loop.first %}border-t border-gray-800{% endif %}">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+            style="background:#1e3a5f;color:#60a5fa;">
+            {{ (u.display_name or u.email)[0].upper() }}
+          </div>
+          <div>
+            <p class="text-white font-medium text-sm flex items-center gap-2">
+              {{ u.display_name or u.email }}
+              {% if u.is_admin %}<span class="text-xs text-yellow-400 font-bold px-2 py-0.5 rounded" style="background:#1a1400;border:1px solid #713f12;">ADMIN</span>{% endif %}
+            </p>
+            <p class="text-gray-500 text-xs">{{ u.email }}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          {% if u.is_approved %}
+          <span class="text-xs text-green-400 font-semibold">✓ Active</span>
+          {% else %}
+          <span class="text-xs text-yellow-400 font-semibold">⏳ Pending</span>
+          {% endif %}
+          <span class="text-xs text-gray-600">{{ u.created_at[:10] }}</span>
+          {% if not u.is_admin %}
+          <form method="post" action="/admin/users/{{ u.id }}/reject"
+            onsubmit="return confirm('Delete user {{ u.email }}?')">
+            <button type="submit" class="text-xs text-gray-600 hover:text-red-400">✕ Delete</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

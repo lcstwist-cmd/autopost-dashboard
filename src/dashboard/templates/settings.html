@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<style>
+  body { background: #0a0f1a; }
+  .card { background: #111827; border: 1px solid #1f2937; }
+  input[type=text], input[type=password], input[type=email] {
+    background: #0a0f1a; border: 1px solid #374151; color: #e5e7eb;
+    border-radius: 8px; padding: 10px 14px; width: 100%; font-size: 13px;
+  }
+  input:focus { outline: none; border-color: #3b82f6; }
+  .section-title { font-size: 11px; color: #6b7280; text-transform: uppercase;
+                   letter-spacing: .08em; font-weight: 700; margin-bottom: 14px;
+                   padding-bottom: 8px; border-bottom: 1px solid #1f2937; }
+</style>
+</head>
+<body class="text-gray-100 min-h-screen">
+
+<header class="sticky top-0 z-10 border-b border-gray-800" style="background:#0d1423;">
+  <div class="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-gray-400 hover:text-white text-sm">← Dashboard</a>
+      <span class="text-gray-700">/</span>
+      <span class="font-bold text-white">Settings</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-gray-500 text-sm">{{ user.email }}</span>
+      <form method="post" action="/logout">
+        <button type="submit" class="text-xs text-gray-500 hover:text-red-400 px-3 py-1 rounded border border-gray-700">Logout</button>
+      </form>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-3xl mx-auto px-6 py-8">
+
+  {% if saved %}
+  <div class="mb-6 px-4 py-3 rounded-lg text-sm text-green-400" style="background:#0a1a0a;border:1px solid #166534;">
+    ✅ Settings saved successfully.
+  </div>
+  {% endif %}
+
+  <h1 class="text-xl font-bold text-white mb-1">Your API Keys</h1>
+  <p class="text-gray-500 text-sm mb-8">All keys are stored securely in the database. They are used only for your posts.</p>
+
+  <form method="post" action="/settings" class="space-y-8">
+
+    <!-- Telegram -->
+    <div class="card rounded-2xl p-6">
+      <p class="section-title">✈ Telegram</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Bot Token</label>
+          <input type="password" name="telegram_token"
+            value="{{ s.telegram_token or '' }}"
+            placeholder="123456:ABCdef...">
+          <p class="text-xs text-gray-600 mt-1">From @BotFather → /newbot</p>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Channel ID</label>
+          <input type="text" name="telegram_channel"
+            value="{{ s.telegram_channel or '' }}"
+            placeholder="@yourchannel or -100123456789">
+        </div>
+      </div>
+    </div>
+
+    <!-- X / Twitter -->
+    <div class="card rounded-2xl p-6">
+      <p class="section-title">✖ X / Twitter</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">API Key</label>
+          <input type="password" name="x_api_key"
+            value="{{ s.x_api_key or '' }}" placeholder="API Key">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">API Secret</label>
+          <input type="password" name="x_api_secret"
+            value="{{ s.x_api_secret or '' }}" placeholder="API Secret">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Access Token</label>
+          <input type="password" name="x_access_token"
+            value="{{ s.x_access_token or '' }}" placeholder="Access Token">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Access Token Secret</label>
+          <input type="password" name="x_access_secret"
+            value="{{ s.x_access_secret or '' }}" placeholder="Access Token Secret">
+        </div>
+      </div>
+      <p class="text-xs text-gray-600 mt-3">From <a href="https://developer.x.com" target="_blank" class="text-blue-500">developer.x.com</a> → Your App → Keys and Tokens</p>
+    </div>
+
+    <!-- D-ID -->
+    <div class="card rounded-2xl p-6">
+      <p class="section-title">🧑 D-ID Avatar</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">API Key</label>
+          <input type="password" name="did_api_key"
+            value="{{ s.did_api_key or '' }}" placeholder="D-ID API Key">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Email (D-ID account)</label>
+          <input type="text" name="did_email"
+            value="{{ s.did_email or '' }}" placeholder="you@example.com">
+        </div>
+      </div>
+    </div>
+
+    <!-- Optional keys -->
+    <div class="card rounded-2xl p-6">
+      <p class="section-title">✨ Optional AI Keys</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">ElevenLabs API Key</label>
+          <input type="password" name="elevenlabs_key"
+            value="{{ s.elevenlabs_key or '' }}" placeholder="Optional — for premium TTS">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Anthropic API Key</label>
+          <input type="password" name="anthropic_key"
+            value="{{ s.anthropic_key or '' }}" placeholder="Optional — for AI rewrite">
+        </div>
+      </div>
+    </div>
+
+    <button type="submit"
+      class="w-full py-3 rounded-xl font-bold text-sm"
+      style="background:#1d4ed8;color:#fff;border:none;cursor:pointer;">
+      💾 Save Settings
+    </button>
+  </form>
+</div>
+</body>
+</html>
