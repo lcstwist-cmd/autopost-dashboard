@@ -1,10 +1,28 @@
 """SQLite database for multi-tenant AutoPost."""
 from __future__ import annotations
+import os
 import sqlite3
+import time
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
-DB_PATH = _HERE.parent.parent / "autopost.db"
+
+# Persistent storage: use DATA_DIR env var, or /data if it exists (Railway volume),
+# or fall back to repo root for local dev.
+def _db_path() -> Path:
+    env = os.environ.get("DATA_DIR", "").strip()
+    if env:
+        p = Path(env)
+        p.mkdir(parents=True, exist_ok=True)
+        return p / "autopost.db"
+    railway_volume = Path("/data")
+    if railway_volume.exists():
+        return railway_volume / "autopost.db"
+    return _HERE.parent.parent / "autopost.db"
+
+DB_PATH = _db_path()
+
+SESSION_TTL = 60 * 60 * 24 * 30  # 30 days in seconds
 
 
 def _conn():
@@ -40,8 +58,50 @@ def init_db():
             anthropic_key     TEXT DEFAULT '',
             updated_at        TEXT DEFAULT (datetime('now'))
         );
+        CREATE TABLE IF NOT EXISTS sessions (
+            token      TEXT    PRIMARY KEY,
+            user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            expires_at REAL    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
         """)
 
+
+# ---------------------------------------------------------------------------
+# Session helpers
+# ---------------------------------------------------------------------------
+
+def create_session(token: str, user_id: int):
+    expires_at = time.time() + SESSION_TTL
+    with _conn() as c:
+        c.execute(
+            "INSERT OR REPLACE INTO sessions (token, user_id, expires_at) VALUES (?,?,?)",
+            (token, user_id, expires_at),
+        )
+
+
+def get_session_user_id(token: str) -> int | None:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT user_id FROM sessions WHERE token=? AND expires_at>?",
+            (token, time.time()),
+        ).fetchone()
+        return row["user_id"] if row else None
+
+
+def delete_session(token: str):
+    with _conn() as c:
+        c.execute("DELETE FROM sessions WHERE token=?", (token,))
+
+
+def cleanup_sessions():
+    with _conn() as c:
+        c.execute("DELETE FROM sessions WHERE expires_at<?", (time.time(),))
+
+
+# ---------------------------------------------------------------------------
+# User helpers
+# ---------------------------------------------------------------------------
 
 def get_user_by_email(email: str) -> dict | None:
     with _conn() as c:

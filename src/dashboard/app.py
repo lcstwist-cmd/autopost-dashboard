@@ -43,6 +43,7 @@ from src.dashboard.database import (
     init_db, get_user_by_email, get_user_by_id, create_user,
     get_all_users, get_pending_users, approve_user, reject_user,
     get_user_settings, save_user_settings,
+    create_session, get_session_user_id, delete_session, cleanup_sessions,
 )
 
 init_db()
@@ -64,29 +65,28 @@ def _render(template_name: str, **ctx) -> HTMLResponse:
 
 
 # ---------------------------------------------------------------------------
-# Session management (in-memory: token -> user_id)
+# Session management (DB-backed: survives redeployments)
 # ---------------------------------------------------------------------------
 
-_sessions: dict[str, int] = {}
 COOKIE = "ap_session"
 COOKIE_AGE = 60 * 60 * 24 * 30  # 30 days
 
 
 def _new_session(user_id: int) -> str:
     token = secrets.token_urlsafe(32)
-    _sessions[token] = user_id
+    create_session(token, user_id)
     return token
 
 
 def _end_session(token: str):
-    _sessions.pop(token, None)
+    delete_session(token)
 
 
 def _session_user(request: Request) -> dict | None:
     token = request.cookies.get(COOKIE)
     if not token:
         return None
-    uid = _sessions.get(token)
+    uid = get_session_user_id(token)
     if not uid:
         return None
     return get_user_by_id(uid)
