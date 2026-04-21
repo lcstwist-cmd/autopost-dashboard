@@ -4,8 +4,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import secrets
 import shutil
+import signal
 import subprocess
 import sys
 from contextlib import contextmanager
@@ -557,6 +559,28 @@ async def publish_live_api(request: Request, name: str,
 # Bot control (admin only)
 # ---------------------------------------------------------------------------
 
+def _pid_alive(pid: int) -> bool:
+    """Cross-platform process existence check."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except (ProcessLookupError, PermissionError):
+        return False
+    except OSError:
+        return False
+
+
+def _kill_pid(pid: int) -> None:
+    """Cross-platform process kill."""
+    try:
+        if platform.system() == "Windows":
+            subprocess.run(["taskkill", "/PID", str(pid), "/F"], capture_output=True)
+        else:
+            os.kill(pid, signal.SIGTERM)
+    except Exception:
+        pass
+
+
 def _bot_status() -> dict[str, Any]:
     if not PID_FILE.exists():
         return {"running": False, "pid": None}
@@ -565,11 +589,7 @@ def _bot_status() -> dict[str, Any]:
     except Exception:
         PID_FILE.unlink(missing_ok=True)
         return {"running": False, "pid": None}
-    result = subprocess.run(
-        ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV"],
-        capture_output=True, text=True,
-    )
-    if str(pid) in result.stdout:
+    if _pid_alive(pid):
         return {"running": True, "pid": pid}
     PID_FILE.unlink(missing_ok=True)
     return {"running": False, "pid": None}
@@ -599,7 +619,7 @@ async def bot_stop(request: Request):
     status = _bot_status()
     if not status["running"]:
         return RedirectResponse("/?bot=not_running", status_code=303)
-    subprocess.run(["taskkill", "/PID", str(status["pid"]), "/F"], capture_output=True)
+    _kill_pid(status["pid"])
     PID_FILE.unlink(missing_ok=True)
     return RedirectResponse("/?bot=stopped", status_code=303)
 
