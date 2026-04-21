@@ -381,9 +381,11 @@ async def admin_backoffice(request: Request):
     total_slots = sum(u["slot_count"] for u in all_users)
     published_today = sum(
         1 for u in all_users
-        for d in (BASE_QUEUE / str(u["id"])).iterdir()
+        for uq in [(BASE_QUEUE / str(u["id"]))]
+        if uq.exists()
+        for d in uq.iterdir()
         if d.is_dir() and today in d.name and (d / "publish_log.json").exists()
-    ) if BASE_QUEUE.exists() else 0
+    )
 
     log_tail: list[str] = []
     if LOG_FILE.exists():
@@ -603,14 +605,17 @@ async def api_bot_status(request: Request):
 @app.post("/bot/start")
 async def bot_start(request: Request):
     _require_admin(request)
-    if _bot_status()["running"]:
-        return RedirectResponse("/?bot=already_running", status_code=303)
-    proc = subprocess.Popen(
-        [sys.executable, str(_REPO / "src" / "agents" / "scheduler.py")],
-        cwd=str(_REPO),
-    )
-    PID_FILE.write_text(str(proc.pid))
-    return RedirectResponse("/?bot=started", status_code=303)
+    try:
+        if _bot_status()["running"]:
+            return RedirectResponse("/admin/backoffice?bot=already_running", status_code=303)
+        proc = subprocess.Popen(
+            [sys.executable, str(_REPO / "src" / "agents" / "scheduler.py")],
+            cwd=str(_REPO),
+        )
+        PID_FILE.write_text(str(proc.pid))
+    except Exception as exc:
+        return RedirectResponse(f"/admin/backoffice?err={exc}", status_code=303)
+    return RedirectResponse("/admin/backoffice?bot=started", status_code=303)
 
 
 @app.post("/bot/stop")
