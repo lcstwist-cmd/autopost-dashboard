@@ -414,86 +414,16 @@
         </div>
       </div>
 
-      <!-- PUBLISH PANEL -->
+      <!-- PUBLISH PANEL (no duplicate IDs — pub bar above handles the publish action) -->
       <div id="panel-pub" style="display:none;">
-        <div class="panel rounded-xl p-6 space-y-5">
-
-          <div>
-            <p class="text-sm font-bold text-white mb-1">Publish Post</p>
-            <p class="text-xs text-gray-500">Seleaza platformele, varianta si apasa Publish.</p>
-          </div>
-
-          <!-- Platforms -->
-          <div>
-            <p class="text-xs text-gray-400 uppercase tracking-wider mb-3 font-semibold">Platforme</p>
-            <div class="grid grid-cols-2 gap-3">
-              <label id="lbl-telegram" class="flex items-center gap-3 p-4 rounded-xl cursor-pointer border-2 border-blue-600 transition"
-                     style="background:#0d1e35;" onclick="togglePlatform('telegram')">
-                <input type="checkbox" id="chk-telegram" checked class="hidden">
-                <span class="text-2xl">✈</span>
-                <div>
-                  <p class="font-bold text-sm text-white">Telegram</p>
-                  <p class="text-xs text-gray-400">@elitemargindesk</p>
-                </div>
-                <span id="chk-telegram-icon" class="ml-auto text-blue-400 text-lg">✓</span>
-              </label>
-              <label id="lbl-x" class="flex items-center gap-3 p-4 rounded-xl cursor-pointer border-2 border-blue-600 transition"
-                     style="background:#0d1e35;" onclick="togglePlatform('x')">
-                <input type="checkbox" id="chk-x" checked class="hidden">
-                <span class="text-2xl">✖</span>
-                <div>
-                  <p class="font-bold text-sm text-white">X / Twitter</p>
-                  <p class="text-xs text-gray-400">@ELITEMARGINDESK</p>
-                </div>
-                <span id="chk-x-icon" class="ml-auto text-blue-400 text-lg">✓</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- X Variant + Dry-run -->
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <p class="text-xs text-gray-400 uppercase tracking-wider mb-2 font-semibold">Varianta X</p>
-              <div class="flex gap-2">
-                {% for v, label in [('auto','Auto'), ('A','A — Factual'), ('B','B — Hook')] %}
-                <button onclick="setVariant('{{ v }}')" id="var-btn-{{ v }}"
-                        class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition
-                               {{ 'border-blue-500 text-blue-300' if v == 'auto' else 'border-gray-700 text-gray-400' }}"
-                        style="background:#0a0f1a;">{{ label }}</button>
-                {% endfor %}
-              </div>
-              <input type="hidden" id="selected-variant" value="auto">
-            </div>
-            <div>
-              <p class="text-xs text-gray-400 uppercase tracking-wider mb-2 font-semibold">Mod</p>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <div onclick="toggleDryRun()" id="dry-toggle"
-                     class="w-10 h-5 rounded-full relative transition-colors duration-200"
-                     style="background:#374151;">
-                  <div id="dry-thumb" class="w-4 h-4 bg-white rounded-full absolute top-0.5 left-0.5 transition-transform duration-200"></div>
-                </div>
-                <span id="dry-label" class="text-sm text-gray-400">Dry-run</span>
-              </label>
-              <p class="text-xs text-gray-600 mt-1">Dezactivat = postare reala</p>
-            </div>
-          </div>
+        <div class="panel rounded-xl p-6 space-y-4">
+          <p class="text-sm font-bold text-white">Publish Post</p>
+          <p class="text-xs text-gray-500">Foloseste bara de Publică de mai sus sau setarile de mai jos.</p>
 
           <!-- Preview rezumat -->
           <div class="p-4 rounded-lg text-xs" style="background:#0a0f1a;border:1px solid #374151;">
             <p class="text-gray-500 mb-2 font-semibold uppercase tracking-wider">Preview postare X</p>
-            <p class="text-gray-300 leading-relaxed whitespace-pre-wrap" id="pub-preview-text" style="max-height:120px;overflow:hidden;">{{ post_x[:300] }}{% if post_x|length > 300 %}…{% endif %}</p>
-          </div>
-
-          <!-- Publish button -->
-          <button onclick="doPublish()" id="pub-btn"
-                  class="w-full py-3 rounded-xl font-bold text-base transition"
-                  style="background:#065f46;color:#34d399;border:2px solid #059669;">
-            🚀 Publică acum
-          </button>
-
-          <!-- Result -->
-          <div id="pub-result" style="display:none;" class="rounded-xl overflow-hidden border border-gray-700">
-            <div id="pub-result-inner" class="p-5 space-y-3"></div>
+            <p class="text-gray-300 leading-relaxed whitespace-pre-wrap" style="max-height:120px;overflow:hidden;">{{ post_x[:300] }}{% if post_x|length > 300 %}…{% endif %}</p>
           </div>
 
           <!-- Previous publish log -->
@@ -746,6 +676,15 @@
 
 <script>
 const SLOT = "{{ name }}";
+
+// HTML escape helper — prevents XSS in dynamic content
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
 
 // --- Tabs ---
 function showTab(id) {
