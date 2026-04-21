@@ -73,58 +73,66 @@
     <div class="card rounded-2xl p-6">
       <p class="section-title">✖ X / Twitter</p>
 
-      <!-- Make.com (FREE — recommended) -->
+      <!-- twikit: email + password (FREE, recommended) -->
       <div class="mb-5 px-4 py-3 rounded-xl" style="background:#0a1a0a;border:1px solid #166534;">
-        <p class="text-xs font-bold text-green-400 mb-2">✅ Metoda GRATUITA — Make.com Webhook (recomandat)</p>
-        <p class="text-xs text-gray-400 mb-3">
-          Nu ai nevoie de plan X API platit. Foloseste <strong class="text-white">Make.com</strong> (gratuit, 1000 operatii/luna).
-        </p>
-        <details class="mb-3">
-          <summary class="text-xs text-blue-400 cursor-pointer hover:text-blue-300">📋 Cum configurezi Make.com (click sa vezi pasii)</summary>
-          <ol class="mt-2 text-xs text-gray-400 space-y-1 pl-3">
-            <li>1. Mergi la <a href="https://make.com" target="_blank" class="text-blue-400 underline">make.com</a> → Cont gratuit</li>
-            <li>2. Create a new Scenario</li>
-            <li>3. Adauga modul: <strong class="text-white">Webhooks → Custom Webhook</strong> → Copy URL</li>
-            <li>4. Adauga modul: <strong class="text-white">X (Twitter) → Create a Tweet</strong></li>
-            <li>5. In campul <em>Text</em> pune: <code class="text-yellow-300">{{1.text}}</code></li>
-            <li>6. Save & Activate scenariul</li>
-            <li>7. Copiaza URL-ul webhook-ului de mai jos</li>
-          </ol>
-        </details>
-        <div>
-          <label class="block text-xs text-gray-400 mb-1">Make.com Webhook URL <span class="text-green-600">(daca e setat, se foloseste automat in loc de API keys)</span></label>
-          <input type="text" name="make_x_webhook_url"
-            value="{{ s.make_x_webhook_url or '' }}"
-            placeholder="https://hook.eu2.make.com/xxxxxxxxxxxxxxxx">
+        <p class="text-xs font-bold text-green-400 mb-1">✅ Metoda GRATUITA — Login cu cont X (recomandat)</p>
+        <p class="text-xs text-gray-500 mb-3">Introdu user + email + parola contului tau X. Nu e nevoie de API keys sau plan platit.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Username X</label>
+            <input type="text" name="x_username"
+              value="{{ s.x_username or '' }}"
+              placeholder="ELITEMARGINDESK">
+            <p class="text-xs text-gray-600 mt-1">Fara @</p>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Email cont X</label>
+            <input type="text" name="x_email"
+              value="{{ s.x_email or '' }}"
+              placeholder="email@exemplu.com">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Parola cont X</label>
+            <input type="password" name="x_password"
+              value="{{ s.x_password or '' }}"
+              placeholder="parola contului X">
+          </div>
         </div>
       </div>
 
-      <!-- Direct API (requires paid plan) -->
+      <!-- Make.com (fallback) -->
+      <details class="mb-4">
+        <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300">▸ Alternativa: Make.com Webhook (daca login direct nu merge)</summary>
+        <div class="mt-3 px-3 py-3 rounded-lg" style="background:#060f06;border:1px solid #1a3a1a;">
+          <label class="block text-xs text-gray-400 mb-1">Make.com Webhook URL</label>
+          <input type="text" name="make_x_webhook_url"
+            value="{{ s.make_x_webhook_url or '' }}"
+            placeholder="https://hook.eu2.make.com/xxxxxxxxxxxxxxxx">
+          <p class="text-xs text-gray-600 mt-1">make.com → New Scenario → Webhooks → Custom Webhook + X → Create Tweet</p>
+        </div>
+      </details>
+
+      <!-- Direct API (last resort) -->
       <details>
-        <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-400 mb-3">▸ X API direct (necesita plan Basic $100/luna — optional)</summary>
+        <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-400">▸ X API direct (necesita plan Basic $100/luna)</summary>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
           <div>
             <label class="block text-xs text-gray-400 mb-1">API Key</label>
-            <input type="password" name="x_api_key"
-              value="{{ s.x_api_key or '' }}" placeholder="API Key">
+            <input type="password" name="x_api_key" value="{{ s.x_api_key or '' }}" placeholder="API Key">
           </div>
           <div>
             <label class="block text-xs text-gray-400 mb-1">API Secret</label>
-            <input type="password" name="x_api_secret"
-              value="{{ s.x_api_secret or '' }}" placeholder="API Secret">
+            <input type="password" name="x_api_secret" value="{{ s.x_api_secret or '' }}" placeholder="API Secret">
           </div>
           <div>
             <label class="block text-xs text-gray-400 mb-1">Access Token</label>
-            <input type="password" name="x_access_token"
-              value="{{ s.x_access_token or '' }}" placeholder="Access Token">
+            <input type="password" name="x_access_token" value="{{ s.x_access_token or '' }}" placeholder="Access Token">
           </div>
           <div>
             <label class="block text-xs text-gray-400 mb-1">Access Token Secret</label>
-            <input type="password" name="x_access_secret"
-              value="{{ s.x_access_secret or '' }}" placeholder="Access Token Secret">
+            <input type="password" name="x_access_secret" value="{{ s.x_access_secret or '' }}" placeholder="Access Token Secret">
           </div>
         </div>
-        <p class="text-xs text-gray-600 mt-2">Daca ai si Make.com URL setat, acesta are prioritate.</p>
       </details>
     </div>
 

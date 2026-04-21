@@ -95,6 +95,9 @@ def _inject_admin_settings():
             "X_ACCESS_TOKEN":        s.get("x_access_token", ""),
             "X_ACCESS_TOKEN_SECRET": s.get("x_access_secret", ""),
             "MAKE_X_WEBHOOK_URL":    s.get("make_x_webhook_url", ""),
+            "X_USERNAME":            s.get("x_username", ""),
+            "X_EMAIL":               s.get("x_email", ""),
+            "X_PASSWORD":            s.get("x_password", ""),
             "ELEVENLABS_API_KEY":    s.get("elevenlabs_key", ""),
         }
         for k, v in mapping.items():

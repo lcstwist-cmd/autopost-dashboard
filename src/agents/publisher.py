@@ -223,6 +223,94 @@ def publish_telegram(queue: dict[str, Any], dry_run: bool = True) -> dict[str, A
         return {"status": "error", "error": str(exc)}
 
 
+# --- X via twikit (unofficial web API — email + password, no API plan) -----
+
+def _cookies_path() -> Path:
+    """Persistent path for saved X session cookies."""
+    data_dir = os.environ.get("DATA_DIR", "").strip()
+    if data_dir:
+        return Path(data_dir) / "x_twikit_cookies.json"
+    return _REPO_ROOT / "x_twikit_cookies.json"
+
+
+def publish_x_twikit(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
+    """Post to X using twikit (unofficial web API — no API plan needed).
+
+    Authenticates with X username + email + password, saves session cookies
+    so subsequent posts skip the login step.
+    """
+    text:       str  = queue["post_x"]
+    image_path: Path = queue["image_x"]
+
+    if dry_run:
+        return {"status": "dry_run", "text": text}
+
+    username = os.environ.get("X_USERNAME", "").strip().lstrip("@")
+    email    = os.environ.get("X_EMAIL",    "").strip()
+    password = os.environ.get("X_PASSWORD", "").strip()
+
+    if not all([username, email, password]):
+        missing = [k for k, v in {"X_USERNAME": username, "X_EMAIL": email,
+                                   "X_PASSWORD": password}.items() if not v]
+        return {"status": "error",
+                "error": f"X credentials missing: {', '.join(missing)} — set them in Settings"}
+
+    try:
+        import twikit
+    except ImportError:
+        return {"status": "error",
+                "error": "twikit not installed — redeploy to pick up requirements.txt"}
+
+    import asyncio
+
+    async def _post_async() -> str:
+        client = twikit.Client("en-US")
+        cookies_file = _cookies_path()
+
+        # Try saved cookies first to avoid login every time
+        if cookies_file.exists():
+            try:
+                client.load_cookies(str(cookies_file))
+                # Quick auth check
+                await client.user()
+            except Exception:
+                cookies_file.unlink(missing_ok=True)
+                await client.login(auth_info_1=username,
+                                   auth_info_2=email,
+                                   password=password)
+                client.save_cookies(str(cookies_file))
+        else:
+            await client.login(auth_info_1=username,
+                               auth_info_2=email,
+                               password=password)
+            client.save_cookies(str(cookies_file))
+
+        # Upload image if available
+        media_ids = []
+        if image_path and image_path.exists():
+            try:
+                media_id = await client.upload_media(str(image_path))
+                media_ids.append(media_id)
+            except Exception as exc:
+                print(f"[publisher] twikit image upload failed ({exc}) — posting text-only")
+
+        tweet = await client.create_tweet(
+            text=text,
+            media_ids=media_ids if media_ids else None,
+        )
+        return str(tweet.id)
+
+    try:
+        tweet_id = asyncio.run(_post_async())
+        return {"status": "ok", "tweet_id": tweet_id,
+                "url": f"https://x.com/i/web/status/{tweet_id}",
+                "via": "twikit"}
+    except Exception as exc:
+        # If cookies expired and re-login also failed, delete stale cookies
+        _cookies_path().unlink(missing_ok=True)
+        return {"status": "error", "error": f"twikit: {exc}"}
+
+
 # --- X via Make.com webhook (free, no API plan needed) ----------------------
 
 def _publish_x_makecom(text: str, image_path: Path, webhook_url: str) -> dict[str, Any]:
@@ -279,7 +367,11 @@ def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
     if dry_run:
         return {"status": "dry_run", "text": text, "image": str(image_path)}
 
-    # ── Make.com webhook (free, no X API plan needed) ────────────────────────
+    # ── twikit (email+password, no API plan) — highest priority if set ───────
+    if os.environ.get("X_USERNAME") and os.environ.get("X_PASSWORD"):
+        return publish_x_twikit(queue, dry_run=False)
+
+    # ── Make.com webhook (second choice) ─────────────────────────────────────
     makecom_url = os.environ.get("MAKE_X_WEBHOOK_URL", "").strip()
     if makecom_url:
         return _publish_x_makecom(text, image_path, makecom_url)
