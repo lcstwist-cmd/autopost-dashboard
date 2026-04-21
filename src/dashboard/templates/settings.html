@@ -100,16 +100,25 @@
     <!-- D-ID -->
     <div class="card rounded-2xl p-6">
       <p class="section-title">🧑 D-ID Avatar</p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="mb-3 px-3 py-2 rounded-lg text-xs text-blue-300" style="background:#0d1e35;border:1px solid #1e3a5f;">
+        <strong>Cum obții cheia:</strong> Mergi la <a href="https://studio.d-id.com" target="_blank" class="underline">studio.d-id.com</a>
+        → Profile → API → copiază cheia care arată ca: <code class="text-yellow-300">bGNz...@gmail.com:secret</code><br>
+        Cheia se pune direct în câmpul <em>D-ID API Key</em> (fără email separat dacă e în formatul complet).
+      </div>
+      <div class="grid grid-cols-1 gap-4">
         <div>
-          <label class="block text-xs text-gray-400 mb-1">API Key</label>
+          <label class="block text-xs text-gray-400 mb-1">D-ID API Key <span class="text-gray-600">(format: base64email:secret)</span></label>
           <input type="password" name="did_api_key"
-            value="{{ s.did_api_key or '' }}" placeholder="D-ID API Key">
+            value="{{ s.did_api_key or '' }}"
+            placeholder="bGNzdHdpc3RAZ21haWwuY29t:ZkgX...">
+          <p class="text-xs text-gray-600 mt-1">Copiază cheia completă din D-ID Studio → API Keys</p>
         </div>
         <div>
-          <label class="block text-xs text-gray-400 mb-1">Email (D-ID account)</label>
-          <input type="text" name="did_email"
-            value="{{ s.did_email or '' }}" placeholder="you@example.com">
+          <label class="block text-xs text-gray-400 mb-1">Presenter Photo URL <span class="text-gray-600">(opțional)</span></label>
+          <input type="text" name="did_presenter_url"
+            value="{{ s.did_presenter_url or '' }}"
+            placeholder="https://... URL la o poză cu fața ta sau un avatar">
+          <p class="text-xs text-gray-600 mt-1">URL public la o imagine JPG/PNG cu un chip (față clară, fundal simplu). Lasă gol pentru imaginea default.</p>
         </div>
       </div>
     </div>

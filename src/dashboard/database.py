@@ -52,10 +52,11 @@ def init_db():
             x_api_secret      TEXT DEFAULT '',
             x_access_token    TEXT DEFAULT '',
             x_access_secret   TEXT DEFAULT '',
-            did_api_key       TEXT DEFAULT '',
-            did_email         TEXT DEFAULT '',
-            elevenlabs_key    TEXT DEFAULT '',
-            anthropic_key     TEXT DEFAULT '',
+            did_api_key           TEXT DEFAULT '',
+            did_email             TEXT DEFAULT '',
+            did_presenter_url     TEXT DEFAULT '',
+            elevenlabs_key        TEXT DEFAULT '',
+            anthropic_key         TEXT DEFAULT '',
             updated_at        TEXT DEFAULT (datetime('now'))
         );
         CREATE TABLE IF NOT EXISTS sessions (
@@ -174,7 +175,7 @@ def save_user_settings(user_id: int, **kwargs):
     fields = [
         "telegram_token", "telegram_channel",
         "x_api_key", "x_api_secret", "x_access_token", "x_access_secret",
-        "did_api_key", "did_email", "elevenlabs_key", "anthropic_key",
+        "did_api_key", "did_email", "did_presenter_url", "elevenlabs_key", "anthropic_key",
     ]
     data = {k: kwargs.get(k, "") for k in fields}
     with _conn() as c:
@@ -182,11 +183,11 @@ def save_user_settings(user_id: int, **kwargs):
             INSERT INTO user_settings
                 (user_id, telegram_token, telegram_channel,
                  x_api_key, x_api_secret, x_access_token, x_access_secret,
-                 did_api_key, did_email, elevenlabs_key, anthropic_key, updated_at)
+                 did_api_key, did_email, did_presenter_url, elevenlabs_key, anthropic_key, updated_at)
             VALUES
                 (:user_id, :telegram_token, :telegram_channel,
                  :x_api_key, :x_api_secret, :x_access_token, :x_access_secret,
-                 :did_api_key, :did_email, :elevenlabs_key, :anthropic_key, datetime('now'))
+                 :did_api_key, :did_email, :did_presenter_url, :elevenlabs_key, :anthropic_key, datetime('now'))
             ON CONFLICT(user_id) DO UPDATE SET
                 telegram_token=excluded.telegram_token,
                 telegram_channel=excluded.telegram_channel,
@@ -196,6 +197,7 @@ def save_user_settings(user_id: int, **kwargs):
                 x_access_secret=excluded.x_access_secret,
                 did_api_key=excluded.did_api_key,
                 did_email=excluded.did_email,
+                did_presenter_url=excluded.did_presenter_url,
                 elevenlabs_key=excluded.elevenlabs_key,
                 anthropic_key=excluded.anthropic_key,
                 updated_at=excluded.updated_at

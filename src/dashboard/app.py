@@ -333,6 +333,7 @@ async def settings_save(request: Request,
                         x_access_secret: str = Form(""),
                         did_api_key: str = Form(""),
                         did_email: str = Form(""),
+                        did_presenter_url: str = Form(""),
                         elevenlabs_key: str = Form(""),
                         anthropic_key: str = Form("")):
     save_user_settings(
@@ -345,6 +346,7 @@ async def settings_save(request: Request,
         x_access_secret=x_access_secret,
         did_api_key=did_api_key,
         did_email=did_email,
+        did_presenter_url=did_presenter_url,
         elevenlabs_key=elevenlabs_key,
         anthropic_key=anthropic_key,
     )
@@ -997,23 +999,23 @@ async def build_avatar_video_route(request: Request, name: str,
 
 def _with_did(settings: dict, fn):
     """Run fn() with user's D-ID credentials injected."""
-    old_key   = os.environ.get("DID_API_KEY")
-    old_email = os.environ.get("DID_API_EMAIL")
-    if settings.get("did_api_key"):
-        os.environ["DID_API_KEY"] = settings["did_api_key"]
-    if settings.get("did_email"):
-        os.environ["DID_API_EMAIL"] = settings["did_email"]
+    mapping = {
+        "DID_API_KEY":       settings.get("did_api_key", ""),
+        "DID_API_EMAIL":     settings.get("did_email", ""),
+        "DID_PRESENTER_URL": settings.get("did_presenter_url", ""),
+    }
+    old = {k: os.environ.get(k) for k in mapping}
+    for k, v in mapping.items():
+        if v:
+            os.environ[k] = v
     try:
         return fn()
     finally:
-        if old_key is None:
-            os.environ.pop("DID_API_KEY", None)
-        else:
-            os.environ["DID_API_KEY"] = old_key
-        if old_email is None:
-            os.environ.pop("DID_API_EMAIL", None)
-        else:
-            os.environ["DID_API_EMAIL"] = old_email
+        for k, v in old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 # ---------------------------------------------------------------------------
