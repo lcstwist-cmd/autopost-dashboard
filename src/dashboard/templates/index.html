@@ -39,6 +39,8 @@
              display:inline-block; box-shadow:0 0 6px #34d399; animation:pulse 2s infinite; }
   .dot-off { width:9px; height:9px; border-radius:50%; background:#6b7280; display:inline-block; }
   @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.5;} }
+  @keyframes flash { 0%,100%{border-color:#1f2937;} 50%{border-color:#3b82f6;box-shadow:0 0 16px rgba(59,130,246,.4);} }
+  .flash-highlight { animation:flash .8s ease 3; }
   ::-webkit-scrollbar { width:5px; }
   ::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
   input[type=number] { background:#0a0f1a; border:1px solid #374151; color:#e5e7eb;
@@ -69,7 +71,7 @@
       </a>
       {% endif %}
 
-      <button class="btn btn-green" onclick="document.getElementById('quick-video').scrollIntoView({behavior:'smooth'})">
+      <button class="btn btn-green" onclick="const el=document.getElementById('quick-video');el.scrollIntoView({behavior:'smooth'});el.classList.add('flash-highlight');setTimeout(()=>el.classList.remove('flash-highlight'),2500);">
         🎬 Video
       </button>
 
@@ -443,8 +445,9 @@ async function doGenerate() {
   }
 }
 // Close modal on backdrop click
-document.getElementById('gen-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeGenModal();
+document.addEventListener('DOMContentLoaded', function() {
+  const m = document.getElementById('gen-modal');
+  if (m) m.addEventListener('click', function(e) { if (e.target === this) closeGenModal(); });
 });
 
 function esc(s) {
