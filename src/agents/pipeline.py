@@ -18,6 +18,16 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Force UTF-8 on stdout/stderr so log lines with unicode (e.g. "≈", "→", "✓")
+# don't crash on Windows cp1252 terminals.
+for _stream_name in ("stdout", "stderr"):
+    _stream = getattr(sys, _stream_name, None)
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 _HERE = Path(__file__).resolve().parent
 _REPO_ROOT = _HERE.parent.parent
 if str(_REPO_ROOT) not in sys.path:
@@ -29,14 +39,69 @@ try:
 except ImportError:
     pass
 
+import re as _re
+
 from src.agents.news_scout import collect_news  # noqa: E402
 from src.agents.ranker import rank              # noqa: E402
 
-STAGES = ["scout", "rank", "copy", "image", "reel", "video", "publish"]
+STAGES = ["scout", "rank", "copy", "image", "reel", "video", "avatar", "publish"]
 
 
-def _stage_scout(out_dir: Path, hours_back: int, published_after=None) -> list[dict]:
-    stories = collect_news(hours_back=hours_back, published_after=published_after)
+# ---------------------------------------------------------------------------
+# Cross-slot deduplication helpers
+# ---------------------------------------------------------------------------
+
+def _title_tokens(title: str) -> frozenset:
+    return frozenset(_re.findall(r"[a-z0-9]+", title.lower()))
+
+
+def _jaccard(a: frozenset, b: frozenset) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _posted_titles_today(out_root: Path, today: str, current_slot: str) -> list[str]:
+    """Return titles from slots already run today (to avoid re-posting same story)."""
+    titles: list[str] = []
+    for slot in ("morning", "evening"):
+        if slot == current_slot:
+            continue
+        p = out_root / f"{today}_{slot}" / "top2.json"
+        if not p.exists():
+            continue
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            stories = data.get("stories", []) if isinstance(data, dict) else data
+            titles.extend(s.get("title", "") for s in stories if s.get("title"))
+        except Exception:
+            pass
+    return titles
+
+
+def _dedup_against_posted(stories: list[dict], posted_titles: list[str],
+                           threshold: float = 0.45) -> list[dict]:
+    """Filter out stories whose title is too similar to already-posted ones."""
+    if not posted_titles:
+        return stories
+    posted_tok = [_title_tokens(t) for t in posted_titles if t]
+    kept, dropped = [], 0
+    for story in stories:
+        toks = _title_tokens(story.get("title", ""))
+        if any(_jaccard(toks, pt) >= threshold for pt in posted_tok):
+            dropped += 1
+            print(f"[pipeline] dedup-skip (similar to today's post): {story.get('title','')[:70]}")
+        else:
+            kept.append(story)
+    if dropped:
+        print(f"[pipeline] cross-slot dedup: removed {dropped} duplicate(s), {len(kept)} remain")
+    return kept
+
+
+def _stage_scout(out_dir: Path, hours_back: int, published_after=None,
+                 niche: str = "crypto") -> list[dict]:
+    stories = collect_news(hours_back=hours_back, published_after=published_after,
+                           niche=niche)
     (out_dir / "raw_news.json").write_text(
         json.dumps(stories, indent=2, ensure_ascii=False),
         encoding="utf-8",
@@ -45,8 +110,26 @@ def _stage_scout(out_dir: Path, hours_back: int, published_after=None) -> list[d
     return stories
 
 
-def _stage_rank(out_dir: Path, stories: list[dict], slot: str) -> list[dict]:
-    picked = rank(stories, top_n=2)
+def _stage_rank(out_dir: Path, stories: list[dict], slot: str, niche: str = "crypto") -> list[dict]:
+    # Boost stories matching trending coins from forecast
+    try:
+        import importlib.util as _ilu
+        _spec = _ilu.spec_from_file_location(
+            "trend_predictor", Path(__file__).parent / "trend_predictor.py"
+        )
+        _mod = _ilu.module_from_spec(_spec)   # type: ignore
+        _spec.loader.exec_module(_mod)         # type: ignore
+        top_tickers = set(_mod.get_top_tickers(n=5))
+        if top_tickers:
+            for s in stories:
+                story_tickers = {t.upper() for t in (s.get("tickers") or [])}
+                if story_tickers & top_tickers:
+                    s["score"] = s.get("score", 50) + 15
+            print(f"[pipeline] trend boost applied for: {top_tickers}")
+    except Exception:
+        pass
+
+    picked = rank(stories, top_n=3, niche=niche)
     report = {
         "picked_at": datetime.now(timezone.utc).isoformat(),
         "slot": slot,
@@ -77,7 +160,7 @@ def _stage_rank(out_dir: Path, stories: list[dict], slot: str) -> list[dict]:
     return picked
 
 
-def _stage_copy(out_dir: Path, model: str) -> None:
+def _stage_copy(out_dir: Path, model: str, niche: str = "crypto") -> None:
     from src.agents.copywriter import write_outputs
     top2 = json.loads((out_dir / "top2.json").read_text(encoding="utf-8"))
     stories = top2.get("stories") or []
@@ -85,22 +168,32 @@ def _stage_copy(out_dir: Path, model: str) -> None:
         print("[pipeline] copy: no stories in top2.json — skipping", file=sys.stderr)
         return
     story = stories[0]
-    stats = write_outputs(story, out_dir, model=model)
+    stats = write_outputs(story, out_dir, model=model, niche=niche)
     print(f"[pipeline] copy: post_x={stats['post_x_chars']}wc  "
           f"tg={stats['post_telegram_chars']}c  img_prompt={stats['image_prompt_chars']}c")
 
 
-def _stage_image(out_dir: Path, template: Path) -> None:
-    from src.agents.image_gen import render_all
+def _stage_image(out_dir: Path, template: Path, niche: str = "crypto") -> None:
+    from src.agents.image_gen import render_all, render_roundup_image
     top2 = json.loads((out_dir / "top2.json").read_text(encoding="utf-8"))
     stories = top2.get("stories") or []
     if not stories:
         print("[pipeline] image: no stories in top2.json — skipping", file=sys.stderr)
         return
-    story = stories[0]
-    # Render X card + Telegram square + Reels/Shorts 9:16 vertical
-    render_all(story, out_dir, seed=42, sizes=["x", "tg", "reel"])
-    print(f"[pipeline] image: rendered x + tg + reel (9:16)")
+    daily_seed = datetime.now().toordinal()
+    # X (landscape 16:9), Telegram (square 1:1) and YouTube thumbnail (16:9 1280x720)
+    render_all(stories[0], out_dir, seed=daily_seed, sizes=["x", "tg", "yt_thumb"], niche=niche)
+    # Reel (9:16) and IG feed (4:5) — multi-story roundup with top 3
+    top3 = stories[:3]
+    if len(top3) > 1:
+        render_roundup_image(top3, out_dir / "image_reel_1080x1920.png",
+                             width=1080, height=1920, seed=daily_seed)
+        render_roundup_image(top3, out_dir / "image_ig_1080x1350.png",
+                             width=1080, height=1350, seed=daily_seed)
+        print(f"[pipeline] image: x+tg+yt_thumb single-story, reel+ig roundup top-{len(top3)} (niche={niche})")
+    else:
+        render_all(stories[0], out_dir, seed=daily_seed, sizes=["reel", "ig_feed"], niche=niche)
+        print(f"[pipeline] image: rendered x+tg+yt_thumb+reel+ig_feed (niche={niche})")
 
 
 def _stage_reel(out_dir: Path) -> None:
@@ -111,19 +204,25 @@ def _stage_reel(out_dir: Path) -> None:
     if not stories:
         print("[pipeline] reel: no stories in top2.json — skipping", file=sys.stderr)
         return
-    story = stories[0]
 
-    # CapCut package
+    # CapCut package — still uses top story only (single-story format)
     reel_dir = out_dir / "reel"
     reel_dir.mkdir(parents=True, exist_ok=True)
-    reel_writer.write_package(story, reel_dir)
+    reel_writer.write_package(stories[0], reel_dir)
     print(f"[pipeline] reel: CapCut package -> {reel_dir}")
 
-    # Avatar script package
+    # Avatar script package — roundup mode when 2+ stories available (45s digest)
     avatar_dir = out_dir / "avatar"
     use_llm = bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())
-    avatar_writer.write_package(story, avatar_dir, use_llm=use_llm)
-    print(f"[pipeline] avatar: script package -> {avatar_dir}")
+    if len(stories) >= 2:
+        # Multi-story roundup: 45-second script covering top 3 stories
+        target_s = 45
+        avatar_writer.write_package(stories[:3], avatar_dir, use_llm=False,
+                                    target_seconds=target_s)
+        print(f"[pipeline] avatar: roundup script ({len(stories[:3])} stories, {target_s}s) -> {avatar_dir}")
+    else:
+        avatar_writer.write_package(stories[0], avatar_dir, use_llm=use_llm)
+        print(f"[pipeline] avatar: single-story script -> {avatar_dir}")
 
 
 def _stage_publish(out_dir: Path, platforms: set[str], dry_run: bool,
@@ -139,12 +238,20 @@ def _stage_publish(out_dir: Path, platforms: set[str], dry_run: bool,
     print(f"[pipeline] publish {mode} -- platforms: {result['platforms']}  "
           f"variant: {result.get('variant')}")
     for plat, res in result["results"].items():
-        extra = f" -- {res.get('error')}" if res.get("status") == "error" else ""
-        print(f"    [{plat}] {res.get('status')}{extra}")
+        status = str(res.get('status', 'unknown'))
+        error = str(res.get('error', ''))
+        # Sanitize for Windows console encoding
+        error = ''.join(c if ord(c) < 128 else '?' for c in error)
+        extra = f" -- {error}" if status == "error" else ""
+        msg = f"    [{plat}] {status}{extra}"
+        # More aggressive cleaning
+        msg = msg.encode('ascii', errors='replace').decode('ascii')
+        print(msg)
 
 
 def run_pipeline(slot, hours_back, out_root, stop_after, model, template_path,
-                 publish_live, platforms, variant=None, published_after=None):
+                 publish_live, platforms, variant=None, published_after=None,
+                 niche: str = "crypto"):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     out_dir = out_root / f"{today}_{slot}"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -155,7 +262,8 @@ def run_pipeline(slot, hours_back, out_root, stop_after, model, template_path,
 
     stories = []
     if stop_idx >= STAGES.index("scout"):
-        stories = _stage_scout(out_dir, hours_back, published_after=published_after)
+        stories = _stage_scout(out_dir, hours_back, published_after=published_after,
+                               niche=niche)
 
     if stop_idx >= STAGES.index("rank"):
         if not stories:
@@ -164,13 +272,38 @@ def run_pipeline(slot, hours_back, out_root, stop_after, model, template_path,
         if not stories:
             print("[pipeline] no stories to rank -- stopping.")
             return out_dir
-        _stage_rank(out_dir, stories, slot)
 
-    if stop_idx >= STAGES.index("copy"):
-        _stage_copy(out_dir, model)
+        # Cross-slot dedup: skip stories already covered in today's other slots
+        posted = _posted_titles_today(out_root, today, slot)
+        stories = _dedup_against_posted(stories, posted)
+        if not stories:
+            print("[pipeline] all stories already covered today — stopping.")
+            return out_dir
 
-    if stop_idx >= STAGES.index("image"):
-        _stage_image(out_dir, template_path)
+        _stage_rank(out_dir, stories, slot, niche=niche)
+
+    # OPTIMIZATION: Parallelize copy + image stages (they don't depend on each other)
+    # This reduces time from ~135s to ~120s (they run 90% in parallel due to I/O)
+    if stop_idx >= STAGES.index("copy") or stop_idx >= STAGES.index("image"):
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def _run_copy():
+            if stop_idx >= STAGES.index("copy"):
+                _stage_copy(out_dir, model, niche=niche)
+        
+        def _run_image():
+            if stop_idx >= STAGES.index("image"):
+                _stage_image(out_dir, template_path, niche=niche)
+        
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_copy = executor.submit(_run_copy)
+            future_image = executor.submit(_run_image)
+            future_copy.result()
+            future_image.result()
+    elif stop_idx >= STAGES.index("copy"):
+        _stage_copy(out_dir, model, niche=niche)
+    elif stop_idx >= STAGES.index("image"):
+        _stage_image(out_dir, template_path, niche=niche)
 
     if stop_idx >= STAGES.index("reel"):
         try:
@@ -179,13 +312,66 @@ def run_pipeline(slot, hours_back, out_root, stop_after, model, template_path,
             print(f"[pipeline] reel stage error (non-fatal): {exc}")
 
     if stop_idx >= STAGES.index("video"):
+        _video_generated = False
         try:
             from src.agents.video_builder import build_video
             build_video(out_dir)
+            _video_generated = True
         except Exception as exc:
-            print(f"[pipeline] video stage error (non-fatal): {exc}")
+            import traceback
+            print("\n" + "!" * 70)
+            print(f"[pipeline] !!! VIDEO STAGE FAILED -- trying ffmpeg fallback !!!")
+            print(f"[pipeline] Error: {exc}")
+            traceback.print_exc()
+            print("!" * 70 + "\n")
 
+        if not _video_generated:
+            # Fallback: create a 20s video from the still image via ffmpeg.
+            # Requires only ffmpeg in PATH — no additional Python dependencies.
+            try:
+                from src.agents.simple_video_gen import build_simple_video
+                fb = build_simple_video(out_dir)
+                if fb:
+                    print(f"[pipeline] ffmpeg fallback video -> {fb.name}")
+                    _video_generated = True
+                else:
+                    print("[pipeline] ffmpeg fallback also failed -- skipping video")
+            except Exception as exc2:
+                print(f"[pipeline] ffmpeg fallback error (non-fatal): {exc2}")
+
+    if stop_idx >= STAGES.index("avatar"):
+        try:
+            from src.agents.avatar_video import build_avatar_reel
+            presenter = os.environ.get("DID_PRESENTER", "default")
+            out = build_avatar_reel(out_dir, presenter=presenter)
+            print(f"[pipeline] avatar video -> {out}")
+        except Exception as exc:
+            import traceback
+            print("\n" + "!" * 70)
+            print(f"[pipeline] !!! AVATAR STAGE FAILED (non-fatal, continuing) !!!")
+            print(f"[pipeline] Error: {exc}")
+            print(f"[pipeline] Full traceback:")
+            traceback.print_exc()
+            print("!" * 70 + "\n")
+
+    # PRE-POST OPTIMIZATION — analiza zilei + selectia variantei optime
+    # Rulează după copy+reel și înainte de publish.
+    # Generează 4 variante per platformă, scorează pe 5 dimensiuni, scrie câștigătoarea.
     if stop_idx >= STAGES.index("publish"):
+        try:
+            from src.agents.pre_post_optimizer import optimize as _optimize
+            plat_list = list(platforms) if platforms else ["tiktok", "instagram", "youtube", "x"]
+            _opt_report = _optimize(out_dir, platforms=plat_list)
+            winner_summary = {
+                p: f"{v.get('winner_style')}({v.get('winner_score',0):.0f})"
+                for p, v in (_opt_report.get("platforms") or {}).items()
+            }
+            print(f"[pipeline] optimizer: {winner_summary}")
+        except Exception as exc:
+            import traceback
+            print(f"[pipeline] optimizer non-fatal error: {exc}")
+            traceback.print_exc()
+
         _stage_publish(out_dir, platforms=platforms, dry_run=not publish_live,
                        variant=variant)
         # Post-publish: refresh analytics + dashboard so the user can see

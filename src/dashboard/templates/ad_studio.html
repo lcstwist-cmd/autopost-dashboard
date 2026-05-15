@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ad Studio — EMD AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<style>
+  body {
+    background:#060c09;
+    color:#e8f5ec;
+    font-family:Inter,system-ui,sans-serif;
+  }
+  .card  { background:#0c1810; border:1px solid #1a3d26; border-radius:12px; }
+  .panel { background:#071a0d; border:1px solid #1a3d26; border-radius:10px; }
+  .card-red { background:#110d0e; border:1px solid #3d1a26; border-radius:12px; }
+  .btn { padding:8px 18px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; border:none; transition:all .15s; }
+  .btn-red    { background:linear-gradient(135deg,#e11d48 0%,#f43f5e 100%); color:#fff; }
+  .btn-red:hover { opacity:.88; }
+  .btn-green  { background:linear-gradient(135deg,#16a34a 0%,#22c55e 100%); color:#fff; }
+  .btn-green:hover { opacity:.9; }
+  .btn-gray   { background:#0c1810; color:#86a899; border:1px solid #1a3d26; }
+  .btn-gray:hover { background:#0d3320; color:#e8f5ec; }
+  .btn-amber  { background:#d97706; color:#fff; }
+  .btn-amber:hover { background:#f59e0b; }
+  input,select,textarea {
+    background:#060c09; border:1px solid #1e4232; border-radius:8px;
+    color:#e8f5ec; padding:8px 12px; width:100%;
+  }
+  input:focus,select:focus,textarea:focus { outline:none; border-color:#f43f5e; }
+  .badge { display:inline-flex; align-items:center; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:600; }
+  .badge-ok   { background:rgba(34,197,94,.15); color:#22c55e; }
+  .badge-red  { background:rgba(244,63,94,.15);  color:#f43f5e; }
+  .badge-blue { background:rgba(96,165,250,.12); color:#60a5fa; }
+  .badge-yellow { background:rgba(251,191,36,.12); color:#fbbf24; }
+  .spinner { display:inline-block; width:16px; height:16px; border:2px solid #f43f5e;
+             border-top-color:transparent; border-radius:50%;
+             animation:spin .7s linear infinite; vertical-align:middle; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .tab-btn { padding:7px 20px; border-radius:8px; font-size:13px; font-weight:600;
+             cursor:pointer; border:none; background:transparent; color:#6b7280; transition:all .15s; }
+  .tab-btn.active { background:#110d0e; color:#f43f5e; border:1px solid #3d1a26; }
+  .formula-btn { padding:10px 20px; border-radius:8px; cursor:pointer; border:2px solid #1a3d26;
+                 font-size:13px; font-weight:600; background:#060c09; color:#6b7280; transition:all .15s; }
+  .formula-btn:hover { border-color:#f43f5e; color:#e8f5ec; }
+  .formula-btn.selected { border-color:#f43f5e; background:#1a0810; color:#f43f5e; }
+  .hook-card { background:#060c09; border:1px solid #1e4232; border-radius:10px; padding:14px; cursor:pointer; transition:all .15s; }
+  .hook-card:hover { border-color:#f43f5e; }
+  .hook-card.selected { border-color:#f43f5e; background:#1a0810; }
+  .platform-pill { display:inline-flex; align-items:center; gap:6px; padding:6px 14px;
+                   border-radius:999px; font-size:12px; font-weight:600;
+                   border:1px solid #1a3d26; cursor:pointer; transition:all .15s; }
+  .platform-pill:hover { border-color:#f43f5e; }
+  pre { white-space:pre-wrap; word-break:break-word; font-family:'Courier New',monospace; font-size:12px; line-height:1.7; }
+  .copy-btn { font-size:11px; padding:3px 10px; border-radius:6px; cursor:pointer;
+              background:#1e4232; color:#86a899; border:1px solid #2d5a3d; transition:all .15s; }
+  .copy-btn:hover { background:#2d5a3d; color:#e8f5ec; }
+  .result-section { background:#060c09; border:1px solid #1e4232; border-radius:10px; padding:16px; }
+  .progress-bar { height:6px; border-radius:3px; background:#1a3d26; overflow:hidden; }
+  .progress-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#16a34a,#22c55e); transition:width .4s; }
+  .avatar-card { border:2px solid #1a3d26; border-radius:8px; cursor:pointer; overflow:hidden;
+                 transition:all .15s; background:#060c09; }
+  .avatar-card:hover { border-color:#f43f5e; }
+  .avatar-card.selected { border-color:#f43f5e; background:#1a0810; }
+  .avatar-card img { width:100%; aspect-ratio:1/1; object-fit:cover; display:block; }
+  .avatar-card .av-name { font-size:9px; padding:3px 4px; text-align:center;
+                           color:#86a899; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* __BG_REPLACED__ */
+body::before {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image: radial-gradient(circle, rgba(0,255,120,.22) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+body::after {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 85%, rgba(0,255,120,.09) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 75% at 85% 15%, rgba(6,214,160,.07) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 45% at 50% 50%, rgba(0,70,35,.06) 0%, transparent 65%);
+  animation: aurora 18s ease-in-out infinite alternate;
+}
+@keyframes aurora { 0%{opacity:.7;} 50%{opacity:1;} 100%{opacity:.75;} }
+.grid-floor {
+  position:fixed; bottom:-10%; left:50%;
+  transform:translateX(-50%) perspective(600px) rotateX(70deg);
+  transform-origin:center bottom; width:250%; height:75%; z-index:0; pointer-events:none;
+  mask-image:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 55%);
+  -webkit-mask-image:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 55%);
+}
+
+</style>
+</head>
+<body class="min-h-screen" style="display:flex;">
+<div class="grid-floor" aria-hidden="true"></div>
+
+{% include '_sidebar.html' %}
+
+<div class="main-wrap">
+<div class="max-w-6xl mx-auto px-6 py-8" style="position:relative;z-index:1;">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+        📢 <span>Ad Studio</span>
+        <span class="badge badge-red text-xs">VIRAL VIDEO ADS</span>
+      </h1>
+      <p class="mt-1 text-sm" style="color:#86a899;" data-i18n="ad.subtitle">Generează script reclamă virală (AIDA / PAS / BAB) pentru orice firmă — Instagram Reels · TikTok · YouTube Shorts</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+    <!-- LEFT: Brief form (3/5) -->
+    <div class="lg:col-span-3 space-y-5">
+
+      <!-- Company & Product -->
+      <div class="card p-5">
+        <h2 class="text-xs font-semibold uppercase tracking-wider mb-4" style="color:#86a899;" data-i18n="ad.section1">1. Brand Brief</h2>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.company">Companie / Brand *</label>
+            <input id="inp-company" type="text" placeholder="ex: Nike, EliteMarginDesk, Dr. Ana Clinic">
+          </div>
+          <div>
+            <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.product">Produs / Serviciu *</label>
+            <input id="inp-product" type="text" placeholder="ex: Air Max 2026, Trading Bot Pro">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.industry">Industrie</label>
+            <select id="inp-industry">
+              {% for ind in industries %}
+              <option value="{{ ind }}" {% if ind == 'crypto' %}selected{% endif %}>{{ ind.replace('_', ' ').title() }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.price">Preț (opțional)</label>
+            <input id="inp-price" type="text" placeholder="ex: $97/lună, €299 odată">
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.audience">Public țintă</label>
+          <input id="inp-audience" type="text" placeholder="ex: antreprenori 25-45 ani care vor să automatizeze marketing-ul">
+        </div>
+      </div>
+
+      <!-- Message -->
+      <div class="card p-5">
+        <h2 class="text-xs font-semibold uppercase tracking-wider mb-4" style="color:#86a899;" data-i18n="ad.section2">2. Mesajul reclamei</h2>
+        <div class="mb-4">
+          <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.benefit">Beneficiu cheie (ce face produsul pentru client)</label>
+          <input id="inp-benefit" type="text" placeholder="ex: 24/7 trading automat cu rată de câștig 68% verificată on-chain">
+        </div>
+        <div class="mb-4">
+          <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.proof">Dovadă / Social proof</label>
+          <input id="inp-proof" type="text" placeholder="ex: Peste 1.200 traderi activi, 4.8★ pe Trustpilot">
+        </div>
+        <div class="mb-4">
+          <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.cta_lbl">CTA — ce vrei să facă vizitatorul</label>
+          <input id="inp-cta" type="text" placeholder="ex: Încearcă gratuit 14 zile la elitemargindesk.io">
+        </div>
+      </div>
+
+      <!-- Formula & Goal -->
+      <div class="card p-5">
+        <h2 class="text-xs font-semibold uppercase tracking-wider mb-4" style="color:#86a899;" data-i18n="ad.section3">3. Formulă & Obiectiv</h2>
+
+        <div class="mb-4">
+          <label class="block text-xs mb-2" style="color:#86a899;" data-i18n="ad.formula_lbl">Formulă de copywriting</label>
+          <div class="flex flex-wrap gap-2">
+            <button class="formula-btn selected" data-formula="auto" onclick="selectFormula('auto')">
+              Auto 🤖
+            </button>
+            <button class="formula-btn" data-formula="bab" onclick="selectFormula('bab')">
+              BAB <span style="color:#6b7280;font-size:11px;">Before→After→Bridge</span>
+            </button>
+            <button class="formula-btn" data-formula="pas" onclick="selectFormula('pas')">
+              PAS <span style="color:#6b7280;font-size:11px;">Problem→Agitate→Solution</span>
+            </button>
+            <button class="formula-btn" data-formula="aida" onclick="selectFormula('aida')">
+              AIDA <span style="color:#6b7280;font-size:11px;">Attention→Interest→Desire→Action</span>
+            </button>
+          </div>
+          <p id="formula-hint" class="mt-2 text-xs" style="color:#4d7a60;" data-i18n="ad.formula_hint">Auto — selectat automat după obiectiv (Sales → BAB, Lead Gen → PAS, Brand → AIDA)</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.goal_lbl">Obiectiv campanie</label>
+            <select id="inp-goal">
+              <option value="sales" data-i18n="ad.goal_sales">Sales — Vânzări directe</option>
+              <option value="lead_gen" data-i18n="ad.goal_leadgen">Lead Gen — Colectare leads</option>
+              <option value="brand_awareness" selected>Brand Awareness</option>
+              <option value="app_download">App Download</option>
+              <option value="engagement">Engagement</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.voice_lbl">Tonul brandului</label>
+            <select id="inp-voice">
+              <option value="authoritative" data-i18n="ad.voice_auth">Autoritar (expert, news-anchor)</option>
+              <option value="energetic" data-i18n="ad.voice_energetic">Energic (TikTok, sport)</option>
+              <option value="casual" selected>Casual (prietenos, relatable)</option>
+              <option value="premium" data-i18n="ad.voice_premium">Premium (luxury, aspirațional)</option>
+              <option value="friendly">Friendly (warm, approachable)</option>
+              <option value="professional" data-i18n="ad.voice_prof">Professional (B2B, corporat)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Generate button -->
+      <button id="gen-btn" onclick="generateAd()" class="btn btn-red w-full py-3 text-base flex items-center justify-center gap-2" data-i18n="ad.generate_btn">
+        ⚡ Generează Script Viral
+      </button>
+
+      <!-- Step 4 — HeyGen Video (appears after script generated) -->
+      <div id="heygen-step" class="card p-5 hidden">
+        <h2 class="text-xs font-semibold uppercase tracking-wider mb-4 flex items-center gap-2" style="color:#86a899;">
+          <span data-i18n="ad.heygen_section">🎬 4. Generează Video cu HeyGen</span>
+          <span class="badge badge-blue text-xs">Studio Avatar</span>
+        </h2>
+
+        <!-- Avatar picker -->
+        <div class="mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs" style="color:#86a899;" data-i18n="ad.select_avatar">Selectează Avatar (Studio)</label>
+            <button onclick="loadAvatars()" class="copy-btn" data-i18n="ad.reload">🔄 Reîncarcă</button>
+          </div>
+          <div id="avatar-loading" class="text-xs py-3 text-center" style="color:#4d7a60;">
+            <span class="spinner"></span> <span data-i18n="ad.loading_avatars">Se încarcă avatarele…</span>
+          </div>
+          <div id="avatar-grid" class="grid grid-cols-3 gap-2 hidden" style="max-height:260px;overflow-y:auto;"></div>
+          <div id="avatar-error" class="hidden text-xs py-2 px-3 rounded" style="color:#f43f5e;background:#1a0810;">
+            HeyGen API Key lipsă — <a href="/settings" style="color:#f43f5e;text-decoration:underline;">configurează în Settings</a>
+          </div>
+          <div id="avatar-selected-info" class="mt-2 text-xs hidden" style="color:#22c55e;"></div>
+        </div>
+
+        <!-- Voice picker -->
+        <div class="mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs" style="color:#86a899;" data-i18n="ad.voice_label">Voce (English)</label>
+            <button onclick="loadVoices()" class="copy-btn" data-i18n="ad.reload_voices">🔄 Reîncarcă voci</button>
+          </div>
+          <div id="voice-loading" class="text-xs" style="color:#4d7a60;" data-i18n="ad.loading_voices">Se încarcă vocile…</div>
+          <select id="voice-select" class="hidden">
+            <option value="">— alege vocea —</option>
+          </select>
+          <div id="voice-preview" class="mt-2 hidden">
+            <audio id="voice-audio" controls style="width:100%;height:32px;"></audio>
+          </div>
+        </div>
+
+        <!-- Script preview (editable) -->
+        <div class="mb-4">
+          <label class="block text-xs mb-1.5" style="color:#86a899;" data-i18n="ad.script_label">Script (editabil înainte de generare)</label>
+          <textarea id="video-script" rows="5" data-i18n-ph="ad.script_ph" placeholder="Scriptul generat apare aici automat…" style="font-size:12px;line-height:1.6;"></textarea>
+        </div>
+
+        <!-- Generate video button -->
+        <button id="video-gen-btn" onclick="generateVideo()" class="btn btn-green w-full flex items-center justify-center gap-2" data-i18n="ad.gen_video_btn">
+          🎬 Generează Video 9:16 cu HeyGen
+        </button>
+
+        <!-- Video job status -->
+        <div id="video-status" class="mt-3 hidden">
+          <div class="flex items-center justify-between mb-1">
+            <span id="video-status-msg" class="text-xs" style="color:#86a899;"></span>
+            <span id="video-pct" class="text-xs font-bold" style="color:#22c55e;"></span>
+          </div>
+          <div class="progress-bar">
+            <div id="video-progress-fill" class="progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Video result -->
+        <div id="video-result" class="mt-4 hidden result-section">
+          <p class="text-xs font-semibold mb-2" style="color:#22c55e;" data-i18n="ad.video_ready">✅ Video generat!</p>
+          <video id="video-player" controls style="width:100%;border-radius:8px;max-height:300px;"></video>
+          <a id="video-download" href="#" download class="btn btn-gray w-full mt-2 flex items-center justify-center gap-2 text-sm" data-i18n="ad.download_video">
+            ⬇ Descarcă video 9:16
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: Results (2/5) -->
+    <div class="lg:col-span-2 space-y-4">
+
+      <!-- Status -->
+      <div id="status-box" class="card p-4 hidden">
+        <div id="status-msg" class="text-sm flex items-center gap-2" style="color:#86a899;"></div>
+      </div>
+
+      <!-- Result tabs -->
+      <div id="result-area" class="hidden">
+
+        <!-- Tab header -->
+        <div class="flex gap-1 p-1 rounded-lg mb-4" style="background:#060c09;border:1px solid #1a3d26;">
+          <button class="tab-btn active" onclick="showTab('script')" id="tab-script">📄 Script</button>
+          <button class="tab-btn" onclick="showTab('hooks')" id="tab-hooks">🎣 Hooks</button>
+          <button class="tab-btn" onclick="showTab('meta')" id="tab-meta">📱 Platforme</button>
+          <button class="tab-btn" onclick="showTab('heygen')" id="tab-heygen">🎬 HeyGen</button>
+        </div>
+
+        <!-- Script tab -->
+        <div id="panel-script" class="result-section">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold uppercase tracking-wider" style="color:#86a899;" data-i18n="ad.full_script">Script complet</span>
+            <div class="flex items-center gap-2">
+              <span id="formula-badge" class="badge badge-red text-xs"></span>
+              <button class="copy-btn" onclick="copyText('script-content')" data-i18n="ad.copy">Copiază</button>
+            </div>
+          </div>
+          <pre id="script-content" class="text-xs" style="color:#e8f5ec;max-height:420px;overflow-y:auto;"></pre>
+        </div>
+
+        <!-- Hooks tab -->
+        <div id="panel-hooks" class="space-y-3 hidden">
+          <p class="text-xs mb-3" style="color:#86a899;" data-i18n="ad.hooks_desc">Testează toate 3 variante — măsoară retenția la 3 secunde. Câștigătoarea → folosit în HeyGen.</p>
+          <div id="hooks-list" class="space-y-3"></div>
+          <div class="result-section mt-3">
+            <pre id="hooks-raw" class="text-xs" style="color:#4d7a60;max-height:200px;overflow-y:auto;"></pre>
+          </div>
+        </div>
+
+        <!-- Meta tab -->
+        <div id="panel-meta" class="hidden">
+          <div class="flex gap-2 mb-4" id="platform-tabs">
+            <button class="platform-pill" onclick="showPlatform('instagram')" id="ptab-instagram" style="color:#e1306c;border-color:#3d1a30;">
+              <span>📸</span> Instagram
+            </button>
+            <button class="platform-pill" onclick="showPlatform('tiktok')" id="ptab-tiktok" style="color:#69C9D0;border-color:#1a3d3d;">
+              <span>🎵</span> TikTok
+            </button>
+            <button class="platform-pill" onclick="showPlatform('youtube')" id="ptab-youtube" style="color:#FF0000;border-color:#3d1a1a;">
+              <span>▶</span> YouTube
+            </button>
+          </div>
+          <div id="platform-content" class="result-section"></div>
+        </div>
+
+        <!-- HeyGen tab -->
+        <div id="panel-heygen" class="hidden">
+          <div class="result-section mb-3">
+            <p class="text-xs font-semibold mb-2" style="color:#86a899;" data-i18n="ad.heygen_brief">Brief HeyGen / D-ID</p>
+            <div id="heygen-content" class="space-y-2 text-xs" style="color:#e8f5ec;"></div>
+          </div>
+          <div class="result-section">
+            <p class="text-xs font-semibold mb-2" style="color:#86a899;" data-i18n="ad.bg_prompt">Prompt imagine fundal 9:16</p>
+            <pre id="imgprompt-content" class="text-xs" style="color:#4d7a60;max-height:200px;overflow-y:auto;"></pre>
+            <button class="copy-btn mt-2" onclick="copyText('imgprompt-content')" data-i18n="ad.copy_prompt">Copiază prompt</button>
+          </div>
+          <a href="/avatar-studio" class="btn btn-green w-full mt-3 flex items-center justify-center gap-2 text-sm" data-i18n="ad.gen_heygen_btn">
+            🎬 Generează cu HeyGen → Avatar Studio
+          </a>
+        </div>
+
+      </div>
+
+      <!-- Recent jobs -->
+      <div class="card p-4">
+        <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:#86a899;" data-i18n="ad.recent">Reclame generate recent</h3>
+        <div id="jobs-list" class="space-y-2 text-xs" style="color:#4d7a60;">
+          <span data-i18n="ad.loading">Se încarcă…</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+let _selectedFormula = 'auto';
+let _currentMeta = {};
+let _currentPlatform = 'instagram';
+let _selectedAvatarId = '';
+let _selectedAvatarName = '';
+let _currentImagePrompt = '';
+let _videoJobId = null;
+let _videoPollingTimer = null;
+
+function getFormulaHint(f) {
+  const hints = {
+    auto: typeof AP_T !== 'undefined' ? AP_T('ad.formula_auto') : 'Auto — selected automatically by goal',
+    bab:  typeof AP_T !== 'undefined' ? AP_T('ad.formula_bab')  : 'BAB — Before/After/Bridge',
+    pas:  typeof AP_T !== 'undefined' ? AP_T('ad.formula_pas')  : 'PAS — Problem/Agitate/Solution',
+    aida: typeof AP_T !== 'undefined' ? AP_T('ad.formula_aida') : 'AIDA — Attention/Interest/Desire/Action',
+  };
+  return hints[f] || '';
+}
+
+function selectFormula(f) {
+  _selectedFormula = f;
+  document.querySelectorAll('.formula-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.formula === f);
+  });
+  document.getElementById('formula-hint').textContent = getFormulaHint(f);
+}
+
+function showTab(tab) {
+  ['script','hooks','meta','heygen'].forEach(t => {
+    document.getElementById('panel-' + t).classList.toggle('hidden', t !== tab);
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
+}
+
+function showPlatform(plat) {
+  _currentPlatform = plat;
+  ['instagram','tiktok','youtube'].forEach(p => {
+    document.getElementById('ptab-' + p).classList.toggle('active', p === plat);
+  });
+  renderPlatform(plat);
+}
+
+function renderPlatform(plat) {
+  const d = _currentMeta[plat];
+  if (!d) return;
+  const el = document.getElementById('platform-content');
+  if (plat === 'instagram') {
+    el.innerHTML = `
+      <p class="text-xs font-semibold mb-1" style="color:#86a899;">Caption</p>
+      <pre class="text-xs mb-3" style="color:#e8f5ec;">${esc(d.caption)}</pre>
+      <p class="text-xs font-semibold mb-1" style="color:#86a899;">Hashtags (${(d.hashtags||[]).length})</p>
+      <p class="text-xs mb-3" style="color:#60a5fa;">${(d.hashtags||[]).join(' ')}</p>
+      <button class="copy-btn" onclick="copyRaw(${JSON.stringify((d.full_post||''))})">${AP_T('ad.copy_all')}</button>
+    `;
+  } else if (plat === 'tiktok') {
+    el.innerHTML = `
+      <p class="text-xs font-semibold mb-1" style="color:#86a899;">Caption</p>
+      <pre class="text-xs mb-2" style="color:#e8f5ec;">${esc(d.caption)}</pre>
+      <p class="text-xs font-semibold mb-1" style="color:#86a899;">Description</p>
+      <pre class="text-xs mb-2" style="color:#4d7a60;">${esc(d.description)}</pre>
+      <p class="text-xs font-semibold mb-1" style="color:#86a899;">Hashtags</p>
+      <p class="text-xs" style="color:#60a5fa;">${(d.hashtags||[]).join(' ')}</p>
+      <button class="copy-btn mt-2" onclick="copyRaw(${JSON.stringify((d.full_caption||''))})">${AP_T('ad.copy_caption')}</button>
+    `;
+  } else {
+    el.innerHTML = `
+      <p class="text-xs font-semibold mb-1" style="color:#86a899;">Title</p>
+      <pre class="text-xs mb-2" style="color:#e8f5ec;">${esc(d.title)}</pre>
+      <p class="text-xs font-semibold mb-1" style="color:#86a899;">Description</p>
+      <pre class="text-xs mb-2" style="color:#4d7a60;">${esc(d.description)}</pre>
+      <p class="text-xs font-semibold mb-1" style="color:#86a899;">Tags</p>
+      <p class="text-xs" style="color:#60a5fa;">${(d.tags||[]).join(' ')}</p>
+    `;
+  }
+}
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyText(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.textContent || el.innerText).then(() => {
+    const btn = event.target;
+    btn.textContent = AP_T('ad.copied_txt');
+    setTimeout(() => btn.textContent = AP_T('ad.copy'), 1500);
+  });
+}
+
+function copyRaw(txt) {
+  navigator.clipboard.writeText(txt).then(() => {
+    const btn = event.target;
+    btn.textContent = AP_T('ad.copied_txt');
+    setTimeout(() => btn.textContent = AP_T('ad.copy_all'), 1500);
+  });
+}
+
+function showStatus(msg, type='info') {
+  const box = document.getElementById('status-box');
+  const el  = document.getElementById('status-msg');
+  box.classList.remove('hidden');
+  const colors = { info:'#86a899', ok:'#22c55e', err:'#f43f5e' };
+  el.style.color = colors[type] || '#86a899';
+  el.innerHTML = msg;
+}
+
+async function generateAd() {
+  const company = document.getElementById('inp-company').value.trim();
+  const product = document.getElementById('inp-product').value.trim();
+  if (!company || !product) {
+    showStatus(AP_T('ad.required_fields'), 'err');
+    return;
+  }
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> ${AP_T('ad.generating')}`;
+
+  document.getElementById('result-area').classList.add('hidden');
+  showStatus('<span class="spinner"></span> Generare script viral…', 'info');
+
+  const payload = {
+    company,
+    product,
+    industry:         document.getElementById('inp-industry').value,
+    target_audience:  document.getElementById('inp-audience').value.trim(),
+    goal:             document.getElementById('inp-goal').value,
+    price_point:      document.getElementById('inp-price').value.trim(),
+    key_benefit:      document.getElementById('inp-benefit').value.trim(),
+    proof_point:      document.getElementById('inp-proof').value.trim(),
+    cta:              document.getElementById('inp-cta').value.trim(),
+    brand_voice:      document.getElementById('inp-voice').value,
+    formula:          _selectedFormula,
+  };
+
+  try {
+    const resp = await fetch('/api/ad-script/generate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      showStatus('❌ ' + (data.detail || 'Eroare server'), 'err');
+      return;
+    }
+
+    // Show results
+    showStatus(`✅ Script ${data.formula.toUpperCase()} generat — ${data.scenes} scene · ${data.industry}`, 'ok');
+    document.getElementById('result-area').classList.remove('hidden');
+
+    // Script tab
+    document.getElementById('script-content').textContent = data.script;
+    document.getElementById('formula-badge').textContent = data.formula.toUpperCase();
+
+    // Hooks tab
+    const hooksEl = document.getElementById('hooks-list');
+    hooksEl.innerHTML = '';
+    (data.hooks || []).forEach((h, i) => {
+      const label = ['A — Direct address', 'B — Question hook', 'C — Social proof'][i] || `Variant ${i+1}`;
+      hooksEl.innerHTML += `
+        <div class="hook-card" onclick="this.classList.toggle('selected')">
+          <p class="text-xs font-semibold mb-1" style="color:#f43f5e;">${label}</p>
+          <p class="text-sm" style="color:#e8f5ec;">"${esc(h)}"</p>
+          <button class="copy-btn mt-2" onclick="event.stopPropagation();copyRaw(${JSON.stringify(h)})">${AP_T('ad.copy_hook')}</button>
+        </div>`;
+    });
+    document.getElementById('hooks-raw').textContent = data.hook_variants || '';
+
+    // Platform meta
+    _currentMeta = data.platform_meta || {};
+    showPlatform('instagram');
+
+    // HeyGen brief
+    const hg = data.heygen_brief || {};
+    const hgEl = document.getElementById('heygen-content');
+    hgEl.innerHTML = `
+      <div class="grid grid-cols-2 gap-2">
+        <div><p style="color:#86a899;">Avatar style</p><p>${esc(hg.recommended_avatar_style||'')}</p></div>
+        <div><p style="color:#86a899;">Voice style</p><p>${esc(hg.voice_style||'')}</p></div>
+        <div><p style="color:#86a899;">Resolution</p><p>${esc(hg.resolution||'1080x1920')}</p></div>
+        <div><p style="color:#86a899;">Duration</p><p>~${hg.estimated_duration_s||45}s</p></div>
+      </div>
+      <div class="mt-2 p-2 rounded" style="background:#1a0810;color:#fbbf24;">${esc(hg.notes||'')}</div>
+      <div class="mt-2 p-2 rounded text-xs" style="background:#060c09;color:#4d7a60;">${esc(hg.composite_instructions||'')}</div>
+    `;
+    document.getElementById('imgprompt-content').textContent = data.image_prompt || '';
+
+    showTab('script');
+
+    // Populate the editable script field for video generation
+    const scriptLines = [];
+    (data.script || '').split('\n').forEach(line => {
+      const m = line.match(/^\s+"(.+)"$/);
+      if (m) scriptLines.push(m[1]);
+    });
+    document.getElementById('video-script').value = scriptLines.join('\n\n');
+    _currentImagePrompt = data.image_prompt || '';
+
+    // Show HeyGen step
+    document.getElementById('heygen-step').classList.remove('hidden');
+    if (!_selectedAvatarId) loadAvatars();
+
+    loadJobs();
+  } catch(e) {
+    showStatus('❌ Eroare conexiune: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = AP_T('ad.generate_btn');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Avatars
+// ---------------------------------------------------------------------------
+
+async function loadAvatars() {
+  const grid    = document.getElementById('avatar-grid');
+  const loading = document.getElementById('avatar-loading');
+  const errEl   = document.getElementById('avatar-error');
+  grid.classList.add('hidden');
+  errEl.classList.add('hidden');
+  loading.classList.remove('hidden');
+  loading.innerHTML = `<span class="spinner"></span> ${AP_T('ad.loading_avatars')}`;
+
+  try {
+    const r = await fetch('/api/heygen/avatars');
+    const d = await r.json();
+    if (d.error) {
+      loading.classList.add('hidden');
+      errEl.classList.remove('hidden');
+      return;
+    }
+    const avatars = d.avatars || [];
+    if (!avatars.length) {
+      loading.innerHTML = `<span style="color:#4d7a60;">${AP_T('ad.no_avs_heygen')}</span>`;
+      return;
+    }
+    loading.classList.add('hidden');
+    grid.classList.remove('hidden');
+    grid.innerHTML = avatars.map(av => {
+      const thumb = av.avatar_url || av.preview_image_url || av.preview_url || '';
+      const name  = av.avatar_name || av.name || av.avatar_id || 'Avatar';
+      const id    = av.avatar_id || '';
+      return `
+        <div class="avatar-card" data-id="${esc(id)}" data-name="${esc(name)}" onclick="selectAvatar('${esc(id)}','${esc(name)}', this)">
+          ${thumb ? `<img src="${esc(thumb)}" alt="${esc(name)}" loading="lazy">` : `<div style="aspect-ratio:1/1;background:#1a3d26;display:flex;align-items:center;justify-content:center;font-size:24px;">🧑</div>`}
+          <div class="av-name">${esc(name)}</div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    loading.innerHTML = `<span style="color:#f43f5e;">Eroare: ${esc(e.message)}</span>`;
+  }
+}
+
+function selectAvatar(id, name, el) {
+  _selectedAvatarId   = id;
+  _selectedAvatarName = name;
+  document.querySelectorAll('.avatar-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const info = document.getElementById('avatar-selected-info');
+  info.classList.remove('hidden');
+  info.textContent = AP_T('ad.av_selected') + name;
+}
+
+// ---------------------------------------------------------------------------
+// Voices
+// ---------------------------------------------------------------------------
+
+async function loadVoices() {
+  const sel     = document.getElementById('voice-select');
+  const loading = document.getElementById('voice-loading');
+  sel.classList.add('hidden');
+  loading.classList.remove('hidden');
+  loading.textContent = AP_T('ad.loading_voices');
+
+  try {
+    const r = await fetch('/api/heygen/voices');
+    const d = await r.json();
+    if (d.error) {
+      loading.textContent = AP_T('ad.def_voice_hint');
+      sel.innerHTML = `<option value="">${AP_T('ad.default_voice')}</option>`;
+      sel.classList.remove('hidden');
+      return;
+    }
+    const voices = d.voices || [];
+    loading.classList.add('hidden');
+    sel.classList.remove('hidden');
+    sel.innerHTML = `<option value="">${AP_T('ad.voice_ph')}</option>` +
+      voices.map(v => {
+        const label = `${v.name} (${v.gender || '?'})`;
+        return `<option value="${esc(v.voice_id)}" data-preview="${esc(v.preview_url||'')}">${esc(label)}</option>`;
+      }).join('');
+    sel.onchange = () => {
+      const opt = sel.selectedOptions[0];
+      const preview = opt ? opt.dataset.preview : '';
+      const box = document.getElementById('voice-preview');
+      const audio = document.getElementById('voice-audio');
+      if (preview) {
+        audio.src = preview;
+        box.classList.remove('hidden');
+      } else {
+        box.classList.add('hidden');
+      }
+    };
+  } catch(e) {
+    loading.textContent = `Eroare voci: ${e.message}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Video generation
+// ---------------------------------------------------------------------------
+
+async function generateVideo() {
+  if (!_selectedAvatarId) {
+    alert(AP_T('ad.select_av_first'));
+    return;
+  }
+  const script = document.getElementById('video-script').value.trim();
+  if (!script) {
+    alert(AP_T('ad.gen_script_first'));
+    return;
+  }
+
+  const btn = document.getElementById('video-gen-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> ${AP_T('ad.sending_heygen')}`;
+
+  document.getElementById('video-result').classList.add('hidden');
+  document.getElementById('video-status').classList.remove('hidden');
+  setVideoProgress(5, 'Pornire generare video…');
+
+  const voiceSel = document.getElementById('voice-select');
+  const voiceId  = voiceSel ? voiceSel.value : '';
+
+  try {
+    const resp = await fetch('/api/heygen/ad-video/generate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        avatar_id:    _selectedAvatarId,
+        voice_id:     voiceId,
+        script,
+        image_prompt: _currentImagePrompt,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      setVideoProgress(0, '❌ ' + (data.detail || 'Eroare server'), true);
+      return;
+    }
+    _videoJobId = data.job_id;
+    setVideoProgress(15, `Job pornit (ID: ${_videoJobId}) — se generează imaginea de fundal…`);
+    startVideoPolling();
+  } catch(e) {
+    setVideoProgress(0, '❌ ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🎬 Generează Video 9:16 cu HeyGen';
+  }
+}
+
+function setVideoProgress(pct, msg, isErr) {
+  document.getElementById('video-status-msg').textContent = msg;
+  document.getElementById('video-status-msg').style.color = isErr ? '#f43f5e' : '#86a899';
+  document.getElementById('video-pct').textContent = pct + '%';
+  document.getElementById('video-progress-fill').style.width = pct + '%';
+}
+
+function startVideoPolling() {
+  if (_videoPollingTimer) clearInterval(_videoPollingTimer);
+  _videoPollingTimer = setInterval(pollVideoJob, 4000);
+}
+
+async function pollVideoJob() {
+  if (!_videoJobId) return;
+  try {
+    const r = await fetch(`/api/heygen/ad-video/job/${_videoJobId}`);
+    const d = await r.json();
+    const pct = d.progress || 0;
+    const st  = d.status || '';
+
+    if (st === 'done') {
+      clearInterval(_videoPollingTimer);
+      setVideoProgress(100, '✅ Video gata!');
+      showVideoResult(d);
+      return;
+    }
+    if (st === 'failed') {
+      clearInterval(_videoPollingTimer);
+      setVideoProgress(pct, '❌ Eroare: ' + (d.error || 'necunoscută'), true);
+      return;
+    }
+    const msgs = {
+      5: 'Se generează imaginea de fundal 9:16…',
+      25: 'Imagine gata — se trimite la HeyGen…',
+      35: 'HeyGen procesează videoclipul…',
+      80: 'Se descarcă videoclipul…',
+      85: 'Se face compositing avatar + fundal…',
+    };
+    const msg = msgs[Math.floor(pct/10)*10] || `Procesare… ${pct}%`;
+    setVideoProgress(pct, msg);
+  } catch(e) {
+    // ignore network blip
+  }
+}
+
+function showVideoResult(job) {
+  const resultBox = document.getElementById('video-result');
+  resultBox.classList.remove('hidden');
+  const videoUrl = job.video_url || `/avatar-video/${job.video_filename || ''}`;
+  const fname    = job.video_filename || 'ad_video.mp4';
+  document.getElementById('video-player').src = videoUrl;
+  const dl = document.getElementById('video-download');
+  dl.href     = videoUrl;
+  dl.download = fname;
+  dl.textContent = job.file_size_mb
+    ? `⬇ Descarcă video 9:16 (${job.file_size_mb} MB)`
+    : '⬇ Descarcă video 9:16';
+}
+
+async function loadJobs() {
+  try {
+    const r = await fetch('/api/ad-script/jobs');
+    const d = await r.json();
+    const el = document.getElementById('jobs-list');
+    if (!d.jobs || !d.jobs.length) {
+      el.innerHTML = '<span style="color:#2d5a3d;">Nicio reclamă generată încă.</span>';
+      return;
+    }
+    el.innerHTML = d.jobs.map(j => `
+      <div class="flex items-center justify-between py-1.5" style="border-bottom:1px solid #1a3d26;">
+        <div>
+          <span class="font-semibold" style="color:#e8f5ec;">${esc(j.company)}</span>
+          <span style="color:#4d7a60;"> — ${esc(j.product)}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="badge badge-red" style="font-size:10px;">${esc(j.formula||'auto')}</span>
+          <span style="color:#4d7a60;font-size:10px;">${esc(j.industry)}</span>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    document.getElementById('jobs-list').innerHTML = '<span style="color:#4d7a60;">—</span>';
+  }
+}
+
+// Init
+loadJobs();
+</script>
+<script src="/static/i18n.js"></script>
+</div><!-- /main-wrap -->
+</body>
+</html>

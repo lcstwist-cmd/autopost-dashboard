@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Istoric Publicări — AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/elite.css">
+<style>
+body { display:flex; min-height:100vh; }
+.sidebar {
+  width:200px; flex-shrink:0; position:fixed; top:0; left:0; bottom:0;
+  background:rgba(4,7,15,.98); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; z-index:20; overflow-y:auto;
+}
+.main-wrap { margin-left:200px; flex:1; min-width:0; display:flex; flex-direction:column; }
+.top-bar {
+  position:sticky; top:0; z-index:10;
+  background:rgba(4,7,15,.96); border-bottom:1px solid var(--border);
+  padding:8px 24px; display:flex; align-items:center; justify-content:space-between;
+  backdrop-filter:blur(8px);
+}
+.main-content { padding:24px; max-width:1100px; width:100%; margin:0 auto; }
+.snav-section { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); padding:12px 16px 4px; }
+.snav-item {
+  display:flex; align-items:center; gap:10px; padding:9px 14px;
+  font-size:13px; font-weight:600; color:var(--muted);
+  text-decoration:none; border-radius:8px; margin:1px 8px;
+  transition:all .15s;
+}
+.snav-item:hover { color:var(--text); background:rgba(255,255,255,.05); }
+.snav-item.active { color:var(--cyan); background:rgba(0,212,170,.09); }
+
+.hist-row {
+  display:grid;
+  grid-template-columns: 160px 1fr auto auto;
+  align-items:center; gap:16px;
+  padding:12px 16px;
+  border-bottom:1px solid var(--border);
+  transition:background .12s;
+}
+.hist-row:hover { background:rgba(255,255,255,.02); }
+.plat-badge {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700;
+  border:1px solid;
+}
+.ok   { color:#34d399; border-color:rgba(52,211,153,.35); background:rgba(52,211,153,.07); }
+.fail { color:#f87171; border-color:rgba(248,113,113,.35); background:rgba(248,113,113,.07); }
+.dry  { color:var(--muted); border-color:var(--dim); background:rgba(0,0,0,.3); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div style="padding:18px 16px 10px;">
+    <div class="elite-logo" style="font-size:13px;line-height:1.2;">ELITEMARGINDESK</div>
+    <div class="elite-logo-tag">AutoPost AI</div>
+  </div>
+  <nav style="margin-top:8px;flex:1;">
+    <div class="snav-section">Main</div>
+    <a href="/" class="snav-item" data-i18n="nav.dashboard">🏠 Dashboard</a>
+    <a href="/settings" class="snav-item" data-i18n="nav.settings">⚙️ Settings</a>
+    <a href="/pricing" class="snav-item" data-i18n="nav.plans">💎 Plans</a>
+    <a href="/history" class="snav-item active" data-i18n="nav.history">📋 Istoric</a>
+    <a href="/viral" class="snav-item" data-i18n="nav.viral">📊 Viral Scout</a>
+    <a href="/competitor-tracker" class="snav-item" data-i18n="nav.competitors">🕵️ Competitors</a>
+    <a href="/avatar-studio" class="snav-item" data-i18n="nav.avatar">🎭 Avatar Studio</a>
+    <a href="/ad-studio" class="snav-item" data-i18n="nav.ad_studio">📢 Ad Studio</a>
+    {% if current_user.is_admin %}
+    <div class="snav-section" style="margin-top:8px;">Admin</div>
+    <a href="/admin/backoffice" class="snav-item" data-i18n="nav.backoffice">🖥️ Backoffice</a>
+    <a href="/admin/users" class="snav-item" data-i18n="nav.users">👥 Users</a>
+    {% endif %}
+  </nav>
+  <div style="padding:12px 8px;border-top:1px solid var(--border);margin-top:auto;">
+    <div style="font-size:11px;color:var(--muted);padding:0 8px;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ current_user.display_name or current_user.email }}</div>
+    <div style="display:flex;gap:4px;padding:0 8px;margin-bottom:8px;">
+      <button class="lang-btn ebtn ebtn-ghost ebtn-sm" data-lang="en" onclick="setLang('en')">EN</button>
+      <button class="lang-btn ebtn ebtn-ghost ebtn-sm" data-lang="ro" onclick="setLang('ro')">RO</button>
+    </div>
+    <form method="post" action="/logout" style="margin:0;padding:0 8px;">
+      <button type="submit" class="ebtn ebtn-danger ebtn-sm" style="width:100%;justify-content:center;" data-i18n="nav.out">Logout</button>
+    </form>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main-wrap">
+<div class="top-bar">
+  <div style="font-size:12px;font-weight:700;color:var(--muted);" data-i18n="hist.title">Istoric Publicări</div>
+  <div style="font-size:11px;color:var(--dim);">{{ history|length }} <span data-i18n="hist.records">înregistrări</span></div>
+</div>
+<div class="main-content">
+
+  {% if not history %}
+  <div style="text-align:center;padding:80px 20px;color:var(--muted);">
+    <div style="font-size:40px;margin-bottom:12px;">📭</div>
+    <div style="font-size:14px;" data-i18n="hist.empty">Nicio publicare înregistrată încă.</div>
+    <div style="font-size:12px;margin-top:6px;color:var(--dim);" data-i18n="hist.empty_hint">Istoricul apare automat după prima publicare live.</div>
+  </div>
+  {% else %}
+
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
+    <!-- header -->
+    <div class="hist-row" style="background:rgba(0,0,0,.3);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);">
+      <div data-i18n="hist.date_col">Data</div>
+      <div data-i18n="hist.title_col">Titlu / Slot</div>
+      <div data-i18n="hist.platforms_col">Platforme</div>
+      <div data-i18n="hist.status_col">Status</div>
+    </div>
+
+    {% for h in history %}
+    {% set pub_date = h.published_at[:16] %}
+    {% set res = h.results %}
+    <div class="hist-row">
+      <!-- Date -->
+      <div style="font-size:11px;color:var(--muted);font-family:monospace;">{{ pub_date }}</div>
+
+      <!-- Title + slot -->
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">{{ h.title[:80] or '—' }}</div>
+        <div style="font-size:10px;color:var(--dim);margin-top:2px;">{{ h.slot_name }}</div>
+      </div>
+
+      <!-- Platform badges -->
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">
+        {% for plat in h.platforms %}
+        <span class="plat-badge" style="font-size:9px;">{{ plat }}</span>
+        {% endfor %}
+      </div>
+
+      <!-- Per-platform status -->
+      <div style="display:flex;flex-wrap:wrap;gap:4px;max-width:220px;">
+        {% if res is mapping %}
+          {% for plat, v in res.items() %}
+          {% if v is mapping %}
+          <span class="plat-badge {{ 'ok' if v.get('status')=='ok' or v.get('ok') else ('dry' if v.get('status')=='dry_run' else 'fail') }}">
+            {{ plat[:2].upper() }} {{ '✓' if v.get('status')=='ok' or v.get('ok') else ('~' if v.get('status')=='dry_run' else '✗') }}
+          </span>
+          {% endif %}
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% endif %}
+
+</div><!-- main-content -->
+</div><!-- main-wrap -->
+<script src="/static/i18n.js"></script>
+</body>
+</html>

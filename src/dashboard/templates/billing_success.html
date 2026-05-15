@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Payment Successful — EMD AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/elite.css">
+</head>
+<body style="background:var(--bg);display:flex;align-items:center;justify-content:center;min-height:100vh;">
+<div style="text-align:center;max-width:480px;padding:40px 32px;background:var(--surface);border:1px solid rgba(0,255,120,.3);border-radius:20px;box-shadow:0 0 40px rgba(0,255,120,.08);">
+  <div style="font-size:56px;margin-bottom:16px;">🎉</div>
+  <h1 style="font-size:26px;font-weight:900;color:var(--text);margin-bottom:8px;">Payment Successful!</h1>
+  <p style="font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:8px;">
+    Your <strong style="color:var(--neon);">{{ current_plan|upper }}</strong> plan is now active.
+    All features have been unlocked on your account.
+  </p>
+  <p style="font-size:12px;color:var(--dim);margin-bottom:28px;">
+    You'll receive a receipt by email. Manage your subscription anytime from the Plans page.
+  </p>
+  <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+    <a href="/" style="padding:12px 28px;background:var(--neon);color:#020806;font-size:13px;font-weight:800;border-radius:10px;text-decoration:none;">
+      Go to Dashboard
+    </a>
+    <a href="/pricing" style="padding:12px 22px;background:rgba(255,255,255,.05);color:var(--muted);font-size:13px;font-weight:700;border-radius:10px;text-decoration:none;border:1px solid var(--border);">
+      View Plan
+    </a>
+  </div>
+</div>
+</body>
+</html>

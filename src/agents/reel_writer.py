@@ -26,11 +26,56 @@ a call to Claude/Anthropic API — see wrap_with_llm() stub.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import sys
+import time as _time
 from datetime import timedelta
 from pathlib import Path
+
+_BLUEPRINT_CACHE = Path(__file__).resolve().parent.parent.parent / "data" / "viral_blueprint.json"
+_LLM_CACHE_FILE  = Path(__file__).resolve().parent.parent.parent / "data" / "reel_llm_cache.json"
+_LLM_CACHE_TTL   = 86_400  # 24 h
+
+def _cache_key(story: dict, tone: str) -> str:
+    raw = f"{story.get('title','')[:100]}|{tone}"
+    return hashlib.md5(raw.encode("utf-8", errors="replace")).hexdigest()
+
+def _cache_get(key: str) -> dict | None:
+    try:
+        data = json.loads(_LLM_CACHE_FILE.read_text(encoding="utf-8"))
+        entry = data.get(key)
+        if entry and (_time.time() - entry["ts"]) < _LLM_CACHE_TTL:
+            return entry["v"]
+    except Exception:
+        pass
+    return None
+
+def _cache_set(key: str, value: dict) -> None:
+    try:
+        _LLM_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            data = json.loads(_LLM_CACHE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+        now = _time.time()
+        data = {k: v for k, v in data.items() if (now - v.get("ts", 0)) < _LLM_CACHE_TTL}
+        data[key] = {"ts": now, "v": value}
+        _LLM_CACHE_FILE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+# Force UTF-8 on stdout/stderr so log lines with unicode (e.g. "→")
+# don't crash on Windows cp1252 terminals.
+for _stream_name in ("stdout", "stderr"):
+    _stream = getattr(sys, _stream_name, None)
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 
 # --- Script template -------------------------------------------------------
@@ -75,16 +120,28 @@ def _extract_numbers(text: str) -> list[str]:
 
 
 def _tone_of(story: dict) -> str:
-    """bear | bull | neutral — used to pick phrasing."""
+    """bear | bull | neutral | macro — used to pick phrasing."""
     title = story["title"].lower()
+    summary = (story.get("summary") or "").lower()
+    haystack = f"{title} {summary}"
     bear_kw = ("hack", "exploit", "drain", "stolen", "crash", "plunge",
-               "liquidation", "rejected", "halt", "freeze")
+               "liquidation", "rejected", "halt", "freeze", "ban", "banned",
+               "lawsuit", "collapse", "warning", "risk")
     bull_kw = ("record", "all-time high", "ath", "surge", "rally", "approval",
-               "approved", "launch", "inflow", "accumulation")
-    if any(k in title for k in bear_kw):
+               "approved", "launch", "inflow", "accumulation", "bullish",
+               "milestone", "breakout", "adoption", "buy")
+    macro_kw = ("federal reserve", "fomc", "rate cut", "rate hike", "rate decision",
+                "interest rate", "raises rates", "cpi", "inflation", "gdp",
+                "sanctions", "tariff", "trade war", "geopolitical", "recession",
+                "treasury yield", "yield curve", "dollar index", "dxy",
+                "oil price", "gold price", "banking crisis", "bank failure",
+                "money supply", "quantitative", "powell says", "fed chair")
+    if any(k in haystack for k in bear_kw):
         return "bear"
-    if any(k in title for k in bull_kw):
+    if any(k in haystack for k in bull_kw):
         return "bull"
+    if any(k in haystack for k in macro_kw):
+        return "macro"
     return "neutral"
 
 
@@ -93,11 +150,157 @@ def _primary_ticker(story: dict) -> str:
     return ticks[0] if ticks else ""
 
 
+# --- Viral hints loader ----------------------------------------------------
+
+def _load_viral_hints() -> dict:
+    """Load cached viral blueprint from viral_analyzer. Returns {} if missing."""
+    try:
+        if _BLUEPRINT_CACHE.exists():
+            data = json.loads(_BLUEPRINT_CACHE.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+# --- LLM script generation -------------------------------------------------
+
+def _llm_script(story: dict, tone: str, viral_hints: dict | None = None) -> dict | None:
+    """Generate a high-impact reel script using Claude. Returns None if unavailable."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    ck = _cache_key(story, tone)
+    cached = _cache_get(ck)
+    if cached:
+        print("[reel_writer] LLM script served from cache", file=sys.stderr)
+        return cached
+
+    try:
+        import anthropic
+        ticker = _primary_ticker(story) or "crypto"
+        numbers = _extract_numbers(
+            story.get("title", "") + " " + (story.get("summary") or "")
+        )
+        num_str = ", ".join(numbers[:5]) if numbers else "none found"
+
+        hints_str = ""
+        if viral_hints:
+            if viral_hints.get("hook_patterns"):
+                hints_str += f"\nTop viral hook patterns: {'; '.join(viral_hints['hook_patterns'][:3])}"
+            if viral_hints.get("avg_duration"):
+                hints_str += f"\nAverage viral duration: {viral_hints['avg_duration']}s"
+
+        is_macro = tone == "macro" or any(
+            kw in (story.get("title","") + (story.get("summary") or "")).lower()
+            for kw in ["fed", "fomc", "cpi", "inflation", "rate", "sanctions",
+                       "tariff", "war", "gdp", "recession"]
+        )
+        story_type = "macroeconomic/geopolitical event affecting crypto" if is_macro else "crypto news story"
+
+        prompt = (
+            f"You are a viral crypto news content creator for TikTok, Instagram Reels, and YouTube Shorts.\n"
+            f"Write a punchy 30-40 second video script for this {story_type}.\n\n"
+            f"STORY: {story.get('title','')}\n"
+            f"SUMMARY: {(story.get('summary') or '')[:450]}\n"
+            f"TICKERS: {', '.join(story.get('tickers') or [ticker])}\n"
+            f"KEY NUMBERS: {num_str}\n"
+            f"TONE: {tone}{hints_str}\n\n"
+            f"Write the script with this EXACT structure:\n"
+            f"[HOOK 0-3s]: 1-2 sentences. Start with the biggest number or most shocking fact. "
+            f"Pattern interrupt — make them stop scrolling.\n"
+            f"[CONTEXT 3-15s]: 3-4 sentences. What happened, who was involved, exact figures.\n"
+            f"[IMPACT 15-30s]: 3 sentences. Why this matters for crypto/markets RIGHT NOW. "
+            f"What price level or event to watch.\n"
+            f"[CTA 30-40s]: 2 sentences. Create urgency. End with: "
+            f"\"Next update at 7 PM — don't miss it.\"\n\n"
+            f"RULES:\n"
+            f"- Max 280 words total\n"
+            f"- Short punchy sentences (max 15 words each)\n"
+            f"- Use at least 1 specific number or percentage\n"
+            f"- For macro stories: ALWAYS connect to Bitcoin/crypto price impact\n"
+            f"- Say 'DYOR before trading this' instead of 'not financial advice'\n"
+            f"- Use present tense for urgency\n"
+            f"Reply with ONLY the script in the format above."
+        )
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = msg.content[0].text.strip()
+
+        hook_m = re.search(r'\[HOOK[^\]]*\]:\s*(.+?)(?=\[CONTEXT|\Z)', raw, re.DOTALL)
+        ctx_m  = re.search(r'\[CONTEXT[^\]]*\]:\s*(.+?)(?=\[IMPACT|\Z)', raw, re.DOTALL)
+        imp_m  = re.search(r'\[IMPACT[^\]]*\]:\s*(.+?)(?=\[CTA|\Z)', raw, re.DOTALL)
+        cta_m  = re.search(r'\[CTA[^\]]*\]:\s*(.+)', raw, re.DOTALL)
+
+        hook    = hook_m.group(1).strip() if hook_m else ""
+        ctx_txt = ctx_m.group(1).strip()  if ctx_m  else ""
+        imp_txt = imp_m.group(1).strip()  if imp_m  else ""
+        cta_txt = cta_m.group(1).strip()  if cta_m  else ""
+
+        if not hook or not ctx_txt:
+            return None
+
+        script_text = (
+            f"[HOOK — 0:00-0:03]\n{hook}\n\n"
+            f"[CONTEXT — 0:03-0:15]\n{ctx_txt}\n\n"
+            f"[IMPACT — 0:15-0:30]\n{imp_txt}\n\n"
+            f"[CTA — 0:30-0:40]\n{cta_txt}"
+        )
+        ctx_lines = ctx_txt.split("\n")
+        imp_lines = imp_txt.split("\n")
+        scenes = [
+            {"scene": 1, "start": 0.0,  "end": 3.0,  "type": "hook",
+             "shot": "avatar_close_up", "line": hook,
+             "overlay": numbers[0] if numbers else ticker.upper() or "BREAKING",
+             "broll": None},
+            {"scene": 2, "start": 3.0,  "end": 9.5,  "type": "context",
+             "shot": "avatar_medium + broll_overlay",
+             "line": ctx_lines[0] if ctx_lines else "",
+             "overlay": ticker, "broll": "chart_zoom + logos"},
+            {"scene": 3, "start": 9.5,  "end": 15.0, "type": "context",
+             "shot": "avatar_medium + broll_overlay",
+             "line": ctx_lines[-1] if len(ctx_lines) > 1 else "",
+             "overlay": numbers[1] if len(numbers) > 1 else "", "broll": "onchain_data"},
+            {"scene": 4, "start": 15.0, "end": 22.5, "type": "impact",
+             "shot": "avatar_medium + broll_split",
+             "line": imp_lines[0] if imp_lines else "",
+             "overlay": "", "broll": "macro_chart + funding_rates"},
+            {"scene": 5, "start": 22.5, "end": 30.0, "type": "impact",
+             "shot": "avatar_medium + broll_split",
+             "line": imp_lines[-1] if len(imp_lines) > 1 else "",
+             "overlay": "", "broll": "price_level_callout"},
+            {"scene": 6, "start": 30.0, "end": 40.0, "type": "cta",
+             "shot": "avatar_close_up", "line": cta_txt,
+             "overlay": "FOLLOW", "broll": None},
+        ]
+        print("[reel_writer] LLM script generated via Claude", file=sys.stderr)
+        result = {"script_text": script_text, "scenes": scenes, "tone": tone, "source": "llm"}
+        _cache_set(ck, result)
+        return result
+    except Exception as exc:
+        print(f"[reel_writer] LLM script failed: {exc}", file=sys.stderr)
+        return None
+
+
 # --- Script generation -----------------------------------------------------
 
 def build_script(story: dict) -> dict:
     """Return { 'script_text': str, 'scenes': [...] } for the chosen story."""
     tone = _tone_of(story)
+
+    # Try LLM generation first — much higher quality
+    hints = _load_viral_hints()
+    llm_result = _llm_script(story, tone, hints if hints else None)
+    if llm_result:
+        return llm_result
+
+    # Fallback: deterministic template
     ticker = _primary_ticker(story)
     numbers = _extract_numbers(
         " ".join([story.get("title", ""), story.get("summary", "")])
@@ -315,12 +518,30 @@ HASHTAGS = {
     "instagram": [
         "#bitcoin", "#crypto", "#btc", "#cryptonews", "#etf", "#bullrun",
         "#tradingview", "#blockchain", "#cryptoupdate", "#satoshi",
+        "#investing", "#finance", "#money", "#wealthmindset",
+        "#financialnews", "#economics", "#cryptotrading",
     ],
     "tiktok": [
         "#crypto", "#bitcoin", "#fyp", "#cryptotok", "#btc",
-        "#investing", "#money", "#financetok",
+        "#investing", "#money", "#financetok", "#cryptonews",
+        "#breakingnews", "#economics", "#finance", "#wealth",
     ],
-    "youtube": ["#Shorts", "#Bitcoin", "#Crypto", "#BTC", "#CryptoNews"],
+    "youtube": [
+        "#Shorts", "#Bitcoin", "#Crypto", "#BTC", "#CryptoNews",
+        "#Finance", "#Investing", "#Economics",
+    ],
+}
+
+HASHTAGS_MACRO = {
+    "instagram": [
+        "#federalreserve", "#inflation", "#interestrates", "#economy",
+        "#macroeconomics", "#geopolitics", "#goldprice", "#recession",
+    ],
+    "tiktok": [
+        "#fed", "#inflation", "#economy", "#recession", "#geopolitics",
+        "#macrotok", "#moneytok",
+    ],
+    "youtube": ["#FederalReserve", "#Inflation", "#MacroEconomics", "#Economy"],
 }
 
 
@@ -328,6 +549,7 @@ def build_platform_metadata(story: dict) -> dict:
     title = story["title"]
     ticker = _primary_ticker(story)
     tone = _tone_of(story)
+    is_macro = tone == "macro"
 
     short_title = title if len(title) <= 60 else title[:59].rstrip(" ,;:") + "…"
 
@@ -338,20 +560,24 @@ def build_platform_metadata(story: dict) -> dict:
         f"Not financial advice. DYOR."
     )
 
+    extra_macro = HASHTAGS_MACRO if is_macro else {"instagram": [], "tiktok": [], "youtube": []}
     return {
         "instagram": {
             "caption": f"{short_title}\n\n{base_description}",
-            "hashtags": HASHTAGS["instagram"] + ([f"#{ticker}"] if ticker else []),
+            "hashtags": (HASHTAGS["instagram"] + extra_macro["instagram"]
+                         + ([f"#{ticker}"] if ticker else []))[:20],
         },
         "tiktok": {
             "caption": short_title,
             "description": base_description,
-            "hashtags": HASHTAGS["tiktok"] + ([f"#{ticker}"] if ticker else []),
+            "hashtags": (HASHTAGS["tiktok"] + extra_macro["tiktok"]
+                         + ([f"#{ticker}"] if ticker else []))[:10],
         },
         "youtube": {
             "title": short_title + " #Shorts",
             "description": base_description,
-            "tags": HASHTAGS["youtube"] + ([f"#{ticker}"] if ticker else []),
+            "tags": (HASHTAGS["youtube"] + extra_macro["youtube"]
+                     + ([f"#{ticker}"] if ticker else []))[:15],
         },
         "_tone": tone,
     }

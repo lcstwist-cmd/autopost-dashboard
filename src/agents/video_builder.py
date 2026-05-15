@@ -75,17 +75,24 @@ def parse_srt(srt_text: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def extract_narration(script_text: str) -> str:
-    lines = []
-    for line in script_text.split("\n"):
+    """Strip [LABEL] section markers and comments from a script before HeyGen/TTS."""
+    # Remove all [...] sections (HOOK, CONTEXT, CTA labels with optional timestamps)
+    stripped = re.sub(r"\[[^\]]*\]", " ", script_text)
+
+    lines: list[str] = []
+    for line in stripped.split("\n"):
         line = line.strip()
-        if not line or line.startswith("[") or line.startswith("#"):
+        if not line or line.startswith("#"):
             continue
-        line = re.sub(r"\[.*?\]", "", line).strip().strip('"').strip()
+        line = line.strip('"').strip()
         if line:
             lines.append(line)
+
     text = " ".join(lines)
-    # Remove characters TTS engines can't speak (arrows, box-drawing, etc.)
-    text = re.sub(r"[^\x00-\x7F\u00C0-\u024F]", " ", text)  # keep Latin + basic Latin
+    # Em/en-dash → comma for natural TTS pause rhythm (preserves dramatic beats)
+    text = text.replace("\u2014", ",").replace("\u2013", ",")
+    # Strip remaining non-printable / non-Latin characters (emojis, box-drawing)
+    text = re.sub(r"[^\x20-\x7E\u00C0-\u024F]", " ", text)
     text = re.sub(r"\s{2,}", " ", text).strip()
     return text
 
@@ -229,8 +236,22 @@ def build_video(slot_dir: Path, use_elevenlabs: bool = False) -> Path:
 
     slot_dir = Path(slot_dir).resolve()
     reel_dir = slot_dir / "reel"
+    avatar_dir = slot_dir / "avatar"
     bg_path = slot_dir / "image_reel_1080x1920.png"
-    script_path = reel_dir / "01_script.txt"
+    
+    # Use avatar's compact 20s script (not reel's 250-word director's script).
+    # Preference: script_20s.txt (new) → script_30s.txt (legacy alias) → reel/01_script.txt.
+    for candidate in (
+        avatar_dir / "script_20s.txt",
+        avatar_dir / "script_30s.txt",
+        reel_dir   / "01_script.txt",
+    ):
+        if candidate.exists():
+            script_path = candidate
+            break
+    else:
+        script_path = avatar_dir / "script_20s.txt"  # so the error below points to the expected name
+    
     srt_path = reel_dir / "03_captions.srt"
     out_path = slot_dir / "reel_final.mp4"
 
@@ -260,6 +281,14 @@ def build_video(slot_dir: Path, use_elevenlabs: bool = False) -> Path:
     # Audio duration
     audio_clip = AudioFileClip(str(audio_path))
     duration = audio_clip.duration
+    
+    # CONSTRAINT: max 20 seconds for TikTok/Instagram/YouTube Shorts
+    MAX_DURATION = 20.0
+    if duration > MAX_DURATION:
+        print(f"[video_builder] ⚠️  audio {duration:.1f}s exceeds max {MAX_DURATION}s — truncating")
+        audio_clip = audio_clip.subclipped(0, MAX_DURATION)
+        duration = MAX_DURATION
+    
     print(f"[video_builder] audio duration: {duration:.1f}s")
 
     # Load background

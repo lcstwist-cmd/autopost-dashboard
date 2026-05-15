@@ -13,17 +13,32 @@ Outputs:
 """
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import random
 import re
 import sys
 import textwrap
+import time
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
 
+# Force UTF-8 output on Windows
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 _HERE = Path(__file__).resolve().parent
 _REPO_ROOT = _HERE.parent.parent
+_BRAIN_PARAMS = _REPO_ROOT / "analytics" / "agent_brains" / "image_gen" / "learned_params.json"
+_STYLE_LOG    = _REPO_ROOT / "analytics" / "agent_brains" / "image_gen" / "style_history.json"
+_CACHE_DIR    = _REPO_ROOT / ".image_cache"  # Local cache for generated images
+
+# Ensure cache dir exists
+_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
 # Mood classification
@@ -53,10 +68,49 @@ def classify_mood(story: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Image caching — avoid re-rendering identical prompts
+# ---------------------------------------------------------------------------
+
+def _cache_key(title: str, prompt: str, width: int, height: int,
+               seed: int = 0) -> str:
+    """Generate unique cache key from story + prompt + dimensions + DAY + SEED.
+
+    Including the date ordinal ensures we deliver a *different* image every
+    day even when the story title repeats (e.g. recurring "Bitcoin price"
+    headlines). Including `seed` makes manual re-renders bypass the cache.
+    """
+    today = datetime.now().toordinal()
+    text = f"{title}|{prompt}|{width}|{height}|{today}|{seed}"
+    return hashlib.md5(text.encode()).hexdigest()
+
+
+def _get_cached_image(cache_key: str) -> "Path | None":
+    """Check if cached image exists; return path or None."""
+    cached = _CACHE_DIR / f"{cache_key}.png"
+    if cached.exists():
+        print(f"[image_gen] ✓ cache HIT: {cache_key[:8]}…", file=sys.stderr)
+        return cached
+    return None
+
+
+def _store_cached_image(src_path: Path, cache_key: str) -> None:
+    """Store rendered image in cache for reuse."""
+    if not src_path.exists():
+        return
+    try:
+        import shutil
+        dst = _CACHE_DIR / f"{cache_key}.png"
+        shutil.copy2(str(src_path), str(dst))
+        print(f"[image_gen] cached: {cache_key[:8]}…", file=sys.stderr)
+    except Exception as exc:
+        print(f"[image_gen] cache store failed: {exc}", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
 # Background styles — 10 cinematic crypto themes
 # ---------------------------------------------------------------------------
 
-# Each mood maps to a list of style variants; one is picked per render (by seed)
+# Each mood maps to a list of style variants; daily rotation picks one per day
 BG_STYLES: dict[str, list[str]] = {
     "bull": [
         # Bloomberg terminal — green data flood
@@ -79,6 +133,46 @@ BG_STYLES: dict[str, list[str]] = {
         "ultra-modern crypto hedge fund office at night, floor-to-ceiling windows "
         "overlooking city skyline, curved monitors showing green price action, "
         "warm accent lighting, photorealistic interior, 8k, no text no watermark",
+
+        # Institutional whale accumulation
+        "prestigious private bank vault doors opening, stacks of gold bars beside "
+        "glowing Bitcoin hardware wallets, dark luxury atmosphere, warm amber light, "
+        "cinematic depth of field, 8k photorealistic, no text no watermark",
+
+        # Crypto nation-state adoption
+        "government building at golden hour, holographic Bitcoin symbol floating above, "
+        "national flags lining grand boulevard, official adoption ceremony aesthetic, "
+        "epic wide angle, 8k photorealistic, no text no watermark",
+
+        # Minimalist editorial bull — clean and modern
+        "minimalist white and gold editorial background, single large upward trending "
+        "abstract arrow in bright gold, clean negative space, high-end financial magazine "
+        "aesthetic, soft bokeh, 8k photorealistic, no text no watermark",
+
+        # Nature sunrise — dawn of a bull market
+        "epic sunrise over modern city financial district, golden rays breaking through "
+        "skyscrapers, warm orange and yellow sky reflecting on glass towers, optimistic "
+        "atmosphere, aerial cinematic view, 8k photorealistic, no text no watermark",
+
+        # Abstract data art — bull
+        "beautiful abstract visualization of financial data flowing upward, golden "
+        "luminous particles forming ascending curves against dark background, "
+        "data art concept, premium aesthetic, 8k render, no text no watermark",
+
+        # Mountain peak — achievement
+        "climber reaching mountain summit at sunrise, gold light flooding the peak, "
+        "vast landscape below, triumph and achievement concept art, epic composition, "
+        "photorealistic, 8k, no text no watermark",
+
+        # Futuristic bridge — progress
+        "futuristic illuminated bridge spanning between two gleaming skyscrapers at "
+        "night, gold and white light trails, motion and progress concept, wide cinematic, "
+        "8k photorealistic, no text no watermark",
+
+        # Premium watch + crypto — wealth
+        "luxury timepiece on dark marble surface beside a glowing Bitcoin coin, "
+        "premium lifestyle flat lay, single dramatic spotlight, shallow depth of field, "
+        "editorial photography style, 8k, no text no watermark",
     ],
 
     "bear": [
@@ -102,6 +196,36 @@ BG_STYLES: dict[str, list[str]] = {
         "underwater scene with giant whale shadow, scattered bitcoins sinking, "
         "deep red water with descending price tickers glowing, dark and ominous, "
         "photorealistic concept art, 8k, no text no watermark",
+
+        # Regulatory crackdown
+        "dark courthouse with heavy storm clouds, red regulatory gavel slamming down, "
+        "crypto logos crumbling, dramatic institutional pressure concept art, "
+        "cinematic, 8k photorealistic, no text no watermark",
+
+        # Geopolitical crypto crisis
+        "dark war room with multiple screens showing falling Bitcoin charts, "
+        "world map with conflict zones highlighted in red, crisis atmosphere, "
+        "cold blue emergency lighting, cinematic tension, 8k photorealistic, no text no watermark",
+
+        # Storm over city — bear editorial
+        "dramatic storm clouds rolling over modern financial district, lightning "
+        "illuminating skyscrapers, ominous dark sky, intense cinematic weather, "
+        "photorealistic, 8k, no text no watermark",
+
+        # Abstract descent — data art
+        "beautiful abstract data art showing cascading red particles falling in elegant "
+        "curves, dark premium background, financial decline concept, fine art aesthetic, "
+        "8k render, no text no watermark",
+
+        # Frozen market — cold aesthetic
+        "abstract digital landscape frozen in ice crystals, blue and silver tones, "
+        "cold sharp aesthetic representing market freeze, concept art, cinematic depth, "
+        "8k photorealistic, no text no watermark",
+
+        # Documentary — empty trading floor
+        "empty dramatic trading floor after hours, screens still glowing red, "
+        "abandoned workstations, haunting atmosphere, documentary-style photography, "
+        "cinematic low light, 8k photorealistic, no text no watermark",
     ],
 
     "neutral": [
@@ -129,6 +253,61 @@ BG_STYLES: dict[str, list[str]] = {
         "dramatic server room with glowing blockchain nodes and data streams, "
         "blue and white light rays through server racks, concept of crypto infrastructure, "
         "cinematic wide shot, 8k photorealistic, no text no watermark",
+
+        # Central bank meets crypto
+        "neoclassical Federal Reserve building at dusk, giant holographic Bitcoin "
+        "looming over marble facade, tension between old finance and new, "
+        "dramatic blue-grey cinematic lighting, 8k photorealistic, no text no watermark",
+
+        # Gold + crypto hybrid
+        "luxury bank vault with gold bars stacked next to Bitcoin logo etched in steel, "
+        "dark premium aesthetic, single spotlight, cinematic still life, "
+        "8k photorealistic, no text no watermark",
+
+        # Macro trading desk
+        "executive macro trading desk at night, three ultrawide monitors showing "
+        "global market charts — equities, forex, crypto — all blue tones, "
+        "city view through floor-to-ceiling glass, cinematic, 8k photorealistic, no text no watermark",
+
+        # Editorial newsroom — premium journalism
+        "high-end financial newsroom at night, glowing editorial desks, reporters "
+        "working under dramatic overhead lighting, journalism meets technology aesthetic, "
+        "clean and authoritative, 8k photorealistic, no text no watermark",
+
+        # Abstract geometric — data art
+        "abstract three-dimensional geometric shapes representing blockchain nodes, "
+        "deep space dark background with cool indigo and silver tones, mathematical "
+        "precision art, premium concept render, 8k, no text no watermark",
+
+        # Corporate rooftop — aerial city
+        "aerial view of futuristic financial district at blue hour, grid of illuminated "
+        "skyscrapers, cool blue and silver palette, calm and analytical atmosphere, "
+        "8k photorealistic drone shot, no text no watermark",
+
+        # Underwater world — deep finance
+        "luminous abstract underwater scene with glowing crypto symbols drifting, "
+        "deep ocean blue, bioluminescent particles, mysterious premium aesthetic, "
+        "cinematic concept art, 8k, no text no watermark",
+
+        # Library / archive — research
+        "grand dark library with towering bookshelves, single spotlight on open book, "
+        "warm amber glow in darkness, knowledge and research concept, timeless premium "
+        "aesthetic, 8k photorealistic, no text no watermark",
+
+        # Minimal gradient — ultra-clean
+        "ultra-minimal dark gradient background transitioning from deep navy to "
+        "charcoal black, single thin horizontal luminous line mid-frame, "
+        "premium brand aesthetic, editorial still, 8k, no text no watermark",
+
+        # Tech lab — innovation
+        "futuristic research laboratory at night, holographic displays floating in air, "
+        "scientists' silhouettes, cool white and blue lighting, innovation concept, "
+        "wide cinematic, 8k photorealistic, no text no watermark",
+
+        # Rain on glass — mood + depth
+        "close-up of rain drops on dark glass window with blurred city lights behind, "
+        "moody and atmospheric, bokeh light effects, blue and amber tones, "
+        "fine art photography style, 8k, no text no watermark",
     ],
 }
 
@@ -170,6 +349,24 @@ _STORY_TYPES: list[tuple[str, set[str]]] = [
     ("macro_economy",     {"fed", "federal reserve", "inflation", "interest rate", "cpi",
                            "recession", "gdp", "dollar", "treasury", "yield curve",
                            "macro", "economy", "financial crisis", "banking"}),
+    ("geopolitical",      {"war", "sanctions", "ukraine", "russia", "china", "taiwan",
+                           "middle east", "conflict", "trade war", "tariff", "tariffs",
+                           "geopolitical", "military", "nato", "opec", "oil crisis",
+                           "energy crisis", "embargo"}),
+    ("central_bank",      {"fomc", "rate cut", "rate hike", "quantitative easing", "qt",
+                           "powell", "lagarde", "ecb", "boj", "pboc",
+                           "central bank digital", "cbdc", "balance sheet",
+                           "interest rate decision", "tapering", "money supply"}),
+    ("gold_commodities",  {"gold price", "gold record", "silver", "commodity",
+                           "oil price", "crude oil", "gold all-time", "safe haven",
+                           "store of value", "hard assets", "precious metals"}),
+    ("luxury_wealth",     {"billionaire", "whale buys", "ultra high net worth",
+                           "hedge fund", "sovereign wealth", "family office",
+                           "luxury", "wealth management", "private equity",
+                           "institutional investor", "asset manager"}),
+    ("market_data",       {"nonfarm payroll", "jobs report", "cpi report", "pce data",
+                           "pmi reading", "gdp growth", "retail sales", "ism",
+                           "unemployment rate", "consumer confidence"}),
 ]
 
 # Per story-type visual prompts (2 variants each: bull/positive, bear/negative)
@@ -224,6 +421,31 @@ _TYPE_PROMPTS: dict[str, dict[str, str]] = {
         "bear": "stormy dark sky over Wall Street, red economic charts descending, Federal Reserve building in dramatic shadows, ominous financial atmosphere, cinematic, 8k photorealistic, no text no watermark",
         "neutral": "Federal Reserve building exterior, serious economic atmosphere, cool blue dawn light, symbolic scale and weight, cinematic composition, 8k photorealistic, no text no watermark",
     },
+    "geopolitical": {
+        "bull": "dramatic sunset over world map with glowing Bitcoin symbol, diplomats shaking hands in grand hall, golden flags, cinematic wide shot, optimistic geopolitical shift, 8k photorealistic, no text no watermark",
+        "bear": "dark storm clouds over capitol buildings worldwide, red alert geopolitical tension, tanks silhouettes and crumbling currency symbols, dramatic war-room atmosphere, cinematic, 8k photorealistic, no text no watermark",
+        "neutral": "United Nations building at dusk, world flags reflecting in water, globe hologram concept, serious diplomatic atmosphere, cool blue tones, cinematic, 8k photorealistic, no text no watermark",
+    },
+    "central_bank": {
+        "bull": "Federal Reserve marble hall flooded with golden light, chairman's podium with Bitcoin hologram above, optimistic rate-cut atmosphere, warm cinematic glow, 8k photorealistic, no text no watermark",
+        "bear": "Federal Reserve press conference room, red emergency lighting, rate hike announcement tension, dark suited figures, ominous cinematic shadows, 8k photorealistic, no text no watermark",
+        "neutral": "Federal Reserve building rotunda interior, marble columns, serious monetary policy atmosphere, cool institutional blue and white light, cinematic depth, 8k photorealistic, no text no watermark",
+    },
+    "gold_commodities": {
+        "bull": "gleaming gold bars stacked in a vault with Bitcoin coins alongside, warm golden spotlight, luxury bank safe aesthetic, rich amber and gold tones, cinematic depth, 8k photorealistic, no text no watermark",
+        "bear": "melting gold bars with red price charts, dark vault atmosphere, dramatic commodity selloff concept, red and black cinematic color grade, 8k photorealistic, no text no watermark",
+        "neutral": "dramatic close-up of polished gold bar with Bitcoin symbol reflection, dark luxury background, metallic texture, cinematic product photography, 8k photorealistic, no text no watermark",
+    },
+    "luxury_wealth": {
+        "bull": "ultra-luxury penthouse overlooking city at night, Bitcoin portfolio on curved ultrawide monitor, champagne glasses reflecting digital charts, billionaire lifestyle aesthetic, warm luxury lighting, 8k photorealistic, no text no watermark",
+        "bear": "luxury trading floor in crisis mode, red screens, abandoned coffee cups on mahogany desk, dramatic contrast between wealth and loss, ominous cinematic, 8k photorealistic, no text no watermark",
+        "neutral": "prestigious private banking office at dusk, dark wood paneling, Bloomberg terminal glowing on antique desk, city view through floor-to-ceiling windows, understated wealth aesthetic, 8k photorealistic, no text no watermark",
+    },
+    "market_data": {
+        "bull": "economic data release celebration on trading floor, green CPI numbers on giant screens, optimistic analysts, warm golden market data aesthetic, cinematic wide shot, 8k photorealistic, no text no watermark",
+        "bear": "economic data shock moment, red jobs report numbers on multiple screens, tense trading floor, dramatic red lighting, 8k photorealistic, no text no watermark",
+        "neutral": "Bloomberg data terminal extreme close-up, economic indicators glowing in the dark, professional market analysis environment, cool blue light, cinematic macro shot, 8k photorealistic, no text no watermark",
+    },
 }
 
 
@@ -247,29 +469,94 @@ def _classify_story_type(story: dict) -> str | None:
     return best_type if best_count >= 1 else None
 
 
-def _llm_bg_prompt(story: dict, mood: str) -> str | None:
-    """Ask Claude for a custom background prompt. Returns None if API key missing."""
+def _gather_post_context(story: dict | None) -> dict:
+    """Pull the actual X / Telegram post bodies (and niche) for the slot the
+    story belongs to, so the image agent can collaborate with the copywriter
+    output instead of working from the headline alone.
+
+    Returns a dict with optional keys: post_x_a, post_x_b, post_tg, niche.
+    Failures are silent — the function is purely best-effort enrichment.
+    """
     import os
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    ctx: dict = {}
+    try:
+        slot_dir = (story or {}).get("_slot_dir")
+        if slot_dir:
+            sd = Path(slot_dir)
+            for fname, key in (("post_x.txt", "post_x_a"),
+                                ("post_x_b.txt", "post_x_b"),
+                                ("post_tg.txt", "post_tg")):
+                fp = sd / fname
+                if fp.exists():
+                    try:
+                        ctx[key] = fp.read_text(encoding="utf-8").strip()[:600]
+                    except Exception:
+                        pass
+        ctx["niche"] = os.environ.get("NICHE", "").strip() or "crypto"
+    except Exception:
+        pass
+    return ctx
+
+
+_IMG_PROMPT_CACHE: dict[str, tuple[float, str]] = {}
+_IMG_PROMPT_TTL = 86_400  # 24 h
+
+def _llm_bg_prompt(story: dict, mood: str) -> str | None:
+    """Ask Claude for a custom, virality-optimized background prompt.
+
+    Strategy: the image agent collaborates with the copywriter (post bodies),
+    the ranker (mood + tickers), and the niche config to pick a scene that
+    maximizes scroll-stop and click-through. Returns None if API key missing.
+    """
+    import os, time as _t
+    api_key = (
+        os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        or os.environ.get("ANTHROPIC_KEY", "").strip()
+    )
     if not api_key:
         return None
+
+    _ck = hashlib.md5(
+        f"{story.get('title','')[:80]}|{mood}".encode("utf-8", errors="replace")
+    ).hexdigest()
+    _now = _t.time()
+    if _ck in _IMG_PROMPT_CACHE:
+        _ts, _val = _IMG_PROMPT_CACHE[_ck]
+        if (_now - _ts) < _IMG_PROMPT_TTL:
+            return _val
+    post_ctx = _gather_post_context(story)
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
+        post_lines = []
+        if post_ctx.get("post_x_a"): post_lines.append(f"X (variant A): {post_ctx['post_x_a']}")
+        if post_ctx.get("post_x_b"): post_lines.append(f"X (variant B): {post_ctx['post_x_b']}")
+        if post_ctx.get("post_tg"):  post_lines.append(f"Telegram: {post_ctx['post_tg']}")
+        post_block = "\n".join(post_lines) or "(post text not yet generated)"
+        niche = post_ctx.get("niche") or "crypto"
         prompt = (
-            f"You are a creative director for a crypto news channel.\n"
-            f"Story title: {story.get('title','')}\n"
+            f"You are the IMAGE strategist for a {niche} news channel. Your "
+            f"job is to design a scroll-stopping, click-magnet background "
+            f"image that pairs with the EXACT post the copywriter wrote.\n\n"
+            f"=== STORY ===\n"
+            f"Title: {story.get('title','')}\n"
             f"Summary: {(story.get('summary') or '')[:300]}\n"
             f"Tickers: {', '.join(story.get('tickers') or [])}\n"
-            f"Mood: {mood}\n\n"
-            f"Write ONE short Stable Diffusion image prompt (max 80 words) for a "
-            f"cinematic, photorealistic background image that perfectly fits this story.\n"
-            f"Requirements:\n"
-            f"- Dark, professional crypto/finance aesthetic\n"
-            f"- NO text, NO watermarks, NO UI elements, NO faces\n"
-            f"- Inspired by the specific story topic\n"
-            f"- End with: 8k photorealistic, no text no watermark\n"
-            f"Reply with ONLY the prompt, nothing else."
+            f"Source: {story.get('source','')}\n"
+            f"Mood (ranker output): {mood}\n\n"
+            f"=== POST COPY (what the image sits next to) ===\n"
+            f"{post_block}\n\n"
+            f"=== YOUR TASK ===\n"
+            f"Write ONE Stable Diffusion / Flux image prompt (max 90 words) "
+            f"for a cinematic, photorealistic background that:\n"
+            f"1. Reinforces the SPECIFIC subject of the post (not generic crypto)\n"
+            f"2. Triggers an emotional reaction matching the mood "
+            f"({'panic / red alert' if mood == 'bear' else 'euphoria / green surge' if mood == 'bull' else 'curiosity / blue analytical'})\n"
+            f"3. Uses high contrast + a clear focal point so it stops the thumb on mobile\n"
+            f"4. Leaves negative space in the lower 60% for headline overlay\n"
+            f"5. NO text, NO watermarks, NO UI elements, NO logos, NO faces\n"
+            f"End the prompt with: 8k photorealistic cinematic lighting, no text no watermark.\n"
+            f"Reply with ONLY the prompt — no preamble, no quotes, no explanation."
         )
         msg = client.messages.create(
             model="claude-haiku-4-5-20251001",
@@ -278,10 +565,53 @@ def _llm_bg_prompt(story: dict, mood: str) -> str | None:
         )
         result = msg.content[0].text.strip().strip('"').strip("'")
         if len(result) > 30:
+            _IMG_PROMPT_CACHE[_ck] = (_t.time(), result)
             return result
     except Exception:
         pass
     return None
+
+
+def _story_seed(story: dict | None) -> int:
+    """Deterministic seed from story title so each story gets its own style."""
+    if not story:
+        return 0
+    title = story.get("title", "") or ""
+    return int(hashlib.md5(title.encode("utf-8", errors="replace")).hexdigest()[:8], 16)
+
+
+def _load_avoid_indices(mood: str) -> list[int]:
+    """Return style indices used in the last 7 days (brain-guided diversity)."""
+    try:
+        if _BRAIN_PARAMS.exists():
+            data = json.loads(_BRAIN_PARAMS.read_text(encoding="utf-8"))
+            return data.get(f"avoid_style_indices_{mood}", [])
+    except Exception:
+        pass
+    return []
+
+
+def _log_style_used(mood: str, idx: int) -> None:
+    """Record which style index was used today for brain learning."""
+    try:
+        _STYLE_LOG.parent.mkdir(parents=True, exist_ok=True)
+        history: dict = {}
+        if _STYLE_LOG.exists():
+            history = json.loads(_STYLE_LOG.read_text(encoding="utf-8"))
+        today = datetime.now().strftime("%Y-%m-%d")
+        key = f"{mood}_{today}"
+        used: list[int] = history.get(key, [])
+        if idx not in used:
+            used.append(idx)
+        history[key] = used
+        # Prune entries older than 14 days
+        cutoff = datetime.now().toordinal() - 14
+        history = {k: v for k, v in history.items()
+                   if datetime.strptime(k.split("_", 1)[1], "%Y-%m-%d").toordinal() >= cutoff
+                   if "_" in k}
+        _STYLE_LOG.write_text(json.dumps(history, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
 
 
 def _pick_bg_prompt(mood: str, seed: int, custom_prompt: str = "", story: dict | None = None) -> str:
@@ -304,9 +634,26 @@ def _pick_bg_prompt(mood: str, seed: int, custom_prompt: str = "", story: dict |
             print(f"[image_gen] story-type '{story_type}' -> specific prompt", file=sys.stderr)
             return prompt
 
-    # 3. Fallback: mood-based style catalogue
+    # 3. Fallback: daily-rotating style catalogue — different visual every day
     styles = BG_STYLES.get(mood, BG_STYLES["neutral"])
-    return styles[seed % len(styles)]
+
+    # Combine date ordinal + story hash so: same story same day = same style,
+    # but different days OR different stories = different style (visual diversity)
+    daily_base = datetime.now().toordinal()
+    story_offset = _story_seed(story) % max(1, len(styles))
+    daily_seed = daily_base + story_offset
+
+    # Brain feedback: avoid recently used indices for maximum visual variety
+    avoid = set(_load_avoid_indices(mood))
+    available = [i for i in range(len(styles)) if i not in avoid]
+    if not available:
+        available = list(range(len(styles)))  # all used → reset
+
+    idx = available[daily_seed % len(available)]
+    _log_style_used(mood, idx)
+    print(f"[image_gen] fallback style #{idx}/{len(styles)} mood={mood} "
+          f"(day={daily_base}, story_offset={story_offset})", file=sys.stderr)
+    return styles[idx]
 
 
 # ---------------------------------------------------------------------------
@@ -412,6 +759,13 @@ def _make_fallback_bg(width: int, height: int, mood: str) -> "Image.Image":
 # Background download  (with retry + fallback)
 # ---------------------------------------------------------------------------
 
+# Premium-quality Pollinations.ai model order:
+#   flux         — best general quality (SDXL-grade)
+#   flux-realism — photoreal fallback for portraits / cinematic shots
+#   turbo        — last-resort, faster but lower fidelity
+# We also pass enhance=true (LLM prompt rewriter) on the first try for
+# richer compositions; only disabled on retry to avoid mutation if the
+# first call rate-limits.
 _POLLINATIONS_MODELS = ["flux", "flux-realism", "turbo"]
 
 
@@ -420,7 +774,7 @@ def _download_background(prompt: str, width: int, height: int, seed: int,
     try:
         import requests
     except ImportError:
-        raise SystemExit("requests not installed: pip install requests")
+        raise RuntimeError("requests not installed: pip install requests")
     from PIL import Image
     import time
 
@@ -428,10 +782,17 @@ def _download_background(prompt: str, width: int, height: int, seed: int,
     delays = [5, 15, 30]  # seconds between retries
 
     for attempt, model in enumerate(_POLLINATIONS_MODELS):
+        # Premium quality knobs:
+        #   enhance=true  → server-side LLM prompt rewriter for richer scenes
+        #   nofeed=true   → don't expose this generation in their public feed
+        #   private=true  → request not shared with the community gallery
+        # We render at native target resolution (no upscale step needed).
+        enhance_flag = "true" if attempt == 0 else "false"
         url = (
             f"https://image.pollinations.ai/prompt/{encoded}"
             f"?width={width}&height={height}&seed={seed + attempt}"
-            f"&nologo=true&model={model}&enhance=false"
+            f"&nologo=true&model={model}&enhance={enhance_flag}"
+            f"&nofeed=true&private=true"
         )
         print(f"[image_gen] Pollinations.ai attempt {attempt + 1}/3 (model={model})...",
               file=sys.stderr)
@@ -508,20 +869,48 @@ def render_card(
 
     # ── Background ──────────────────────────────────────────────────────────
     prompt = _pick_bg_prompt(mood, seed, custom_prompt, story=story)
+    # Premium quality modifiers — appended to every prompt to push Pollinations
+    # /flux towards sharper, magazine-grade compositions. Order matters: keep
+    # negatives (`no text…`) at the end so prior commas don't dilute them.
+    prompt = (
+        f"{prompt}, "
+        f"masterpiece, ultra detailed, sharp focus, professional color grading, "
+        f"hyper-realistic textures, dramatic studio lighting, depth of field, "
+        f"premium magazine cover quality, 8k uhd, photorealism, "
+        f"no blurry, no watermark, no signature, no text artifacts"
+    )
     bg = _download_background(prompt, width, height, seed, mood=mood)
 
-    # ── Dark gradient overlay (bottom 60%) ──────────────────────────────────
+    # Detect portrait "reel" layout (9:16). When the image will be composited
+    # behind an AI avatar, we need text in the UPPER half of the frame so it
+    # stays visible above the presenter strip (which sits at y=1152–1692 on
+    # a 1080×1920 canvas).
+    is_portrait_reel = height >= int(width * 1.4)
+
+    # ── Dark gradient overlay ───────────────────────────────────────────────
     overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     ov_draw = ImageDraw.Draw(overlay)
-    grad_top = int(height * 0.32)
-    for y in range(grad_top, height):
-        alpha = int(215 * (y - grad_top) / (height - grad_top))
-        ov_draw.line([(0, y), (width, y)], fill=(0, 0, 8, alpha))
+    if is_portrait_reel:
+        # Dark gradient in the TOP portion so text is readable over the bg.
+        grad_stop = int(height * 0.55)
+        for y in range(0, grad_stop):
+            t = 1 - (y / grad_stop)
+            alpha = int(220 * t)
+            ov_draw.line([(0, y), (width, y)], fill=(0, 0, 8, alpha))
+        # Faint darkening on the avatar strip area too, to prevent bg noise.
+        for y in range(int(height * 0.55), height):
+            ov_draw.line([(0, y), (width, y)], fill=(0, 0, 8, 70))
+    else:
+        # Classic landscape/square: darken the bottom 60% for title area.
+        grad_top = int(height * 0.32)
+        for y in range(grad_top, height):
+            alpha = int(215 * (y - grad_top) / (height - grad_top))
+            ov_draw.line([(0, y), (width, y)], fill=(0, 0, 8, alpha))
 
-    # Subtle top vignette
-    for y in range(0, int(height * 0.15)):
-        alpha = int(90 * (1 - y / (height * 0.15)))
-        ov_draw.line([(0, y), (width, y)], fill=(0, 0, 0, alpha))
+        # Subtle top vignette
+        for y in range(0, int(height * 0.15)):
+            alpha = int(90 * (1 - y / (height * 0.15)))
+            ov_draw.line([(0, y), (width, y)], fill=(0, 0, 0, alpha))
 
     bg = Image.alpha_composite(bg.convert("RGBA"), overlay).convert("RGB")
     draw = ImageDraw.Draw(bg)
@@ -590,8 +979,14 @@ def render_card(
                  + (spacing + len(sub_lines) * sub_lh if sub_lines else 0)
                  + spacing + brand_h)
 
-    bottom_margin = bar_h + int(height * 0.055)
-    y = height - bottom_margin - block_h
+    if is_portrait_reel:
+        # Place text in the UPPER portion of the 9:16 canvas so it stays
+        # visible above the AI-avatar strip in the final composite video.
+        # Leave ~9% top margin for the source badge / ticker pills.
+        y = int(height * 0.11)
+    else:
+        bottom_margin = bar_h + int(height * 0.055)
+        y = height - bottom_margin - block_h
 
     # ── Draw title ───────────────────────────────────────────────────────────
     for line in title_lines:
@@ -623,8 +1018,170 @@ def render_card(
     # ── Save ─────────────────────────────────────────────────────────────────
     out_path.parent.mkdir(parents=True, exist_ok=True)
     bg.save(str(out_path), "PNG")
-    print(f"[image_gen] saved {out_path.name} ({width}x{height}, mood={mood}, style={seed % len(BG_STYLES[mood])})",
+    print(f"[image_gen] saved {out_path.name} ({width}x{height}, mood={mood})",
           file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Roundup mode — 3 headlines on one background (engagement-grade design)
+# ---------------------------------------------------------------------------
+
+def render_roundup_image(stories: list, out_path: Path,
+                          width: int = 1080, height: int = 1920,
+                          seed: int | None = None,
+                          custom_prompt: str = "") -> None:
+    """Render a 9:16 background with up to 5 numbered headlines stacked.
+
+    Layout (1080×1920):
+      • Top 6%   — "TOP CRYPTO TODAY" badge with neon underline
+      • 8% .. 78% — N stacked headline cards (background-blurred dark cards
+                     with neon accent number circle + 3-line max wrapped title)
+      • Bottom 22% — clean area for AI avatar overlay (we keep the area
+                       between y=1450..1850 fully empty so the talking head
+                       sits on top without covering text)
+
+    Falls back to single-story `render_card` if `stories` has 1 item.
+    """
+    from PIL import Image, ImageDraw, ImageFilter
+
+    n = max(1, min(len(stories), 5))
+    if n == 1:
+        render_card(stories[0], width, height, out_path, seed=seed or 42,
+                     custom_prompt=custom_prompt)
+        return
+
+    # Use mood from first story for color/prompt selection
+    primary = stories[0]
+    mood    = classify_mood(primary)
+    accent  = ACCENT.get(mood, ACCENT["neutral"])
+    seed    = seed if seed is not None else _story_seed(primary)
+
+    # Pollinations background — premium quality prompt
+    prompt = _pick_bg_prompt(mood, seed, custom_prompt, story=primary)
+    prompt = (
+        f"{prompt}, masterpiece, ultra detailed, sharp focus, "
+        f"professional color grading, hyper-realistic textures, "
+        f"dramatic studio lighting, depth of field, 8k uhd, photorealism, "
+        f"no blurry, no watermark, no signature, no text artifacts"
+    )
+    bg = _download_background(prompt, width, height, seed, mood=mood)
+
+    # ── Heavy darken pass: roundup needs lots of text contrast ─────────────
+    overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    ov_draw = ImageDraw.Draw(overlay)
+    # Darken top 78% (text area) heavily, keep bottom 22% lighter (avatar zone)
+    for y in range(0, int(height * 0.78)):
+        # 0.85 alpha at top fading to 0.55 at the bottom of text zone
+        t = 1 - (y / (height * 0.78))
+        alpha = int(220 - 120 * (1 - t))
+        ov_draw.line([(0, y), (width, y)], fill=(2, 8, 6, alpha))
+    # Light darkening on avatar zone for chromakey edge cleanup
+    for y in range(int(height * 0.78), height):
+        ov_draw.line([(0, y), (width, y)], fill=(2, 8, 6, 90))
+    bg = Image.alpha_composite(bg.convert("RGBA"), overlay).convert("RGB")
+    draw = ImageDraw.Draw(bg)
+
+    # ── Top badge: "TOP CRYPTO TODAY" ──────────────────────────────────────
+    badge_fnt   = _load_font(34, bold=True)
+    badge_text  = "▲ TOP CRYPTO TODAY"
+    bb          = draw.textbbox((0, 0), badge_text, font=badge_fnt)
+    badge_w     = bb[2] - bb[0]
+    bx          = (width - badge_w) // 2
+    by          = int(height * 0.04)
+    # Soft pill background
+    pill_pad_x  = 22
+    pill_pad_y  = 8
+    draw.rounded_rectangle(
+        [(bx - pill_pad_x, by - pill_pad_y),
+         (bx + badge_w + pill_pad_x, by + 38 + pill_pad_y)],
+        radius=22, fill=(0, 0, 0, 200), outline=accent, width=2,
+    )
+    draw.text((bx + 2, by + 2), badge_text, font=badge_fnt, fill=(0, 0, 0))
+    draw.text((bx, by), badge_text, font=badge_fnt, fill=accent)
+
+    # Subtle underline glow
+    line_y = by + 56
+    draw.rectangle([(width // 2 - 80, line_y),
+                    (width // 2 + 80, line_y + 3)], fill=accent)
+
+    # ── Headline cards ──────────────────────────────────────────────────────
+    cards_top    = int(height * 0.13)
+    cards_bottom = int(height * 0.76)   # leave 24% bottom for avatar
+    available_h  = cards_bottom - cards_top
+    card_h       = available_h // n
+    card_pad     = 18
+
+    title_fnt    = _load_font(46, bold=True)
+    num_fnt      = _load_font(64, bold=True)
+
+    for i, story in enumerate(stories[:n]):
+        title = story.get("title") or story.get("headline") or ""
+        # Strip source suffixes that look ugly in headlines
+        title = re.sub(r"\s+[\-–—]\s+[A-Za-z0-9 .]+\.(net|com|co|io|news|tv)\b",
+                        "", title)
+        title = re.sub(r"\s*\([^)]+\)\s*$", "", title).strip()
+        if not title:
+            continue
+
+        cx0 = int(width * 0.05)
+        cx1 = width - cx0
+        cy0 = cards_top + i * card_h
+        cy1 = cy0 + card_h - 14    # 14px gap between cards
+
+        # Card background — translucent dark with accent left bar
+        draw.rounded_rectangle(
+            [(cx0, cy0), (cx1, cy1)],
+            radius=18, fill=(8, 16, 12, 220), outline=(0, 0, 0, 0),
+        )
+        # Left accent bar (mood-tinted)
+        draw.rounded_rectangle(
+            [(cx0, cy0), (cx0 + 8, cy1)],
+            radius=4, fill=accent,
+        )
+
+        # Number circle (1, 2, 3 ...)
+        circ_x = cx0 + 38
+        circ_y = cy0 + (cy1 - cy0) // 2
+        circ_r = 36
+        draw.ellipse(
+            [(circ_x - circ_r, circ_y - circ_r),
+             (circ_x + circ_r, circ_y + circ_r)],
+            fill=accent, outline=(0, 0, 0, 0),
+        )
+        n_text = str(i + 1)
+        nb     = draw.textbbox((0, 0), n_text, font=num_fnt)
+        nw     = nb[2] - nb[0]
+        nh     = nb[3] - nb[1]
+        draw.text((circ_x - nw // 2, circ_y - nh // 2 - 6),
+                   n_text, font=num_fnt, fill=(0, 0, 0))
+
+        # Title — wrap to fit, max 3 lines
+        title_x0 = circ_x + circ_r + 24
+        title_x1 = cx1 - 24
+        max_tw   = title_x1 - title_x0
+        lines    = _wrap_text(title, title_fnt, max_tw, draw)[:3]
+        # If we truncated, append … to the last line
+        if len(_wrap_text(title, title_fnt, max_tw, draw)) > 3:
+            last = lines[-1].rstrip()
+            while last and draw.textbbox((0, 0), last + "…", font=title_fnt)[2] > max_tw:
+                last = last[:-1].rstrip()
+            lines[-1] = last + "…"
+
+        line_h = title_fnt.size + 8
+        block_h = line_h * len(lines)
+        ty     = cy0 + ((cy1 - cy0) - block_h) // 2
+
+        for line in lines:
+            # Drop shadow for depth
+            draw.text((title_x0 + 2, ty + 3), line, font=title_fnt, fill=(0, 0, 0))
+            draw.text((title_x0, ty),         line, font=title_fnt, fill=(245, 250, 255))
+            ty += line_h
+
+    # Save
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    bg.save(str(out_path), "PNG")
+    print(f"[image_gen] roundup saved {out_path.name} "
+          f"({width}x{height}, {n} headlines, mood={mood})", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -632,61 +1189,174 @@ def render_card(
 # ---------------------------------------------------------------------------
 
 SIZES = {
-    "x":     (1200, 675,  "x_1200x675"),      # X/Twitter OG card
-    "tg":    (1080, 1080, "tg_1080x1080"),     # Telegram square
-    "reel":  (1080, 1920, "reel_1080x1920"),   # TikTok/Reels/Shorts 9:16
+    "x":       (1200, 675,  "x_1200x675"),      # X/Twitter OG card 16:9
+    "tg":      (1080, 1080, "tg_1080x1080"),    # Telegram square 1:1
+    "reel":    (1080, 1920, "reel_1080x1920"),  # TikTok/Reels/Shorts 9:16
+    "ig_feed": (1080, 1350, "ig_1080x1350"),    # Instagram feed 4:5 (portrait)
+    "yt_thumb": (1280, 720, "yt_thumb_1280x720"),  # YouTube thumbnail 16:9
 }
 
 
 def render_all(story: dict, out_dir: Path, seed: int = 42,
-               sizes: list[str] | None = None, custom_prompt: str = "") -> dict[str, Path]:
-    """Render one or all size variants. Returns {size_key: path}."""
+               sizes: list[str] | None = None, custom_prompt: str = "",
+               niche: str = "crypto") -> dict[str, Path]:
+    """Render one or all size variants in parallel.
+
+    Each render_card() spends ~30-60s waiting on Pollinations.ai (network I/O).
+    Running 3 in parallel cuts the total from ~150s to ~50s because the GIL
+    releases during HTTP calls and PIL image work.
+
+    OPTIMIZATION: Cache check before rendering — reuse identical backgrounds.
+
+    NEW: stamps `_slot_dir` on the story dict so the LLM image strategist can
+    read the actual X / Telegram post bodies the copywriter generated and
+    optimize the background for that specific copy (virality / scroll-stop).
+    """
+    # Annotate story with the output directory — _gather_post_context() looks
+    # for post_x.txt / post_tg.txt next to the image to inform the LLM prompt.
+    try:
+        if isinstance(story, dict) and "_slot_dir" not in story:
+            story = dict(story)
+            story["_slot_dir"] = str(out_dir)
+    except Exception:
+        pass
+    # Inject niche-specific background styles before rendering
+    if niche and niche != "crypto":
+        try:
+            from src.agents.niches import NICHE_BG_STYLES
+        except ImportError:
+            from niches import NICHE_BG_STYLES  # type: ignore
+        if niche in NICHE_BG_STYLES:
+            _orig_styles = BG_STYLES.copy()
+            niche_styles = NICHE_BG_STYLES[niche]
+            BG_STYLES["bull"]    = niche_styles.get("positive", BG_STYLES["bull"])
+            BG_STYLES["bear"]    = niche_styles.get("negative", BG_STYLES["bear"])
+            BG_STYLES["neutral"] = niche_styles.get("neutral",  BG_STYLES["neutral"])
+        else:
+            _orig_styles = None
+    else:
+        _orig_styles = None
+
     targets = sizes or ["x", "tg"]
     result: dict[str, Path] = {}
-    for key in targets:
+
+    if len(targets) <= 1:
+        for key in targets:
+            w, h, suffix = SIZES[key]
+            out = out_dir / f"image_{suffix}.png"
+            
+            # Check cache before rendering
+            title = story.get("title", "")
+            cache_k = _cache_key(title, custom_prompt, w, h, seed=seed)
+            cached_img = _get_cached_image(cache_k)
+            if cached_img:
+                try:
+                    import shutil
+                    shutil.copy2(str(cached_img), str(out))
+                    print(f"[image_gen] copied from cache -> {out.name}", file=sys.stderr)
+                    result[key] = out
+                    continue
+                except Exception as exc:
+                    print(f"[image_gen] cache copy failed: {exc}", file=sys.stderr)
+
+            # Cache miss: render normally
+            render_card(story, w, h, out, seed=seed, custom_prompt=custom_prompt)
+            _store_cached_image(out, cache_k)
+            result[key] = out
+        if _orig_styles:
+            BG_STYLES.update(_orig_styles)
+        return result
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _one(key: str) -> tuple[str, Path]:
         w, h, suffix = SIZES[key]
         out = out_dir / f"image_{suffix}.png"
+
+        # Check cache before rendering
+        title = story.get("title", "")
+        cache_k = _cache_key(title, custom_prompt, w, h, seed=seed)
+        cached_img = _get_cached_image(cache_k)
+        if cached_img:
+            try:
+                import shutil
+                shutil.copy2(str(cached_img), str(out))
+                print(f"[image_gen] copied from cache -> {out.name}", file=sys.stderr)
+                return key, out
+            except Exception as exc:
+                print(f"[image_gen] cache copy failed: {exc}", file=sys.stderr)
+
+        # Cache miss: render normally
         render_card(story, w, h, out, seed=seed, custom_prompt=custom_prompt)
-        result[key] = out
+        _store_cached_image(out, cache_k)
+        return key, out
+
+    t0 = time.time()
+    with ThreadPoolExecutor(max_workers=len(targets)) as pool:
+        futures = [pool.submit(_one, k) for k in targets]
+        for fut in as_completed(futures):
+            try:
+                key, out = fut.result()
+                result[key] = out
+            except Exception as exc:
+                print(f"[image_gen] parallel render failed: {exc}", file=sys.stderr)
+
+    if _orig_styles:
+        BG_STYLES.update(_orig_styles)
+    print(f"[image_gen] rendered {len(result)}/{len(targets)} images in {time.time()-t0:.1f}s",
+          file=sys.stderr)
     return result
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
 def main(argv: list[str]) -> int:
+    """CLI entrypoint - read top2.json from a slot dir and render images."""
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("top2_json")
-    ap.add_argument("--out-dir", default=None)
-    ap.add_argument("--seed",    type=int, default=42)
-    ap.add_argument("--sizes",   default="x,tg",
-                    help="comma-separated: x,tg,reel  (default: x,tg)")
-    args = ap.parse_args(argv[1:])
+    ap.add_argument("slot_dir", help="Path to a queue/<slot> directory")
+    ap.add_argument("--seed", type=int, default=None)
+    ap.add_argument("--sizes", nargs="*", default=None,
+                    choices=list(SIZES.keys()))
+    ap.add_argument("--prompt", default="", help="Custom background prompt")
+    ap.add_argument("--niche", default="crypto")
+    args = ap.parse_args(argv)
 
-    data    = json.loads(Path(args.top2_json).read_text(encoding="utf-8"))
-    stories = data.get("stories", data) if isinstance(data, dict) else data
+    slot = Path(args.slot_dir)
+    top2 = slot / "top2.json"
+    if not top2.exists():
+        print(f"[image_gen] top2.json not found in {slot}", file=sys.stderr)
+        return 2
+    data = json.loads(top2.read_text(encoding="utf-8"))
+    stories = data.get("stories") or (data if isinstance(data, list) else [])
     if not stories:
-        print("[image_gen] no stories", file=sys.stderr)
-        return 1
+        print(f"[image_gen] no stories in {top2}", file=sys.stderr)
+        return 2
 
-    out_dir = Path(args.out_dir).resolve() if args.out_dir else Path(args.top2_json).parent
-    sizes   = [s.strip() for s in args.sizes.split(",") if s.strip()]
-    render_all(stories[0], out_dir, seed=args.seed, sizes=sizes)
-    print(f"[image_gen] done -> {out_dir}")
+    seed = args.seed if args.seed is not None else datetime.now().toordinal()
+    out = render_all(stories[0], slot, seed=seed, sizes=args.sizes,
+                     custom_prompt=args.prompt, niche=args.niche)
+    print(f"[image_gen] wrote: {[str(p) for p in out.values()]}")
     return 0
-
-
-# Compatibility shim for pipeline.py
-def derive_params(story: dict, size: str) -> dict:
-    return {"mood": classify_mood(story), "size": size}
 
 
 def render_png(template_path: Path, params: dict, width: int, height: int,
                out_path: Path) -> None:
-    render_card(params.get("_story", {}), width, height, out_path, seed=42)
+    """Backwards-compat shim: redirect templated calls to render_card.
+
+    Older pipeline code expected an HTML-template renderer; we now produce
+    everything via PIL. The template is ignored; `params` is treated as the
+    story dict (with title/summary/tickers/source) and forwarded to
+    render_card.
+    """
+    story = {
+        "title":   params.get("title", ""),
+        "summary": params.get("summary") or params.get("subhead", ""),
+        "source":  params.get("source", ""),
+        "tickers": params.get("tickers") or [],
+    }
+    seed = int(params.get("seed", datetime.now().toordinal()))
+    render_card(story, width, height, out_path, seed=seed,
+                custom_prompt=params.get("prompt", ""))
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv))
+    raise SystemExit(main(sys.argv[1:]))

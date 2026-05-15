@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — IP Logs — AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<style>
+  :root {
+    --bg:#020806; --surface:rgba(4,13,7,.95);
+    --border:rgba(0,255,120,.1);
+    --neon:#00ff7a; --cyan:#06d6a0;
+    --text:#dff7e8; --muted:#3d7a55; --dim:#1a3d26;
+  }
+  *{box-sizing:border-box;}
+  body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; backdrop-filter:blur(12px); }
+  .row-item { transition:background .15s; }
+  .row-item:hover { background:rgba(0,255,120,.02); }
+  code { background:rgba(0,0,0,.4); padding:2px 7px; border-radius:4px; font-size:11px; font-family:monospace; }
+  .badge-ok   { background:rgba(0,255,120,.09);color:var(--neon);border:1px solid rgba(0,255,120,.2);padding:2px 9px;border-radius:999px;font-size:10px;font-weight:700; }
+  .badge-fail { background:rgba(239,68,68,.09);color:#f87171;border:1px solid rgba(239,68,68,.2);padding:2px 9px;border-radius:999px;font-size:10px;font-weight:700; }
+  .badge-local{ background:rgba(148,163,184,.08);color:#94a3b8;border:1px solid rgba(148,163,184,.18);padding:2px 9px;border-radius:999px;font-size:10px;font-weight:700; }
+  .ip-real    { color:#86efac; }
+  .ip-local   { color:#94a3b8; }
+  .country    { color:var(--cyan); font-size:11px; }
+  input[type=text] { background:rgba(0,0,0,.3);border:1px solid rgba(0,255,120,.15);border-radius:8px;color:var(--text);padding:8px 14px;font-size:13px; }
+  input:focus { outline:none;border-color:var(--neon); }
+body::before {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image: radial-gradient(circle, rgba(0,255,120,.22) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+</style>
+</head>
+<body class="min-h-screen">
+
+<header style="position:sticky;top:0;z-index:100;background:rgba(2,8,4,.95);border-bottom:1px solid rgba(0,255,120,.08);backdrop-filter:blur(20px);">
+  <div class="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <a href="/admin/users" style="color:var(--muted);font-size:13px;font-weight:600;text-decoration:none;" class="hover:text-white">← Users</a>
+      <span style="color:var(--dim);">/</span>
+      <span style="font-weight:800;color:var(--text);font-size:14px;">🔍 IP Logs</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span style="font-size:12px;color:var(--muted);">Ultimele <strong style="color:var(--text);">{{ logs|length }}</strong> intrari</span>
+      {% if limit < 500 %}
+      <a href="/admin/login-logs?limit=500" style="font-size:11px;color:var(--cyan);text-decoration:none;border:1px solid rgba(6,214,160,.2);padding:5px 12px;border-radius:7px;background:rgba(6,214,160,.05);">Arata 500</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<div class="max-w-6xl mx-auto px-6 py-8" style="position:relative;z-index:1;">
+
+  <div class="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h1 class="text-xl font-bold" style="color:var(--text);">Activitate Login</h1>
+      <p class="text-sm mt-1" style="color:var(--muted);">
+        Fiecare login/tentativa esuata, cu IP real, browser si tara.
+        <span style="color:var(--dim);">IP <code style="color:#94a3b8;">127.0.0.1</code> = acces din aceeasi masina (localhost).</span>
+      </p>
+    </div>
+    <input type="text" id="filterInput" placeholder="🔍  Filtreaza IP / email / browser..."
+      oninput="filterRows(this.value)" style="width:280px;">
+  </div>
+
+  <!-- Stats bar -->
+  <div class="flex gap-4 mb-5 flex-wrap">
+    <div class="card px-4 py-3 text-center" style="min-width:100px;">
+      <div class="text-lg font-bold" style="color:var(--neon);" id="stat-total">{{ logs|length }}</div>
+      <div class="text-xs" style="color:var(--muted);">Total</div>
+    </div>
+    <div class="card px-4 py-3 text-center" style="min-width:100px;">
+      <div class="text-lg font-bold" style="color:var(--neon);" id="stat-ok">{{ logs | selectattr('success','equalto',1) | list | length }}</div>
+      <div class="text-xs" style="color:var(--muted);">Reusite</div>
+    </div>
+    <div class="card px-4 py-3 text-center" style="min-width:100px;">
+      <div class="text-lg font-bold" style="color:#f87171;" id="stat-fail">{{ logs | rejectattr('success','equalto',1) | list | length }}</div>
+      <div class="text-xs" style="color:var(--muted);">Esuate</div>
+    </div>
+    <div class="card px-4 py-3 text-center" style="min-width:100px;">
+      <div class="text-lg font-bold" style="color:var(--cyan);" id="stat-ips">
+        {{ logs | map(attribute='ip') | unique | list | length }}
+      </div>
+      <div class="text-xs" style="color:var(--muted);">IP-uri unice</div>
+    </div>
+  </div>
+
+  {% if logs %}
+  <div class="card overflow-hidden">
+    <!-- Header -->
+    <div class="grid px-5 py-2 text-xs font-bold uppercase" style="color:var(--muted);border-bottom:1px solid rgba(0,255,120,.06);background:rgba(0,0,0,.18);grid-template-columns:200px 150px 120px 90px 140px 1fr;">
+      <div>User</div>
+      <div>IP</div>
+      <div>Tara / Oras</div>
+      <div>Status</div>
+      <div>Data / Ora</div>
+      <div>Browser</div>
+    </div>
+
+    {% for log in logs %}
+    {% set ip = log.ip or '' %}
+    {% set is_local = ip in ('127.0.0.1','::1','localhost','') or ip.startswith('192.168.') or ip.startswith('10.') or ip.startswith('172.') %}
+    <div class="log-row row-item grid px-5 py-3 items-center"
+      style="{% if not loop.first %}border-top:1px solid rgba(0,255,120,.04);{% endif %}grid-template-columns:200px 150px 120px 90px 140px 1fr;">
+
+      <!-- User -->
+      <div>
+        <p class="text-xs font-semibold" style="color:var(--text);">{{ log.display_name or (log.email or '—').split('@')[0] }}</p>
+        <p class="text-xs" style="color:var(--muted);">{{ log.email or '—' }}</p>
+      </div>
+
+      <!-- IP -->
+      <div>
+        {% if is_local %}
+          <span class="badge-local">🏠 Local</span>
+          <p class="text-xs mt-1" style="color:var(--dim);">{{ ip or '—' }}</p>
+        {% else %}
+          <code class="ip-real">{{ ip }}</code>
+        {% endif %}
+      </div>
+
+      <!-- Tara -->
+      <div class="country">
+        {% if log.country_code and log.country_code != '' %}
+          <span title="{{ log.country_name }}">{{ log.country_code }}</span>
+          {% if log.city %}<br><span style="font-size:10px;color:var(--dim);">{{ log.city[:18] }}</span>{% endif %}
+        {% elif is_local %}
+          <span style="color:var(--dim);">Localhost</span>
+        {% else %}
+          <span style="color:var(--dim);">—</span>
+        {% endif %}
+      </div>
+
+      <!-- Status -->
+      <div>
+        {% if log.success %}
+          <span class="badge-ok">✓ OK</span>
+        {% else %}
+          <span class="badge-fail">✕ Fail</span>
+        {% endif %}
+      </div>
+
+      <!-- Data -->
+      <div style="font-size:11px;color:var(--dim);">
+        {{ (log.logged_at or '')[:16].replace('T',' ') or '—' }}
+      </div>
+
+      <!-- Browser (parsed din UA) -->
+      <div style="font-size:11px;color:var(--muted);" title="{{ log.user_agent or '' }}">
+        {{ log.user_agent | parse_ua if log.user_agent else '—' }}
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card px-5 py-12 text-center text-sm" style="color:var(--muted);">
+    Nu exista activitate inregistrata inca.
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function filterRows(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.log-row').forEach(row => {
+    row.style.display = (!q || row.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>

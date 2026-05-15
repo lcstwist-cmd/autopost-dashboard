@@ -3,188 +3,916 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Settings — AutoPost</title>
+<title>Settings — AutoPost by EMD</title>
 <script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/elite.css">
 <style>
-  body { background: #0a0f1a; }
-  .card { background: #111827; border: 1px solid #1f2937; }
-  input[type=text], input[type=password], input[type=email] {
-    background: #0a0f1a; border: 1px solid #374151; color: #e5e7eb;
-    border-radius: 8px; padding: 10px 14px; width: 100%; font-size: 13px;
+  :root {
+    --bg:    #020806; --surface:rgba(4,13,7,.97);
+    --border:rgba(0,255,120,.1); --border-h:rgba(0,255,120,.38);
+    --neon:  #00ff7a; --green:#22c55e; --text:#dff7e8;
+    --muted: #3d7a55; --dim:#1a3d26;
   }
-  input:focus { outline: none; border-color: #3b82f6; }
-  .section-title { font-size: 11px; color: #6b7280; text-transform: uppercase;
-                   letter-spacing: .08em; font-weight: 700; margin-bottom: 14px;
-                   padding-bottom: 8px; border-bottom: 1px solid #1f2937; }
+  *{box-sizing:border-box;}
+  body {
+    background: var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  .card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:16px; padding:24px; position:relative;
+    backdrop-filter:blur(12px); transition:border-color .2s;
+  }
+  .card:hover { border-color:rgba(0,255,120,.18); }
+  .card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg,transparent,rgba(0,255,120,.25),transparent);
+    opacity:0; transition:opacity .25s;
+  }
+  .card:hover::before { opacity:1; }
+  .section-label {
+    font-size:10px; color:var(--neon); text-transform:uppercase;
+    letter-spacing:.1em; font-weight:700; margin-bottom:16px;
+    padding-bottom:10px; border-bottom:1px solid var(--dim);
+    display:flex; align-items:center; gap:8px;
+  }
+  .section-label::after {
+    content:''; flex:1; height:1px;
+    background:linear-gradient(90deg,var(--dim),transparent);
+  }
+  label.field-label { display:block; font-size:11px; color:var(--muted); margin-bottom:5px; font-weight:600; letter-spacing:.04em; }
+  input[type=text], input[type=password], input[type=email], input[type=number],
+  input[type=time], select, textarea {
+    background:rgba(2,8,4,.95); border:1px solid rgba(0,255,120,.1);
+    color:var(--text); border-radius:9px; padding:10px 14px; width:100%;
+    font-size:13px; transition:border-color .18s, box-shadow .18s; outline:none;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color:rgba(0,255,120,.38);
+    box-shadow:0 0 0 3px rgba(0,255,120,.05);
+  }
+  input::placeholder, textarea::placeholder { color:rgba(61,122,85,.5); }
+  select option { background:#020806; }
+  .hint { font-size:11px; color:var(--muted); margin-top:5px; }
+  .btn-save {
+    background:linear-gradient(135deg,#065c28,#16a34a);
+    color:#fff; border:none; border-radius:11px;
+    padding:13px; font-weight:800; font-size:14px; width:100%; cursor:pointer;
+    letter-spacing:.04em; transition:all .2s;
+    box-shadow:0 0 20px rgba(22,163,74,.2);
+  }
+  .btn-save:hover { box-shadow:0 0 32px rgba(0,255,120,.4); transform:translateY(-1px); }
+  .badge-ok   { background:rgba(0,255,120,.09); color:var(--neon); padding:2px 10px;
+                border-radius:999px; font-size:10px; font-weight:700;
+                border:1px solid rgba(0,255,120,.2); }
+  .badge-miss { background:rgba(255,255,255,.03); color:var(--dim); padding:2px 10px;
+                border-radius:999px; font-size:10px; border:1px solid rgba(255,255,255,.06); }
+  .advanced summary { font-size:11px; color:var(--muted); cursor:pointer; padding:6px 0;
+                      list-style:none; display:flex; align-items:center; gap:6px; }
+  .advanced summary:hover { color:var(--text); }
+  .advanced summary::before { content:'▸'; transition:transform .2s; }
+  details.advanced[open] summary::before { content:'▾'; }
+  /* ── Save toast ── */
+  #save-toast {
+    position: fixed;
+    top: 72px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-8px);
+    z-index: 9999;
+    background: #071a0d;
+    border: 1px solid #22c55e;
+    color: #22c55e;
+    padding: 13px 28px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 4px 24px rgba(34,197,94,.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s, transform .25s;
+  }
+  #save-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+  }
+/* __BG_REPLACED__ */
+body::before {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image: radial-gradient(circle, rgba(0,255,120,.22) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+body::after {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 85%, rgba(0,255,120,.09) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 75% at 85% 15%, rgba(6,214,160,.07) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 45% at 50% 50%, rgba(0,70,35,.06) 0%, transparent 65%);
+  animation: aurora 18s ease-in-out infinite alternate;
+}
+@keyframes aurora { 0%{opacity:.7;} 50%{opacity:1;} 100%{opacity:.75;} }
+.grid-floor {
+  position:fixed; bottom:-10%; left:50%;
+  transform:translateX(-50%) perspective(600px) rotateX(70deg);
+  transform-origin:center bottom; width:250%; height:75%; z-index:0; pointer-events:none;
+  mask-image:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 55%);
+  -webkit-mask-image:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 55%);
+}
+
 </style>
 </head>
-<body class="text-gray-100 min-h-screen">
+<body style="display:flex;min-height:100vh;color:var(--text);">
+<div class="grid-floor" aria-hidden="true"></div>
+{% include '_sidebar.html' %}
+<div class="main-wrap">
 
-<header class="sticky top-0 z-10 border-b border-gray-800" style="background:#0d1423;">
-  <div class="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
+{% if saved %}
+<div id="save-toast">✅ <span data-i18n="settings.saved">Saved successfully.</span></div>
+<script>
+  (function(){
+    var t = document.getElementById('save-toast');
+    if (!t) return;
+    setTimeout(function(){ t.classList.add('show'); }, 50);
+    setTimeout(function(){ t.classList.remove('show'); }, 3800);
+  })();
+</script>
+{% endif %}
+
+<header class="sticky top-0 z-10" style="background:rgba(2,8,4,.95);border-bottom:1px solid rgba(0,255,120,.08);backdrop-filter:blur(20px);">
+  <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <a href="/" class="text-gray-400 hover:text-white text-sm">← Dashboard</a>
-      <span class="text-gray-700">/</span>
-      <span class="font-bold text-white">Settings</span>
+      <a href="/" style="color:var(--muted);font-size:13px;text-decoration:none;font-weight:600;letter-spacing:.02em;transition:color .15s;" class="hover:text-white" data-i18n="nav.back">← Dashboard</a>
+      <span style="color:var(--dim);">/</span>
+      <span style="font-weight:800;color:var(--text);font-size:14px;letter-spacing:.02em;" data-i18n="settings.title">Settings</span>
     </div>
-    <div class="flex items-center gap-3">
-      <span class="text-gray-500 text-sm">{{ user.email }}</span>
-      <form method="post" action="/logout">
-        <button type="submit" class="text-xs text-gray-500 hover:text-red-400 px-3 py-1 rounded border border-gray-700">Logout</button>
-      </form>
+    <div class="flex items-center gap-2">
+      <span style="color:var(--muted);font-size:12px;">{{ user.email }}</span>
+      <div class="flex items-center gap-1" style="border-left:1px solid var(--dim);padding-left:8px;">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')" style="font-size:10px;padding:3px 7px;border-radius:6px;border:1px solid var(--dim);background:rgba(0,255,120,.04);color:var(--muted);cursor:pointer;letter-spacing:.05em;">EN</button>
+        <button class="lang-btn" data-lang="ro" onclick="setLang('ro')" style="font-size:10px;padding:3px 7px;border-radius:6px;border:1px solid var(--dim);background:rgba(0,255,120,.04);color:var(--muted);cursor:pointer;letter-spacing:.05em;">RO</button>
+      </div>
     </div>
   </div>
 </header>
 
-<div class="max-w-3xl mx-auto px-6 py-8">
+<div class="max-w-7xl mx-auto px-6 py-8">
 
   {% if saved %}
-  <div class="mb-6 px-4 py-3 rounded-lg text-sm text-green-400" style="background:#0a1a0a;border:1px solid #166534;">
-    ✅ Settings saved successfully.
+  <div class="mb-6 px-4 py-3 rounded-xl text-sm text-green-400" style="background:#0a1a0a;border:1px solid #166534;" data-i18n="settings.saved">
+    ✅ Saved successfully.
   </div>
   {% endif %}
 
-  <h1 class="text-xl font-bold text-white mb-1">Your API Keys</h1>
-  <p class="text-gray-500 text-sm mb-8">All keys are stored securely in the database. They are used only for your posts.</p>
+  {% if csrf_error %}
+  <div class="mb-6 px-4 py-3 rounded-xl text-sm" style="color:#f87171;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);">
+    <span data-i18n="settings.csrf_error1">⚠ Sesiunea a expirat după un restart al serverului. Pagina s-a reîncărcat — încearcă din nou să salvezi.</span>
+  </div>
+  {% endif %}
 
-  <form method="post" action="/settings" class="space-y-8">
+  <!-- Quick-jump tab nav (sticky below the main header, scrolls page to section) -->
+  <div id="settings-nav" class="sticky z-20 mb-5 -mx-6 px-6 py-2"
+       style="top:54px;background:rgba(2,8,6,0.94);backdrop-filter:blur(10px);border-bottom:1px solid rgba(0,255,120,.08);">
+    <div class="flex flex-wrap gap-2 text-xs">
+      <a href="#sec-telegram" class="settings-jump">📨 Telegram</a>
+      <a href="#sec-x"        class="settings-jump">𝕏 X</a>
+      <a href="#sec-instagram" class="settings-jump">📸 Instagram</a>
+      <a href="#sec-tiktok"   class="settings-jump">🎵 TikTok</a>
+      <a href="#sec-youtube"  class="settings-jump">▶ YouTube</a>
+      <a href="#sec-facebook" class="settings-jump">👍 Facebook</a>
+      <a href="#sec-ai"       class="settings-jump">🤖 AI Keys</a>
+      <a href="#sec-brand"    class="settings-jump">🎬 Brand & Video</a>
+      <a href="#sec-niche"    class="settings-jump">🎯 Niche</a>
+      <a href="#sec-schedule" class="settings-jump">⏰ Schedule</a>
+      <a href="#sec-platforms" class="settings-jump">📡 Platforms</a>
+      <a href="#sec-email"    class="settings-jump">📧 Email</a>
+      <a href="#sec-webhook"  class="settings-jump">🔗 Webhook</a>
+    </div>
+  </div>
+  <style>
+    .settings-jump {
+      padding: 4px 10px; border-radius: 999px;
+      background: rgba(0,255,120,.05);
+      border: 1px solid rgba(0,255,120,.12);
+      color: var(--text); transition: all .15s;
+    }
+    .settings-jump:hover { background: rgba(0,255,120,.12); color: var(--neon); }
+    /* Adjust scroll target offset so sticky nav doesn't cover the heading */
+    [id^="sec-"] { scroll-margin-top: 90px; }
+  </style>
 
-    <!-- Telegram -->
-    <div class="card rounded-2xl p-6">
-      <p class="section-title">✈ Telegram</p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <form id="settings-form" method="post" action="/settings"
+        class="grid lg:grid-cols-2 gap-5">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+
+    <!-- ══ TELEGRAM ══ -->
+    <div class="card" id="sec-telegram">
+      <p class="section-label" data-i18n="settings.telegram">📨 Telegram</p>
+      <div class="grid grid-cols-2 gap-4">
         <div>
-          <label class="block text-xs text-gray-400 mb-1">Bot Token</label>
-          <input type="password" name="telegram_token"
-            value="{{ s.telegram_token or '' }}"
-            placeholder="123456:ABCdef...">
-          <p class="text-xs text-gray-600 mt-1">From @BotFather → /newbot</p>
+          <label class="field-label" data-i18n="settings.tg_bot_token">Bot Token</label>
+          <input type="password" name="telegram_token" value="{{ s.telegram_token or '' }}" placeholder="123456:ABCdef...">
+          <p class="hint" data-i18n="settings.tg_bot_hint">From @BotFather → /newbot</p>
         </div>
         <div>
-          <label class="block text-xs text-gray-400 mb-1">Channel ID</label>
-          <input type="text" name="telegram_channel"
-            value="{{ s.telegram_channel or '' }}"
-            placeholder="@yourchannel or -100123456789">
+          <label class="field-label" data-i18n="settings.tg_news_chan">📰 News Channel (auto posts)</label>
+          <input type="text" name="telegram_channel" value="{{ s.telegram_channel or '' }}" placeholder="@canal sau -100123...">
+          <p class="hint" data-i18n="settings.tg_news_hint">Crypto news is posted here daily</p>
         </div>
       </div>
+      {% if user.is_admin %}
+      <div class="mt-3" style="border:1px solid rgba(0,255,120,.1);border-radius:10px;padding:12px;background:rgba(0,255,120,.02);">
+        <label class="field-label flex items-center gap-2" data-i18n="settings.tg_alert_chan">
+          🔔 Admin Alert Channel (bot errors, health monitor)
+          <span style="background:rgba(34,197,94,.12);color:#22c55e;font-size:10px;padding:2px 8px;border-radius:999px;font-weight:600;">ADMIN ONLY</span>
+        </label>
+        <div class="flex items-center gap-2 flex-wrap">
+          <input type="text" name="telegram_alert_chat"
+                 id="alert-chat-input"
+                 value="{{ s.telegram_alert_chat or '' }}"
+                 placeholder="-1001234567890 sau @username"
+                 style="max-width:320px;">
+          <button type="button" onclick="testAlertChat()"
+            class="px-3 py-2 rounded-lg text-xs font-semibold"
+            style="background:#071a0d;color:#22c55e;border:1px solid #166534;cursor:pointer;white-space:nowrap;"
+            data-i18n="settings.tg_test_btn">
+            🔔 Test channel
+          </button>
+        </div>
+        <p id="alert-chat-status" class="text-xs mt-1" style="display:none;"></p>
+        <p class="hint" data-i18n="settings.tg_alert_hint">Bot errors and health alerts go HERE ONLY — not in the news channel. Add bot as admin, save settings, then press Test.</p>
+      </div>
+      {% endif %}
     </div>
 
-    <!-- X / Twitter -->
-    <div class="card rounded-2xl p-6">
-      <p class="section-title">✖ X / Twitter</p>
+    <!-- ══ X / TWITTER ══ -->
+    <div class="card" id="sec-x">
+      <p class="section-label" data-i18n="settings.x">𝕏 X / Twitter</p>
 
-      <!-- twikit: email + password (FREE, recommended) -->
-      <div class="mb-5 px-4 py-3 rounded-xl" style="background:#0a1a0a;border:1px solid #166534;">
-        <p class="text-xs font-bold text-green-400 mb-1">✅ Metoda GRATUITA — Login cu cont X (recomandat)</p>
-        <p class="text-xs text-gray-500 mb-3">Introdu user + email + parola contului tau X. Nu e nevoie de API keys sau plan platit.</p>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">Username X</label>
-            <input type="text" name="x_username"
-              value="{{ s.x_username or '' }}"
-              placeholder="ELITEMARGINDESK">
-            <p class="text-xs text-gray-600 mt-1">Fara @</p>
-          </div>
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">Email cont X</label>
-            <input type="text" name="x_email"
-              value="{{ s.x_email or '' }}"
-              placeholder="email@exemplu.com">
-          </div>
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">Parola cont X</label>
-            <input type="password" name="x_password"
-              value="{{ s.x_password or '' }}"
-              placeholder="parola contului X">
-          </div>
+      <!-- Cookies — PRINCIPAL -->
+      <div class="mb-2 flex items-center gap-2">
+        <span class="text-sm font-semibold text-purple-300" data-i18n="settings.x_cookies_free">🍪 Free alternative — Paste cookies</span>
+        {% if s.x_cookies_json %}
+        <span class="badge-ok"><span data-i18n="settings.x_cookies_saved">saved</span> @{{ s.x_cookies_handle or '?' }}</span>
+        {% endif %}
+      </div>
+      <div class="space-y-3 mb-4">
+        <p class="text-xs" style="color:#4d7a60;" data-i18n-html="settings.x_install_hint">Install <a href="https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm" target="_blank" style="color:#22c55e;" class="underline">Cookie-Editor</a>, go to x.com, Export → JSON, paste below.</p>
+        <textarea id="x_cookies_json_input" rows="3"
+          placeholder='[{"name":"auth_token","value":"..."}]'
+          style="font-family:monospace;font-size:11px;">{% if s.x_cookies_json %}[cookie-uri salvate]{% endif %}</textarea>
+        <div class="flex gap-2 items-center flex-wrap">
+          <button type="button" id="x_cookies_save_btn"
+                  class="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+                  style="background:#7c3aed;"
+                  data-i18n="settings.x_save_cookies">Save cookies</button>
+          {% if s.x_cookies_json %}
+          <button type="button" id="x_cookies_test_btn"
+                  class="px-3 py-2 rounded-lg text-xs text-white"
+                  style="background:#1e3a5f;"
+                  data-i18n="settings.x_test_cookies">Test</button>
+          <button type="button" class="px-3 py-2 rounded-lg text-xs text-red-400"
+                  style="background:#1c0a0a;"
+                  data-i18n="settings.x_del_cookies"
+                  onclick="fetchPost('/x/cookies-clear','{{ csrf_token }}',function(){location.reload();})">Delete</button>
+          {% endif %}
+          <span id="x_cookies_result" class="text-xs ml-2"></span>
         </div>
       </div>
 
-      <!-- Make.com (fallback) -->
-      <details class="mb-4">
-        <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-300">▸ Alternativa: Make.com Webhook (daca login direct nu merge)</summary>
-        <div class="mt-3 px-3 py-3 rounded-lg" style="background:#060f06;border:1px solid #1a3a1a;">
-          <label class="block text-xs text-gray-400 mb-1">Make.com Webhook URL</label>
-          <input type="text" name="make_x_webhook_url"
-            value="{{ s.make_x_webhook_url or '' }}"
-            placeholder="https://hook.eu2.make.com/xxxxxxxxxxxxxxxx">
-          <p class="text-xs text-gray-600 mt-1">make.com → New Scenario → Webhooks → Custom Webhook + X → Create Tweet</p>
-        </div>
-      </details>
-
-      <!-- Direct API (last resort) -->
-      <details>
-        <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-400">▸ X API direct (necesita plan Basic $100/luna)</summary>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">API Key</label>
-            <input type="password" name="x_api_key" value="{{ s.x_api_key or '' }}" placeholder="API Key">
-          </div>
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">API Secret</label>
-            <input type="password" name="x_api_secret" value="{{ s.x_api_secret or '' }}" placeholder="API Secret">
-          </div>
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">Access Token</label>
-            <input type="password" name="x_access_token" value="{{ s.x_access_token or '' }}" placeholder="Access Token">
-          </div>
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">Access Token Secret</label>
-            <input type="password" name="x_access_secret" value="{{ s.x_access_secret or '' }}" placeholder="Access Token Secret">
+      <!-- Developer API — SECUNDAR -->
+      <details class="advanced">
+        <summary><span data-i18n="settings.x_dev_plan">X Developer Plan — $100/mo (Official OAuth 2.0 API)</span>
+          {% if s.x_oauth_access_token %}
+          <span class="badge-ok ml-2">@{{ s.x_oauth_username or '?' }}</span>
+          {% endif %}
+        </summary>
+        <div class="mt-3">
+          <p class="text-xs mb-3" style="color:#4d7a60;" data-i18n-html="settings.x_dev_hint">Requires <strong style="color:#86a899;">Basic ($100/mo)</strong> subscription on <a href="https://developer.x.com" target="_blank" style="color:#22c55e;" class="underline">developer.x.com</a>. Token refreshes automatically.</p>
+          <div class="flex items-center gap-3">
+            {% if s.x_oauth_access_token %}
+            <span class="text-xs" style="color:#86a899;"><span data-i18n="settings.x_connected_as">Connected as</span> @{{ s.x_oauth_username or '?' }}</span>
+            <a href="/x/connect" class="text-xs" style="color:#22c55e;" data-i18n="settings.x_reconnect">Reconnect</a>
+            <button type="button" class="text-xs" style="color:#f87171;"
+                    data-i18n="settings.x_disconnect"
+                    onclick="fetchPost('/x/disconnect','{{ csrf_token }}',function(){location.reload();})">Disconnect</button>
+            {% else %}
+            <a href="/x/connect"
+               class="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+               style="background:#16a34a;"
+               data-i18n="settings.x_connect_oauth">
+              Connect with OAuth
+            </a>
+            {% endif %}
           </div>
         </div>
       </details>
     </div>
 
-    <!-- D-ID -->
-    <div class="card rounded-2xl p-6">
-      <p class="section-title">🧑 D-ID Avatar</p>
-      <div class="mb-3 px-3 py-2 rounded-lg text-xs text-blue-300" style="background:#0d1e35;border:1px solid #1e3a5f;">
-        <strong>Cum obții cheia:</strong> Mergi la <a href="https://studio.d-id.com" target="_blank" class="underline">studio.d-id.com</a>
-        → Profile → API → copiază cheia care arată ca: <code class="text-yellow-300">bGNz...@gmail.com:secret</code><br>
-        Cheia se pune direct în câmpul <em>D-ID API Key</em> (fără email separat dacă e în formatul complet).
+    <!-- ══ INSTAGRAM ══ -->
+    <div class="card" id="sec-instagram">
+      <p class="section-label" data-i18n="settings.instagram">📸 Instagram</p>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="field-label">User ID</label>
+          <input type="text" name="ig_user_id" value="{{ s.ig_user_id or '' }}" placeholder="17841400123456789">
+          <p class="hint">Instagram Business Account ID</p>
+        </div>
+        <div>
+          <label class="field-label">Access Token</label>
+          <input type="password" name="ig_access_token" value="{{ s.ig_access_token or '' }}" placeholder="EAAxxxxxx...">
+          <p class="hint">Long-lived Page Access Token</p>
+        </div>
       </div>
+      <details class="advanced mt-3">
+        <summary data-i18n="settings.ig_hosting">Image hosting (required for Instagram)</summary>
+        <div class="grid grid-cols-2 gap-4 mt-3">
+          <div>
+            <label class="field-label">ImgBB API Key</label>
+            <input type="password" name="imgbb_api_key" value="{{ s.imgbb_api_key or '' }}" placeholder="...">
+            <p class="hint"><a href="https://api.imgbb.com" target="_blank" style="color:#22c55e;">api.imgbb.com</a> — free</p>
+          </div>
+          <div>
+            <label class="field-label">Public Base URL</label>
+            <input type="text" name="public_base_url" value="{{ s.public_base_url or '' }}" placeholder="https://...ngrok.io">
+            <p class="hint" data-i18n="settings.ngrok_hint">ngrok / public tunnel (optional)</p>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- ══ FACEBOOK ══ -->
+    <div class="card" id="sec-facebook">
+      <p class="section-label">👍 Facebook</p>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="field-label">Page Access Token</label>
+          <input type="password" name="fb_access_token" value="{{ s.fb_access_token or '' }}" placeholder="EAAxxxxxx...">
+          <p class="hint">Long-lived Page Access Token din <a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:#22c55e;">Graph API Explorer</a></p>
+        </div>
+        <div>
+          <label class="field-label">Page ID</label>
+          <input type="text" name="fb_page_id" value="{{ s.fb_page_id or '' }}" placeholder="123456789012345">
+          <p class="hint" data-i18n="settings.fb_page_hint">ID-ul paginii tale Facebook (nu username). Găsești în About → Page ID.</p>
+        </div>
+      </div>
+      <p class="hint mt-2" style="color:var(--muted);" data-i18n="settings.fb_reels_hint">Postează Reels video + imagini pe pagina ta Facebook. Necesită un token de tip Page, nu Personal.</p>
+    </div>
+
+    <!-- ══ TIKTOK ══ -->
+    <div class="card" id="sec-tiktok">
+      <p class="section-label" data-i18n="settings.tiktok">🎵 TikTok</p>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="field-label">Access Token</label>
+          <input type="password" name="tiktok_access_token" value="{{ s.tiktok_access_token or '' }}" placeholder="act.xxx...">
+        </div>
+        <div>
+          <label class="field-label">Refresh Token</label>
+          <input type="password" name="tiktok_refresh_token" value="{{ s.tiktok_refresh_token or '' }}" placeholder="rft.xxx...">
+        </div>
+      </div>
+      <details class="advanced mt-3">
+        <summary data-i18n="settings.tiktok_creds">Client credentials (for OAuth flow)</summary>
+        <div class="grid grid-cols-2 gap-4 mt-3">
+          <div>
+            <label class="field-label">Client Key</label>
+            <input type="text" name="tiktok_client_key" value="{{ s.tiktok_client_key or '' }}" placeholder="awxxxxxx">
+          </div>
+          <div>
+            <label class="field-label">Client Secret</label>
+            <input type="password" name="tiktok_client_secret" value="{{ s.tiktok_client_secret or '' }}" placeholder="...">
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- ══ YOUTUBE ══ -->
+    <div class="card" id="sec-youtube">
+      <p class="section-label" data-i18n="settings.youtube">▶ YouTube</p>
       <div class="grid grid-cols-1 gap-4">
         <div>
-          <label class="block text-xs text-gray-400 mb-1">D-ID API Key <span class="text-gray-600">(format: base64email:secret)</span></label>
-          <input type="password" name="did_api_key"
-            value="{{ s.did_api_key or '' }}"
-            placeholder="bGNzdHdpc3RAZ21haWwuY29t:ZkgX...">
-          <p class="text-xs text-gray-600 mt-1">Copiază cheia completă din D-ID Studio → API Keys</p>
+          <label class="field-label">Refresh Token</label>
+          <input type="password" name="youtube_refresh_token" value="{{ s.yt_refresh_token or s.youtube_refresh_token or '' }}" placeholder="1//0g...">
+          <p class="hint">From <a href="/youtube/connect" style="color:#22c55e;">YouTube OAuth flow</a></p>
+        </div>
+      </div>
+      <details class="advanced mt-3">
+        <summary>Client credentials</summary>
+        <div class="grid grid-cols-2 gap-4 mt-3">
+          <div>
+            <label class="field-label">Client ID</label>
+            <input type="text" name="youtube_client_id" value="{{ s.yt_client_id or s.youtube_client_id or '' }}" placeholder="xxx.apps.googleusercontent.com">
+          </div>
+          <div>
+            <label class="field-label">Client Secret</label>
+            <input type="password" name="youtube_client_secret" value="{{ s.yt_client_secret or s.youtube_client_secret or '' }}" placeholder="GOCSPX-...">
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- ══ AI KEYS ══ -->
+    <div class="card" id="sec-ai">
+      <p class="section-label" data-i18n="settings.ai_keys">🤖 AI Keys</p>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="field-label">Anthropic API Key</label>
+          <input type="password" name="anthropic_key" value="{{ s.anthropic_key or '' }}" placeholder="sk-ant-api03-...">
+          <p class="hint" data-i18n="settings.ai_anthropic_hint">For AI rewrite + news analysis</p>
         </div>
         <div>
-          <label class="block text-xs text-gray-400 mb-1">Presenter Photo URL <span class="text-gray-600">(opțional)</span></label>
-          <input type="text" name="did_presenter_url"
-            value="{{ s.did_presenter_url or '' }}"
-            placeholder="https://... URL la o poză cu fața ta sau un avatar">
-          <p class="text-xs text-gray-600 mt-1">URL public la o imagine JPG/PNG cu un chip (față clară, fundal simplu). Lasă gol pentru imaginea default.</p>
+          <label class="field-label">ElevenLabs API Key</label>
+          <input type="password" name="elevenlabs_key" value="{{ s.elevenlabs_key or '' }}" placeholder="sk_...">
+          <p class="hint" data-i18n="settings.ai_elevenlabs_hint">Premium TTS for avatar</p>
         </div>
+      </div>
+      <!-- D-ID Avatar -->
+      <div class="mt-4 p-3 rounded-lg" style="background:#071a0d;border:1px solid #1a3d26;">
+        <p class="text-xs font-semibold mb-2" style="color:#22c55e;">🎬 D-ID API Key</p>
+        <div class="flex items-center gap-2 flex-wrap">
+          <input type="password" name="did_api_key" id="did-key-input"
+                 value="{{ s.did_api_key or '' }}"
+                 placeholder="email@gmail.com:secretKey"
+                 style="flex:1;min-width:220px;">
+          <button type="button" onclick="testDidKey()"
+                  class="btn btn-green text-xs" style="white-space:nowrap;"
+                  data-i18n="settings.did_test_btn">🔑 Test key</button>
+        </div>
+        <p class="hint">Format: <code style="color:#4ade80;">email@gmail.com:secretKey</code> — from studio.d-id.com → Account → API Keys</p>
+        <p id="did-key-status" style="display:none;font-size:11px;margin-top:4px;"></p>
+      </div>
+      <!-- HeyGen API Key -->
+      <div class="mt-4 p-3 rounded-lg" style="background:#071a0d;border:1px solid #1a3d26;">
+        <p class="text-xs font-semibold mb-2" style="color:#22c55e;">🎭 HeyGen API Key</p>
+        <input type="password" name="heygen_api_key" id="heygen-key-input"
+               value="{{ s.heygen_api_key or '' }}"
+               data-i18n-ph="settings.heygen_ph"
+               placeholder="Key from app.heygen.com → Settings → API">
+        <p class="hint" data-i18n="settings.heygen_hint">Allows avatar selection in Avatar Studio</p>
       </div>
     </div>
 
-    <!-- Optional keys -->
-    <div class="card rounded-2xl p-6">
-      <p class="section-title">✨ Optional AI Keys</p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <!-- ══ BRAND & VIDEO ══ -->
+    <div class="card lg:col-span-2" id="sec-brand">
+      <p class="section-label" data-i18n="settings.brand">🎬 Brand & Video</p>
+      <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
-          <label class="block text-xs text-gray-400 mb-1">ElevenLabs API Key</label>
-          <input type="password" name="elevenlabs_key"
-            value="{{ s.elevenlabs_key or '' }}" placeholder="Optional — for premium TTS">
+          <label class="field-label" data-i18n="settings.brand_handle_lbl">Brand handle (outro)</label>
+          <input type="text" name="video_brand_handle" value="{{ s.video_brand_handle or '' }}" placeholder="@cryptonews">
         </div>
         <div>
-          <label class="block text-xs text-gray-400 mb-1">Anthropic API Key</label>
-          <input type="password" name="anthropic_key"
-            value="{{ s.anthropic_key or '' }}" placeholder="Optional — for AI rewrite">
+          <label class="field-label" data-i18n="settings.brand_color_lbl">Brand color</label>
+          <input type="color" name="video_brand_color" value="{{ s.video_brand_color or '#F59E0B' }}"
+                 style="height:42px;padding:3px;">
         </div>
+      </div>
+      <div class="mb-4">
+        <label class="field-label" data-i18n="settings.cta_outro">CTA outro</label>
+        <input type="text" name="video_brand_cta" value="{{ s.video_brand_cta or 'Follow for more' }}" placeholder="Follow for more">
+      </div>
+      <!-- Durations -->
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <label class="field-label" data-i18n="settings.duration_tiktok">TikTok (sec)</label>
+          <input type="number" name="video_duration_tiktok" min="10" max="60" value="{{ s.video_duration_tiktok or 25 }}">
+          <p class="hint">Sweet spot: 21-34s</p>
+        </div>
+        <div>
+          <label class="field-label" data-i18n="settings.duration_ig">Instagram (sec)</label>
+          <input type="number" name="video_duration_instagram" min="10" max="60" value="{{ s.video_duration_instagram or 25 }}">
+          <p class="hint">Max reach: 15-30s</p>
+        </div>
+        <div>
+          <label class="field-label" data-i18n="settings.duration_yt">YouTube Shorts (sec)</label>
+          <input type="number" name="video_duration_youtube_shorts" min="10" max="60" value="{{ s.video_duration_youtube_shorts or 45 }}">
+          <p class="hint">Max 60s</p>
+        </div>
+      </div>
+
+      <!-- Advanced video options -->
+      <details class="advanced mt-4">
+        <summary data-i18n="settings.video_adv">Advanced video options</summary>
+        <div class="mt-3 space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="field-label" data-i18n="settings.video_style_lbl">Video style</label>
+              <select name="video_style">
+                {% set cur = s.video_style or 'full_ai' %}
+                <option value="full_ai" {% if cur=='full_ai' %}selected{% endif %} data-i18n="settings.style_full_ai">Full AI (avatar + b-roll)</option>
+                <option value="avatar_only" {% if cur=='avatar_only' %}selected{% endif %} data-i18n="settings.style_avatar_only">Avatar only</option>
+                <option value="reel_only" {% if cur=='reel_only' %}selected{% endif %} data-i18n="settings.style_reel_only">Static reel</option>
+              </select>
+            </div>
+            <div class="flex flex-col gap-2 justify-end">
+              <label class="flex items-center gap-2 text-xs" style="color:#e8f5ec;">
+                <input type="checkbox" name="video_intro_enabled" value="1" {% if s.video_intro_enabled or s.video_intro_enabled is none %}checked{% endif %}>
+                <span data-i18n="settings.intro_card">Intro card</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs" style="color:#e8f5ec;">
+                <input type="checkbox" name="video_outro_enabled" value="1" {% if s.video_outro_enabled or s.video_outro_enabled is none %}checked{% endif %}>
+                <span data-i18n="settings.outro_card">Outro card (CTA)</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs" style="color:#e8f5ec;">
+                <input type="checkbox" name="video_bgm_enabled" value="1" {% if s.video_bgm_enabled or s.video_bgm_enabled is none %}checked{% endif %}>
+                <span data-i18n="settings.bgm_enabled_lbl">Background music</span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="field-label"><span data-i18n="settings.bgm_vol">BGM Volume:</span> <span id="bgm_vol_lbl">{{ s.video_bgm_volume or 15 }}</span>%</label>
+            <input type="range" name="video_bgm_volume" min="0" max="50"
+                   value="{{ s.video_bgm_volume or 15 }}"
+                   oninput="document.getElementById('bgm_vol_lbl').textContent=this.value"
+                   style="width:100%;">
+          </div>
+          <!-- BGM upload -->
+          <div class="p-3 rounded-lg" style="background:#071a0d;border:1px solid #1a3d26;">
+            <label class="field-label mb-2" data-i18n="settings.bgm_upload_lbl">Background Music (MP3/WAV, max 20MB)</label>
+            <div class="flex items-center gap-2">
+              <input type="file" id="bgm-file-input" accept="audio/*" style="flex:1;padding:5px;">
+              <button type="button" id="bgm-upload-btn"
+                      class="px-3 py-2 rounded-lg text-xs font-semibold"
+                      style="background:#0d3320;color:#22c55e;border:1px solid #1a3d26;flex-shrink:0;"
+                      data-i18n="common.upload">Upload</button>
+              <button type="button" id="bgm-clear-btn"
+                      class="px-3 py-2 rounded-lg text-xs"
+                      style="background:#1c0a0a;color:#f87171;flex-shrink:0;"
+                      data-i18n="settings.bgm_delete">Delete</button>
+            </div>
+            <div id="bgm-current" class="hint mt-2">
+              {% if s.video_bgm_path %}✓ {{ s.video_bgm_path }}{% else %}<span data-i18n="settings.bgm_none">(nothing loaded)</span>{% endif %}
+            </div>
+            <div id="bgm-result" class="hint mt-1"></div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- ══ PLATFORMS ENABLED ══ -->
+    <!-- ── Content Niche ──────────────────────────────────────────────── -->
+    <div class="card" id="sec-niche">
+      <p class="section-label">🎯 Content Niche</p>
+      <p class="hint mb-4">Choose the content category your account focuses on. This controls news sources, hashtags, image styles and CTAs.</p>
+      <div style="max-width:420px;">
+        <label class="field-label">Niche</label>
+        <select name="niche" style="width:100%;padding:8px 12px;background:#0a1f13;border:1px solid #2d5a3d;border-radius:6px;color:#e2e8f0;font-size:14px;">
+          {% set current_niche = s.get('niche','crypto') %}
+          <option value="crypto"        {% if current_niche=='crypto' %}selected{% endif %}>₿  Crypto &amp; Web3</option>
+          <option value="fitness"       {% if current_niche=='fitness' %}selected{% endif %}>💪  Fitness &amp; Health</option>
+          <option value="business"      {% if current_niche=='business' %}selected{% endif %}>📊  Business &amp; Entrepreneurship</option>
+          <option value="food"          {% if current_niche=='food' %}selected{% endif %}>🍕  Food &amp; Cooking</option>
+          <option value="fashion"       {% if current_niche=='fashion' %}selected{% endif %}>👗  Fashion &amp; Style</option>
+          <option value="travel"        {% if current_niche=='travel' %}selected{% endif %}>✈️  Travel &amp; Adventure</option>
+          <option value="technology"    {% if current_niche=='technology' %}selected{% endif %}>🤖  Technology &amp; AI</option>
+          <option value="marketing"     {% if current_niche=='marketing' %}selected{% endif %}>📣  Marketing &amp; Social Media</option>
+          <option value="real_estate"   {% if current_niche=='real_estate' %}selected{% endif %}>🏠  Real Estate</option>
+          <option value="entertainment" {% if current_niche=='entertainment' %}selected{% endif %}>🎬  Entertainment &amp; Pop Culture</option>
+        </select>
+        <p class="hint mt-2">The pipeline adapts automatically — news sources, hashtags, image backgrounds and CTAs all change per niche.</p>
       </div>
     </div>
 
-    <button type="submit"
-      class="w-full py-3 rounded-xl font-bold text-sm"
-      style="background:#1d4ed8;color:#fff;border:none;cursor:pointer;">
-      💾 Save Settings
-    </button>
+    <div class="card" id="sec-schedule">
+      <p class="section-label" data-i18n="settings.schedule">⏰ Posting Schedule</p>
+      <p class="hint mb-4" data-i18n="settings.schedule_hint">Set times for your automatic posts. Each user has their own schedule.</p>
+      <div class="grid grid-cols-2 gap-4" style="max-width:360px;">
+        <div>
+          <label class="field-label" data-i18n="settings.morning_lbl">Morning</label>
+          <input type="time" name="post_time_morning"
+            value="{{ s.post_time_morning or '08:00' }}"
+            class="font-mono">
+        </div>
+        <div>
+          <label class="field-label" data-i18n="settings.evening_lbl">Evening</label>
+          <input type="time" name="post_time_evening"
+            value="{{ s.post_time_evening or '18:00' }}"
+            class="font-mono">
+        </div>
+      </div>
+      <p class="hint mt-2" data-i18n="settings.schedule_tz">Local time GMT+2. Changes take effect on next save.</p>
+    </div>
+
+    <div class="card lg:col-span-2" id="sec-platforms">
+      <p class="section-label" data-i18n="settings.platforms_section">📡 Active platforms for auto-posting</p>
+      <p class="hint mb-3" data-i18n="settings.platforms_hint">Select which platforms the bot posts to. If no credentials exist for a platform, it is skipped.</p>
+      <div class="flex flex-wrap gap-4">
+        {% set ep = s.enabled_platforms or '' %}
+        {% for plat, icon in [('telegram','📨'), ('x','𝕏'), ('instagram','📸'), ('tiktok','🎵'), ('youtube','▶'), ('facebook','👍')] %}
+        <label class="flex items-center gap-2 text-sm cursor-pointer" style="color:#e8f5ec;">
+          <input type="checkbox" name="enabled_platforms_{{ plat }}" value="{{ plat }}"
+                 {% if not ep or plat in ep %}checked{% endif %}>
+          {{ icon }} {{ plat.title() }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ══ EMAIL NOTIFICATIONS ══ -->
+    <div class="card" id="sec-email">
+      <p class="section-label" data-i18n="settings.email_notif">📧 Notificări Email (SMTP)</p>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="field-label" data-i18n="settings.smtp_host_lbl">SMTP Host</label>
+          <input type="text" name="smtp_host" value="{{ s.smtp_host or '' }}" placeholder="smtp.gmail.com">
+        </div>
+        <div>
+          <label class="field-label" data-i18n="settings.smtp_port_lbl">SMTP Port</label>
+          <input type="number" name="smtp_port" value="{{ s.smtp_port or 587 }}" placeholder="587">
+        </div>
+        <div>
+          <label class="field-label" data-i18n="settings.smtp_user_lbl">SMTP User</label>
+          <input type="text" name="smtp_user" value="{{ s.smtp_user or '' }}" placeholder="you@gmail.com">
+        </div>
+        <div>
+          <label class="field-label" data-i18n="settings.smtp_pass_lbl">SMTP Password</label>
+          <input type="password" name="smtp_pass" value="{{ s.smtp_pass or '' }}" placeholder="app-password-xxx">
+        </div>
+        <div>
+          <label class="field-label" data-i18n="settings.smtp_from_lbl">From email</label>
+          <input type="text" name="smtp_from" value="{{ s.smtp_from or '' }}" placeholder="autopost@gmail.com">
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-4">
+        <label class="flex items-center gap-2 text-sm" style="cursor:pointer;">
+          <input type="checkbox" name="email_notify_heygen" value="1"
+                 {{ 'checked' if s.email_notify_heygen else '' }}>
+          <span data-i18n="settings.notif_heygen">Notificare HeyGen gata</span>
+        </label>
+        <label class="flex items-center gap-2 text-sm" style="cursor:pointer;">
+          <input type="checkbox" name="email_notify_fail" value="1"
+                 {{ 'checked' if s.email_notify_fail else '' }}>
+          <span data-i18n="settings.notif_fail">Notificare publicare eșuată</span>
+        </label>
+        <label class="flex items-center gap-2 text-sm" style="cursor:pointer;">
+          <input type="checkbox" name="email_notify_digest" value="1"
+                 {{ 'checked' if s.email_notify_digest else '' }}>
+          <span data-i18n="settings.notif_digest">Digest zilnic</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- ══ WEBHOOK INBOUND ══ -->
+    <div class="card" id="sec-webhook">
+      <p class="section-label" data-i18n="settings.webhook_title">🔗 Webhook Inbound (Make.com / n8n / Zapier)</p>
+      <p class="hint mb-4" data-i18n="settings.webhook_hint">POST la /api/webhook/trigger cu {"secret":"cheia_ta"} pentru a declanșa o postare de la distanță.</p>
+      <div>
+        <label class="field-label" data-i18n="settings.webhook_secret_lbl">Secret Key</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" name="webhook_secret" id="webhook-secret-input"
+                 value="{{ s.webhook_secret or '' }}" placeholder="Generate or enter manually" style="flex:1;">
+          <button type="button" onclick="_genWebhookSecret()"
+                  class="ebtn ebtn-ghost" style="font-size:11px;padding:6px 14px;flex-shrink:0;" data-i18n="settings.webhook_gen">
+            🔑 Generează
+          </button>
+        </div>
+        <p class="hint mt-1">Endpoint: <strong>POST /api/webhook/trigger</strong></p>
+      </div>
+    </div>
+
+    <!-- SAVE -->
+    <div class="flex items-center gap-4 flex-wrap">
+      <button type="submit" class="btn-save" data-i18n="settings.save">💾 Save Settings</button>
+      {% if saved %}
+      <span style="color:#4ade80;font-size:14px;font-weight:600;" data-i18n="settings.saved">✅ Salvat cu succes!</span>
+      {% endif %}
+      {% if csrf_error %}
+      <span style="color:#fca5a5;font-size:14px;font-weight:600;" data-i18n="settings.csrf_error2">⚠ Sesiunea a expirat — reîncarcă pagina și încearcă din nou.</span>
+      {% endif %}
+    </div>
+
   </form>
+
+  <!-- ══ SCHEDULER STATUS (outside form) ══ -->
+  <div class="card mt-5">
+    <p class="section-label" data-i18n="settings.scheduler_status">⏰ Scheduler Status</p>
+    <div id="scheduler-status" class="text-xs mb-3" style="color:#86a899;" data-i18n="common.loading">Loading…</div>
+    <div class="flex gap-2 flex-wrap">
+      <button onclick="schedulerRunNow('morning')"
+              class="px-4 py-2 rounded-lg text-xs font-semibold"
+              style="background:#0c1810;border:1px solid #1a3d26;color:#fbbf24;"
+              data-i18n="settings.run_morning">▶ Run Morning now</button>
+      <button onclick="schedulerRunNow('evening')"
+              class="px-4 py-2 rounded-lg text-xs font-semibold"
+              style="background:#0c1810;border:1px solid #1a3d26;color:#a78bfa;"
+              data-i18n="settings.run_evening">▶ Run Evening now</button>
+    </div>
+    <div id="scheduler-run-result" class="hint mt-3"></div>
+  </div>
 </div>
+
+<script>
+// ── Helper: POST with CSRF token ───────────────────────────────────────────
+function fetchPost(url, csrf, cb) {
+  var fd = new FormData();
+  fd.append('_csrf', csrf);
+  fetch(url, {method:'POST', body:fd})
+    .then(function(r){ if(cb) cb(r); })
+    .catch(function(e){ console.error(url, e); });
+}
+
+// ── X cookies ──────────────────────────────────────────────────────────────
+(function(){
+  var saveBtn = document.getElementById('x_cookies_save_btn');
+  var testBtn = document.getElementById('x_cookies_test_btn');
+  var input   = document.getElementById('x_cookies_json_input');
+  var result  = document.getElementById('x_cookies_result');
+  function show(t,ok){ if(result){result.textContent=t; result.style.color=ok?'#86efac':'#fca5a5';} }
+
+  if(saveBtn) saveBtn.addEventListener('click', async function(){
+    var raw=(input&&input.value||'').trim();
+    if(!raw||raw.startsWith('[cookie-uri')){ show(AP_T('settings.x_paste_first'),false); return; }
+    saveBtn.disabled=true; show(AP_T('common.checking'),true);
+    try{
+      var fd=new FormData(); fd.append('cookies_json',raw);
+      var r=await fetch('/api/x/cookies-save',{method:'POST',body:fd});
+      var j=await r.json();
+      if(j.ok){ show('✓ '+AP_T('settings.x_cookies_saved')+' @'+j.handle,true); setTimeout(()=>location.reload(),1000); }
+      else show('✗ '+(j.error||AP_T('common.unknown_error')),false);
+    }catch(e){show('✗ '+e,false);}
+    finally{saveBtn.disabled=false;}
+  });
+
+  if(testBtn) testBtn.addEventListener('click', async function(){
+    testBtn.disabled=true; show(AP_T('common.testing'),true);
+    try{
+      var r=await fetch('/api/x/cookies-test',{method:'POST'});
+      var j=await r.json();
+      if(j.ok&&j.handle) show('✓ Valid — @'+j.handle,true);
+      else if(j.ok) show('⚠ Cookies ok, '+AP_T('settings.x_handle_unverified'),true);
+      else show('✗ '+(j.error||AP_T('settings.x_expired')),false);
+    }catch(e){show('✗ '+e,false);}
+    finally{testBtn.disabled=false;}
+  });
+})();
+
+// ── BGM ────────────────────────────────────────────────────────────────────
+(function(){
+  var fileInput=document.getElementById('bgm-file-input');
+  var upBtn=document.getElementById('bgm-upload-btn');
+  var clrBtn=document.getElementById('bgm-clear-btn');
+  var res=document.getElementById('bgm-result');
+  var cur=document.getElementById('bgm-current');
+  function show(t,ok){if(res){res.textContent=t;res.style.color=ok?'#86efac':'#fca5a5';}}
+
+  if(upBtn) upBtn.addEventListener('click', async function(){
+    if(!fileInput||!fileInput.files.length){show(AP_T('settings.bgm_choose_file'),false);return;}
+    upBtn.disabled=true; show(AP_T('common.uploading'),true);
+    var fd=new FormData(); fd.append('audio',fileInput.files[0]);
+    try{
+      var r=await fetch('/api/upload-bgm',{method:'POST',body:fd});
+      var j=await r.json();
+      if(j.ok){show('✓ '+AP_T('common.save'),true);if(cur)cur.textContent='✓ '+j.path;}
+      else show('✗ '+(j.error||AP_T('common.unknown_error')),false);
+    }catch(e){show('✗ '+e,false);}
+    finally{upBtn.disabled=false;}
+  });
+
+  if(clrBtn) clrBtn.addEventListener('click', async function(){
+    if(!confirm(AP_T('settings.bgm_confirm_delete')))return;
+    clrBtn.disabled=true;
+    try{
+      var r=await fetch('/api/upload-bgm/clear',{method:'POST'});
+      var j=await r.json();
+      if(j.ok){show('✓ '+AP_T('common.delete'),true);if(cur)cur.textContent=AP_T('settings.bgm_none');}
+      else show('✗ '+(j.error||AP_T('common.unknown_error')),false);
+    }catch(e){show('✗ '+e,false);}
+    finally{clrBtn.disabled=false;}
+  });
+})();
+
+// ── Scheduler status ────────────────────────────────────────────────────────
+window.schedulerRunNow = async function(slot){
+  var out=document.getElementById('scheduler-run-result');
+  if(out) out.innerHTML='<span style="color:#fbbf24">'+AP_T('settings.sched_running')+' '+slot+'…</span>';
+  try{
+    var fd=new FormData(); fd.append('slot',slot);
+    var r=await fetch('/api/scheduler/run-now',{method:'POST',body:fd});
+    var j=await r.json();
+    if(out){
+      if(j.ok) out.innerHTML='<span style="color:#86efac">✓ '+slot+' '+AP_T('settings.sched_started_bg')+'</span>';
+      else out.innerHTML='<span style="color:#fca5a5">✗ '+(j.error||AP_T('common.unknown_error'))+'</span>';
+    }
+    setTimeout(loadSchedulerStatus, 1500);
+  }catch(e){ if(out) out.innerHTML='<span style="color:#fca5a5">✗ '+e+'</span>'; }
+};
+
+async function loadSchedulerStatus(){
+  var box=document.getElementById('scheduler-status');
+  if(!box)return;
+  try{
+    var [r,rp]=await Promise.all([fetch('/api/scheduler/status'),fetch('/api/scheduler/platforms')]);
+    var j=await r.json(), pl=rp.ok?await rp.json():null;
+    var dot=j.alive
+      ?'<span style="width:8px;height:8px;border-radius:50%;background:#34d399;display:inline-block;margin-right:6px;"></span>'
+      :'<span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;margin-right:6px;"></span>';
+    var age=j.heartbeat_age_seconds==null?'—':(j.heartbeat_age_seconds<60?Math.round(j.heartbeat_age_seconds)+'s':Math.round(j.heartbeat_age_seconds/60)+'m')+' ago';
+    var html=dot+'<strong style="color:'+(j.alive?'#86efac':'#fca5a5')+'">'+(j.alive?AP_T('bo.status_running'):AP_T('bo.status_stopped'))+'</strong>';
+    html+=' <span style="color:#4d7a60">heartbeat: '+age+'</span>';
+    if(j.last_morning) html+=' <span style="color:#86a899;margin-left:10px;">Morning: '+j.last_morning.substring(0,10)+(j.last_morning_ok?' ✓':' ✗')+'</span>';
+    if(j.last_evening) html+=' <span style="color:#86a899;margin-left:10px;">Evening: '+j.last_evening.substring(0,10)+(j.last_evening_ok?' ✓':' ✗')+'</span>';
+    if(pl&&pl.ok){
+      var icons={telegram:'📨',x:'𝕏',instagram:'📸',tiktok:'🎵',youtube:'▶',facebook:'👍'};
+      html+='<div style="margin-top:8px;">';
+      ['telegram','x','instagram','tiktok','youtube','facebook'].forEach(function(p){
+        var c=(pl.checks||{})[p]||{};
+        html+='<span style="margin:2px 4px 2px 0;padding:2px 8px;border-radius:4px;display:inline-block;'+
+              'background:'+(c.ready?'#064e3b':'#3f1d1d')+';color:'+(c.ready?'#86efac':'#fca5a5')+';">'+
+              (icons[p]||'')+' '+p+(c.ready?' ✓':' ✗')+'</span>';
+      });
+      html+='</div>';
+    }
+    box.innerHTML=html;
+  }catch(e){ box.innerHTML='<span style="color:#fca5a5">✗ '+e+'</span>'; }
+}
+loadSchedulerStatus();
+setInterval(loadSchedulerStatus,30000);
+
+// ── Auto-scroll to save button after successful save ─────────────────────────
+if (window.location.search.includes('saved=1') || window.location.search.includes('csrf_error=1')) {
+  var saveBtn = document.querySelector('.btn-save');
+  if (saveBtn) setTimeout(function(){ saveBtn.scrollIntoView({behavior:'smooth', block:'center'}); }, 200);
+}
+
+// ── Save — collect platform checkboxes into enabled_platforms field ─────────
+document.getElementById('settings-form').addEventListener('submit', function(){
+  var plats=[];
+  ['telegram','x','instagram','tiktok','youtube','facebook'].forEach(function(p){
+    var cb=document.querySelector('input[name="enabled_platforms_'+p+'"]');
+    if(cb&&cb.checked) plats.push(p);
+  });
+  // Add hidden field so the backend receives it
+  var hf=document.createElement('input');
+  hf.type='hidden'; hf.name='enabled_platforms'; hf.value=plats.join(',');
+  this.appendChild(hf);
+
+  // Convert email notify checkboxes to 0/1 hidden fields
+  ['email_notify_heygen','email_notify_fail','email_notify_digest'].forEach(function(n){
+    var cb = document.querySelector('input[name="'+n+'"]');
+    var hf2 = document.createElement('input');
+    hf2.type='hidden'; hf2.name=n; hf2.value = (cb && cb.checked) ? '1' : '0';
+    // Remove the original checkbox so it doesn't conflict
+    if(cb) cb.removeAttribute('name');
+    this.appendChild(hf2);
+  }, this);
+});
+
+// ── Generate webhook secret ─────────────────────────────────────────────────
+function _genWebhookSecret() {
+  const arr = new Uint8Array(24);
+  window.crypto.getRandomValues(arr);
+  const hex = Array.from(arr).map(b=>b.toString(16).padStart(2,'0')).join('');
+  document.getElementById('webhook-secret-input').value = hex;
+}
+
+// ── Test Alert Chat ─────────────────────────────────────────────────────────
+async function testAlertChat() {
+  const statusEl = document.getElementById('alert-chat-status');
+  statusEl.textContent = AP_T('settings.tg_test_sending');
+  statusEl.style.color = '#86a899';
+  statusEl.style.display = '';
+  try {
+    const r = await fetch('/api/test-alert-chat', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      statusEl.textContent = AP_T('settings.tg_test_ok');
+      statusEl.style.color = '#34d399';
+    } else {
+      statusEl.textContent = '❌ ' + (d.error || AP_T('common.unknown_error'));
+      statusEl.style.color = '#f87171';
+    }
+  } catch(e) {
+    statusEl.textContent = '❌ ' + AP_T('common.net_error') + ' ' + e.message;
+    statusEl.style.color = '#f87171';
+  }
+}
+
+// ── Test D-ID Key ────────────────────────────────────────────────────────────
+async function testDidKey() {
+  const statusEl = document.getElementById('did-key-status');
+  statusEl.textContent = AP_T('settings.did_checking');
+  statusEl.style.color = '#86a899';
+  statusEl.style.display = '';
+  try {
+    const key = document.getElementById('did-key-input').value.trim();
+    if (!key) { statusEl.textContent = '❌ ' + AP_T('settings.did_enter_key'); statusEl.style.color='#f87171'; return; }
+    const fd = new FormData();
+    fd.append('did_api_key', key);
+    const r = await fetch('/api/test-did-key', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.ok) {
+      statusEl.textContent = '✅ ' + (d.message || AP_T('settings.did_ok'));
+      statusEl.style.color = '#34d399';
+    } else {
+      statusEl.textContent = '❌ ' + (d.error || AP_T('common.unknown_error'));
+      statusEl.style.color = '#f87171';
+    }
+  } catch(e) {
+    statusEl.textContent = '❌ ' + AP_T('common.net_error') + ' ' + e.message;
+    statusEl.style.color = '#f87171';
+  }
+}
+</script>
+<script src="/static/i18n.js"></script>
+</div><!-- /main-wrap -->
 </body>
 </html>

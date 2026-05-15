@@ -3,78 +3,144 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Register — AutoPost</title>
+<title>Register — AutoPost by EMD</title>
 <script src="/static/tailwind.js"></script>
-<style>body { background: #0a0f1a; }</style>
+<style>
+  body {
+    background: #060c09;
+  }
+  .card {
+    background: #0c1810;
+    border: 1px solid #1a3d26;
+    border-radius: 18px;
+    padding: 32px;
+  }
+  input[type=email], input[type=password], input[type=text] {
+    background: #060c09;
+    border: 1px solid #1e4232;
+    color: #e8f5ec;
+    border-radius: 9px;
+    padding: 11px 14px;
+    width: 100%;
+    font-size: 13px;
+    transition: border-color .15s;
+    outline: none;
+  }
+  input:focus { border-color: #22c55e; }
+  .btn-primary {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 13px;
+    font-weight: 700;
+    font-size: 14px;
+    width: 100%;
+    cursor: pointer;
+    letter-spacing: .02em;
+    transition: opacity .15s;
+  }
+  .btn-primary:hover { opacity: .9; }
+  label { display: block; font-size: 11px; color: #4d7a60; font-weight: 700;
+          text-transform: uppercase; letter-spacing: .07em; margin-bottom: 5px; }
+/* __BG_REPLACED__ */
+body::before {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image: radial-gradient(circle, rgba(0,255,120,.22) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+body::after {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 85%, rgba(0,255,120,.09) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 75% at 85% 15%, rgba(6,214,160,.07) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 45% at 50% 50%, rgba(0,70,35,.06) 0%, transparent 65%);
+  animation: aurora 18s ease-in-out infinite alternate;
+}
+@keyframes aurora { 0%{opacity:.7;} 50%{opacity:1;} 100%{opacity:.75;} }
+.grid-floor {
+  position:fixed; bottom:-10%; left:50%;
+  transform:translateX(-50%) perspective(600px) rotateX(70deg);
+  transform-origin:center bottom; width:250%; height:75%; z-index:0; pointer-events:none;
+  mask-image:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 55%);
+  -webkit-mask-image:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 55%);
+}
+
+</style>
 </head>
-<body class="text-gray-100 min-h-screen flex items-center justify-center">
+<body class="min-h-screen flex items-center justify-center" style="color:#e8f5ec;">
+<div class="grid-floor" aria-hidden="true"></div>
 <div class="w-full max-w-md px-6">
 
   <div class="text-center mb-8">
-    <div class="text-4xl mb-3">📡</div>
-    <h1 class="text-2xl font-bold text-white">AutoPost</h1>
-    <p class="text-gray-500 text-sm mt-1">Crypto Social Media Automation</p>
+    <img src="/_next/image?url=%2FemdLogo.png&w=256&q=75"
+         onerror="this.style.display='none'"
+         class="h-14 mx-auto mb-4" alt="EMD Logo">
+    <h1 class="text-2xl font-bold" style="color:#22c55e;">AutoPost</h1>
+    <p class="text-sm mt-1" style="color:#4d7a60;">by EliteMarginDesk — Social Media Automation</p>
   </div>
 
-  <div class="rounded-2xl p-8" style="background:#111827;border:1px solid #1f2937;">
-    <h2 class="text-lg font-bold text-white mb-2">Create Account</h2>
+  <div class="card">
+    <h2 class="text-lg font-bold mb-2" style="color:#e8f5ec;">Create Account</h2>
 
     {% if pending %}
-    <div class="mb-4 px-4 py-3 rounded-lg text-sm text-yellow-400" style="background:#1a1a00;border:1px solid #713f12;">
-      ✅ Account created! An admin will review and approve your account shortly.
-      You'll be able to log in once approved.
+    <div class="mb-4 px-4 py-3 rounded-lg text-sm" style="background:#071a0d;border:1px solid #166534;color:#4ade80;">
+      ✅ Account creat! Un admin va aproba contul tău în scurt timp.
     </div>
-    <p class="text-center mt-4"><a href="/login" class="text-blue-400 hover:text-blue-300 text-sm">← Back to Login</a></p>
+    <p class="text-center mt-4">
+      <a href="/login" style="color:#4ade80;font-size:14px;">← Înapoi la Login</a>
+    </p>
 
     {% else %}
 
-    <p class="text-gray-500 text-sm mb-6">After registration, an admin must approve your account before you can sign in.</p>
+    <p class="text-sm mb-6" style="color:#4d7a60;">
+      Un admin trebuie să aprobe contul tău înainte să te poți autentifica.
+    </p>
 
     {% if error %}
-    <div class="mb-4 px-4 py-3 rounded-lg text-sm text-red-400" style="background:#1c0a0a;border:1px solid #7f1d1d;">
+    <div class="mb-4 px-4 py-3 rounded-lg text-sm" style="background:#1c0a0a;border:1px solid #7f1d1d;color:#f87171;">
       {{ error }}
     </div>
     {% endif %}
 
     <form method="post" action="/register" class="space-y-4">
       <div>
-        <label class="block text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Display Name</label>
-        <input type="text" name="display_name"
-          class="w-full rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500"
-          style="background:#0a0f1a;border:1px solid #374151;"
-          placeholder="John Doe">
+        <label>Nume</label>
+        <input type="text" name="display_name" placeholder="John Doe">
       </div>
       <div>
-        <label class="block text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Email</label>
-        <input type="email" name="email" required autofocus
-          class="w-full rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500"
-          style="background:#0a0f1a;border:1px solid #374151;"
-          placeholder="you@example.com">
+        <label>Email</label>
+        <input type="email" name="email" required autofocus placeholder="you@example.com">
       </div>
       <div>
-        <label class="block text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Password</label>
-        <input type="password" name="password" required minlength="8"
-          class="w-full rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500"
-          style="background:#0a0f1a;border:1px solid #374151;"
-          placeholder="Min. 8 characters">
+        <label>Parolă</label>
+        <input type="password" name="password" required minlength="8" placeholder="Min. 8 caractere">
       </div>
       <div>
-        <label class="block text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Confirm Password</label>
-        <input type="password" name="password2" required
-          class="w-full rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500"
-          style="background:#0a0f1a;border:1px solid #374151;"
-          placeholder="••••••••">
+        <label>Confirmă Parola</label>
+        <input type="password" name="password2" required placeholder="••••••••">
       </div>
-      <button type="submit"
-        class="w-full py-3 rounded-xl font-bold text-sm mt-2"
-        style="background:#1d4ed8;color:#fff;border:none;cursor:pointer;">
-        Request Access →
-      </button>
+
+      <!-- CAPTCHA -->
+      <div style="background:#071a0e;border:1px solid #1e4232;border-radius:10px;padding:14px 16px;">
+        <label style="color:#22c55e;font-size:12px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:16px;">🛡️</span> Verificare Anti-Bot
+        </label>
+        <div style="font-size:14px;font-weight:700;color:#a7f3d0;margin-bottom:10px;padding:10px;background:rgba(0,0,0,.3);border-radius:7px;text-align:center;letter-spacing:.03em;">
+          {{ captcha_q }}
+        </div>
+        <input type="text" name="captcha_answer" required placeholder="Răspunsul tău..."
+               autocomplete="off" inputmode="numeric"
+               style="text-align:center;font-size:16px;font-weight:700;letter-spacing:.1em;">
+        <input type="hidden" name="captcha_token" value="{{ captcha_token }}">
+      </div>
+
+      <button type="submit" class="btn-primary mt-2">Solicită Acces →</button>
     </form>
 
-    <p class="text-center text-sm text-gray-500 mt-6">
-      Already have an account?
-      <a href="/login" class="text-blue-400 hover:text-blue-300 font-medium">Sign In</a>
+    <p class="text-center text-sm mt-6" style="color:#4d7a60;">
+      Ai deja cont?
+      <a href="/login" style="color:#4ade80;font-weight:600;">Sign In</a>
     </p>
     {% endif %}
   </div>

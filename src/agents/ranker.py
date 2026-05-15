@@ -37,13 +37,27 @@ from dateutil import parser as dateparser
 # --- Config ----------------------------------------------------------------
 
 WEIGHTS = {
-    "recency":    0.20,   # freshness matters most
-    "cluster":    0.22,   # cross-source coverage = organic importance proxy
-    "keywords":   0.18,   # breaking news signal
-    "tickers":    0.10,
-    "importance": 0.12,   # source signal boosted by source_tier
-    "engagement": 0.08,   # CryptoPanic/LunarCrush vote counts
-    "reddit":     0.10,   # Reddit hot score + comments + upvote ratio
+    "recency":       0.18,   # freshness — breaking news wins
+    "cluster":       0.22,   # cross-source coverage = viral/organic reach
+    "keywords":      0.14,   # high-impact signal keywords
+    "tickers":       0.08,
+    "importance":    0.10,   # source tier signal
+    "engagement":    0.18,   # CryptoPanic/LunarCrush votes — boosted for max engagement
+    "reddit":        0.07,   # Reddit hot score
+    "macro_impact":  0.03,   # macro/geopolitical catalyst score
+}
+
+# Weights for non-crypto niches: tickers/engagement/macro are crypto-specific,
+# so their weight drops to near-zero; niche keyword relevance is the key signal.
+WEIGHTS_NICHE = {
+    "recency":      0.20,
+    "cluster":      0.25,
+    "keywords":     0.25,   # niche-specific tone keywords
+    "tickers":      0.00,   # crypto tickers irrelevant
+    "importance":   0.15,
+    "engagement":   0.03,   # no CryptoPanic/LunarCrush for non-crypto
+    "reddit":       0.10,
+    "macro_impact": 0.02,
 }
 
 # High-impact keywords (lowercase). Each hit adds weight (saturates at 3).
@@ -55,9 +69,9 @@ IMPACT_KEYWORDS = {
     # Price action
     "all-time high", "ath", "record", "crash", "plunge", "surge",
     "rally", "bull run", "bear market", "correction", "dump", "pump",
-    "breakout", "support", "resistance",
+    "breakout", "support", "resistance", "new high",
     # Halving / supply
-    "halving", "halvening", "mining reward",
+    "halving", "halvening", "mining reward", "supply shock",
     # Security incidents
     "hack", "exploit", "drain", "stolen", "breach", "attack",
     "rug pull", "exit scam", "phishing", "vulnerability",
@@ -71,6 +85,31 @@ IMPACT_KEYWORDS = {
     # Legal
     "lawsuit", "settlement", "indicted", "charged", "arrested",
     "banned", "ban", "regulation", "bill", "congress",
+    # Macro indicators with crypto impact
+    "quantitative easing", "money printer", "m2 supply", "liquidity",
+    "recession fears", "banking crisis", "bank run", "bank collapse",
+    "treasury yield", "yield curve", "dollar collapse",
+    "sanctions", "trade war", "tariff", "geopolitical",
+    "sovereign wealth", "nation state", "strategic reserve",
+    "gold record", "oil shock",
+}
+
+# Macro/geopolitical catalyst keywords — scored separately to avoid
+# double-counting with IMPACT_KEYWORDS and to calibrate the macro_impact weight.
+MACRO_IMPACT_KEYWORDS = {
+    "federal reserve", "fed", "fomc", "powell", "rate cut", "rate hike",
+    "cpi data", "inflation data", "pce", "jobs report", "nonfarm",
+    "gdp", "recession", "soft landing",
+    "treasury", "yield curve", "10-year", "dollar index", "dxy",
+    "quantitative easing", "qe", "quantitative tightening",
+    "sanctions", "trade war", "tariff", "geopolitical",
+    "ukraine", "russia", "china", "taiwan", "middle east",
+    "opec", "oil price", "energy crisis",
+    "ecb", "boj", "pboc", "central bank",
+    "banking crisis", "bank failure", "credit crunch",
+    "m2 money", "money supply", "liquidity crisis",
+    "gold price", "commodity",
+    "nasdaq", "s&p 500", "stock market crash", "risk-off",
 }
 
 TIER1_TICKERS = {"BTC", "ETH"}
@@ -133,11 +172,15 @@ def score_recency(story: dict, now: datetime) -> float:
     return score
 
 
-def score_keywords(story: dict) -> float:
+def score_keywords(story: dict, keywords: "set | None" = None) -> float:
+    """Keyword relevance. For crypto uses IMPACT_KEYWORDS; for other niches
+    pass the niche-specific tone_positive | tone_negative set."""
+    if keywords is None:
+        keywords = IMPACT_KEYWORDS
     title_lc = story["title"].lower()
     summary_lc = (story.get("summary") or "").lower()
     haystack = f"{title_lc} {summary_lc}"
-    hits = sum(1 for kw in IMPACT_KEYWORDS if kw in haystack)
+    hits = sum(1 for kw in keywords if kw in haystack)
     # saturate at 3 hits
     return min(1.0, hits / 3.0)
 
@@ -190,6 +233,25 @@ def score_engagement(story: dict) -> float:
         return min(1.0, (x_likes + x_retweets * 3) / 10_000.0)
 
     return 0.5  # no engagement data — neutral
+
+
+def score_macro_impact(story: dict) -> float:
+    """Score how much macro/geopolitical context this story carries.
+
+    Returns 0.0 for pure crypto-only stories (no penalty, just no bonus).
+    Returns up to 1.0 for high-impact macro events that historically move crypto.
+    Extra weight when the story explicitly links the macro event to crypto/BTC.
+    """
+    haystack = (story.get("title", "") + " " + (story.get("summary") or "")).lower()
+    hits = sum(1 for kw in MACRO_IMPACT_KEYWORDS if kw in haystack)
+    if hits == 0:
+        return 0.0
+    # Bonus when the macro event is explicitly connected to crypto/BTC price
+    crypto_bridge = any(t in haystack for t in {
+        "bitcoin", "btc", "crypto", "ethereum", "digital asset", "risk asset"
+    })
+    base = min(1.0, hits / 3.0)
+    return min(1.0, base * 1.5 if crypto_bridge else base)
 
 
 def score_reddit(story: dict) -> float:
@@ -259,10 +321,38 @@ def _cluster_sources_from_story(story: dict) -> int:
 
 # --- Rank ------------------------------------------------------------------
 
-def rank(stories: list[dict], top_n: int = 2) -> list[dict]:
-    """Score + rank. Returns enriched copies of top_n stories."""
+def rank(stories: list[dict], top_n: int = 2, niche: str = "crypto") -> list[dict]:
+    """Score + rank. Returns enriched copies of top_n stories.
+
+    For non-crypto niches: uses niche-specific keyword scoring and adjusted
+    weights that zero out crypto-only signals (tickers, engagement, macro_impact).
+    Stories with zero niche keyword hits are deprioritised unless there are no
+    better alternatives.
+    """
     if not stories:
         return []
+
+    is_crypto = (niche == "crypto")
+    weights = WEIGHTS if is_crypto else WEIGHTS_NICHE
+
+    # Load niche keyword set for non-crypto scoring
+    niche_kw: set = set()
+    if not is_crypto:
+        try:
+            try:
+                from src.agents.niches import get_niche as _get_niche
+            except ImportError:
+                from niches import get_niche as _get_niche  # type: ignore[no-redef]
+            cfg = _get_niche(niche)
+            niche_kw = (
+                (cfg.get("tone_positive") or set())
+                | (cfg.get("tone_negative") or set())
+                | (cfg.get("keywords") or set())
+            )
+        except Exception:
+            pass
+        if not niche_kw:
+            niche_kw = IMPACT_KEYWORDS  # fallback keeps ranking functional
 
     now = datetime.now(timezone.utc)
     clusters = cluster_stories(stories)
@@ -286,21 +376,29 @@ def rank(stories: list[dict], top_n: int = 2) -> list[dict]:
         if scout_distinct > 1:
             cl_distinct = max(cl_distinct, scout_distinct)
         components = {
-            "recency":    score_recency(s, now),
-            "cluster":    score_cluster(cl_size, cl_distinct),
-            "keywords":   score_keywords(s),
-            "tickers":    score_tickers(s),
-            "importance": score_importance(s),
-            "engagement": score_engagement(s),
-            "reddit":     score_reddit(s),
+            "recency":      score_recency(s, now),
+            "cluster":      score_cluster(cl_size, cl_distinct),
+            "keywords":     score_keywords(s, None if is_crypto else niche_kw),
+            "tickers":      score_tickers(s),
+            "importance":   score_importance(s),
+            "engagement":   score_engagement(s),
+            "reddit":       score_reddit(s),
+            "macro_impact": score_macro_impact(s),
         }
-        total = sum(WEIGHTS[k] * v for k, v in components.items())
+        total = sum(weights[k] * v for k, v in components.items())
         enriched = dict(s)
         enriched["_scores"] = {k: round(v, 3) for k, v in components.items()}
         enriched["_score_total"] = round(total, 3)
         enriched["_cluster_size"] = cl_size
         enriched["_cluster_sources"] = cl_distinct
         scored.append(enriched)
+
+    # For non-crypto: drop stories with zero niche keyword hits when there are
+    # enough relevant alternatives — prevents unrelated stories from winning
+    if not is_crypto:
+        relevant = [s for s in scored if s["_scores"]["keywords"] > 0.0]
+        if len(relevant) >= top_n:
+            scored = relevant
 
     # Sort by score desc, then recency desc
     scored.sort(
@@ -321,7 +419,7 @@ def rank(stories: list[dict], top_n: int = 2) -> list[dict]:
         ci = story_to_cluster.get(s["id"])
         if ci in used_clusters:
             continue
-        picked.append(_add_rationale(s))
+        picked.append(_add_rationale(s, niche))
         if ci is not None:
             used_clusters.add(ci)
         if len(picked) >= top_n:
@@ -331,21 +429,22 @@ def rank(stories: list[dict], top_n: int = 2) -> list[dict]:
     if len(picked) < top_n:
         for s in scored:
             if s not in picked:
-                picked.append(_add_rationale(s))
+                picked.append(_add_rationale(s, niche))
                 if len(picked) >= top_n:
                     break
     return picked
 
 
-def _add_rationale(story: dict) -> dict:
+def _add_rationale(story: dict, niche: str = "crypto") -> dict:
     s = dict(story)
     parts = []
     scores = s["_scores"]
     if scores["cluster"] >= 0.5:
         parts.append(f"reported by {s['_cluster_sources']} sources")
     if scores["keywords"] >= 0.5:
-        parts.append("high-impact keywords in title")
-    if scores["tickers"] >= 0.8:
+        label = "high-impact keywords in title" if niche == "crypto" else f"relevant {niche} keywords"
+        parts.append(label)
+    if niche == "crypto" and scores["tickers"] >= 0.8:
         parts.append("involves BTC/ETH")
     if scores["importance"] >= 0.6:
         tier = s.get("source_tier", 3)
@@ -360,6 +459,8 @@ def _add_rationale(story: dict) -> dict:
     if scores["reddit"] >= 0.4:
         rs = s.get("reddit_score", 0)
         parts.append(f"trending on Reddit ({rs:,} upvotes)")
+    if niche == "crypto" and scores["macro_impact"] >= 0.4:
+        parts.append("macro/geopolitical catalyst")
     s["_rationale"] = "; ".join(parts) or "top aggregate score"
     return s
 

@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avatar Studio — EMD AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/elite.css">
+<style>
+/* Page-specific overrides */
+.profile-card { transition: border-color .2s, box-shadow .2s; cursor: pointer; }
+.profile-card:hover { border-color: rgba(0,255,120,.35); }
+.profile-card.selected {
+  border-color: var(--blue);
+  background: rgba(0,255,120,.06);
+  box-shadow: 0 0 18px rgba(45,126,248,.15);
+}
+.profile-card.selected::after {
+  content: '✓'; position: absolute; top: 6px; right: 8px;
+  font-size: 10px; font-weight: 900; color: var(--blue);
+}
+input, select, textarea {
+  background: rgba(5,10,20,.9);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text); padding: 9px 13px; width: 100%;
+  transition: border-color .18s, box-shadow .18s;
+  font-family: inherit; font-size: 13px; outline: none;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: rgba(0,255,120,.42);
+  box-shadow: 0 0 0 3px rgba(0,255,120,.06);
+}
+select option { background: #080D18; color: var(--text); }
+.tab-btn {
+  padding: 7px 18px; border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; border: none; background: transparent; color: var(--muted);
+  transition: all .15s;
+}
+.tab-btn.active {
+  background: rgba(0,255,120,.08); color: var(--blue);
+  border: 1px solid rgba(45,126,248,.25);
+}
+
+/* ── Avatar Picker Modal ── */
+#avatar-modal-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,.72);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+  animation: fadeIn .15s ease;
+}
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+#avatar-modal-box {
+  background: var(--surface2);
+  border: 1px solid var(--border-h);
+  border-radius: var(--r-xl);
+  width: min(760px, 95vw);
+  max-height: 82vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 0 60px rgba(0,255,120,.12), 0 24px 60px rgba(0,0,0,.6);
+}
+#avatar-modal-header {
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+#avatar-modal-grid-wrap {
+  overflow-y: auto; padding: 14px 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  flex: 1; min-height: 0;
+}
+#avatar-modal-grid-wrap::-webkit-scrollbar { width: 5px; }
+#avatar-modal-grid-wrap::-webkit-scrollbar-track { background: transparent; }
+#avatar-modal-grid-wrap::-webkit-scrollbar-thumb { background: var(--border-h); border-radius: 4px; }
+
+/* Compact avatar card in popup */
+.av-card {
+  background: rgba(4,13,7,.95);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 8px 6px 6px;
+  cursor: pointer; text-align: center;
+  transition: border-color .15s, transform .1s, box-shadow .15s;
+  position: relative;
+}
+.av-card:hover { border-color: var(--border-h); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,255,120,.1); }
+.av-card.selected { border-color: var(--neon); background: rgba(0,255,120,.07); }
+.av-card.selected::after {
+  content: '✓'; position: absolute; top: 4px; right: 6px;
+  font-size: 10px; font-weight: 900; color: var(--neon);
+}
+.av-card img { width: 100%; border-radius: var(--r-sm); aspect-ratio: 3/4; object-fit: cover; display: block; margin-bottom: 5px; }
+.av-card .av-no-img { width:100%; aspect-ratio:3/4; background:rgba(0,255,120,.04); border-radius:var(--r-sm); display:flex; align-items:center; justify-content:center; font-size:28px; margin-bottom:5px; }
+.av-card .av-name { font-size: 10px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.av-card .av-meta { font-size: 9px; color: var(--muted); margin-top: 1px; }
+
+/* Avatar picker button in panel */
+.av-picker-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: rgba(4,13,7,.8); border: 1px dashed var(--border-h);
+  border-radius: var(--r-md); padding: 10px 14px; cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.av-picker-btn:hover { border-color: var(--neon); background: rgba(0,255,120,.04); }
+.av-picker-thumb { width: 40px; height: 40px; border-radius: var(--r-sm); object-fit: cover; background: rgba(0,255,120,.05); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px; overflow:hidden; }
+
+/* Options grid: compact 4-col on desktop, 2-col on mobile */
+.opts-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+@media (max-width:640px) { .opts-grid { grid-template-columns: repeat(2,1fr); } }
+.opts-grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+
+/* Compact opt tile */
+.eopt-tile { padding: 10px 12px; }
+.eopt-tile .ot-icon { font-size: 18px; display: block; margin-bottom: 4px; }
+.eopt-tile .ot-label { font-size: 12px; font-weight: 700; color: var(--text); display: block; }
+.eopt-tile .ot-desc  { font-size: 10px; color: var(--muted); display: block; margin-top: 1px; }
+
+.options-panel {
+  background: rgba(5,10,20,.6);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+}
+</style>
+</head>
+<body style="display:flex;min-height:100vh;">
+<div class="grid-floor" aria-hidden="true"></div>
+{% include '_sidebar.html' %}
+<div class="main-wrap">
+<!-- Header -->
+<header class="elite-header">
+  <div class="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <a href="/" class="ebtn ebtn-ghost ebtn-sm">← Dashboard</a>
+      <div>
+        <div class="elite-logo">ELITEMARGINDESK</div>
+        <div class="elite-logo-tag">Avatar Studio</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="flex gap-1">
+        <button class="lang-btn ebtn ebtn-ghost ebtn-sm" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn ebtn ebtn-ghost ebtn-sm" data-lang="ro" onclick="setLang('ro')">RO</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-6xl mx-auto px-5 py-7 z1" style="position:relative;">
+
+  <!-- Page title -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <div class="esec-title mb-1">Studio</div>
+      <h1 class="esec-heading" data-i18n="avatar.title">Avatar Studio</h1>
+      <p class="text-sm mt-1" style="color:var(--muted);" data-i18n="avatar.subtitle">Generează clipuri AI cu avatari HeyGen sau D-ID pentru TikTok, YouTube Shorts și Instagram</p>
+    </div>
+    <div class="epill epill-blue">
+      <span class="edot edot-blue"></span> AI Powered
+    </div>
+  </div>
+
+  <!-- AVATARS SECTION -->
+  <div class="ecard hud p-5 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <div class="esec-title" data-i18n="avatar.select_section">Selectează avatar</div>
+      </div>
+      <span class="text-xs" style="color:var(--muted);">D-ID & HeyGen</span>
+    </div>
+
+    {% if has_did_key or has_heygen_key %}
+    <div class="flex gap-1 mb-4 p-1 rounded-xl" style="background:rgba(5,10,20,.9);border:1px solid var(--border);max-width:320px;">
+      {% if has_did_key %}
+      <button class="tab-btn {% if not has_heygen_key %}active{% endif %} flex-1" id="tab-did" onclick="switchTab('did')">🤖 D-ID</button>
+      {% endif %}
+      {% if has_heygen_key %}
+      <button class="tab-btn active flex-1" id="tab-heygen" onclick="switchTab('heygen')" data-i18n="avatar.heygen_tab">🎭 HeyGen</button>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="ealert-info text-center py-6">
+      <div class="text-3xl mb-2">🔑</div>
+      <p class="text-sm"><span data-i18n="avatar.no_key">Configurează o cheie D-ID sau HeyGen în</span>
+        <a href="/settings" style="color:var(--neon);">Settings → AI Keys</a></p>
+    </div>
+    {% endif %}
+
+    <!-- D-ID panel — compact picker -->
+    {% if has_did_key %}
+    <div id="panel-did" class="{% if has_heygen_key %}hidden{% endif %}">
+      <div id="did-loading" class="text-center py-6 hidden">
+        <span class="espinner cyan"></span>
+        <span class="text-sm ml-2" style="color:var(--cyan);" data-i18n="avatar.loading_txt">Se încarcă...</span>
+      </div>
+      <div id="did-error" class="hidden ealert-err text-xs mb-2"></div>
+      <button class="av-picker-btn" onclick="openAvatarModal('did')" id="did-picker-btn">
+        <div class="av-picker-thumb" id="did-thumb">🤖</div>
+        <div class="flex-1 text-left min-w-0">
+          <div class="text-xs" style="color:var(--muted);" data-i18n="avatar.pick_lbl_did">Presenter selectat</div>
+          <div id="did-picker-label" class="text-sm font-bold" style="color:var(--text);" data-i18n="avatar.pick_did">Apasă pentru a alege</div>
+        </div>
+        <span style="color:var(--neon);font-size:18px;">›</span>
+      </button>
+      <p class="text-xs mt-2" style="color:var(--muted);">
+        Fotografia din <a href="/settings" style="color:var(--neon);">Settings → Presenter Photo</a>, sau Alice implicit.
+      </p>
+    </div>
+    {% endif %}
+
+    <!-- HeyGen panel — compact picker button (avatarele se deschid în popup) -->
+    {% if has_heygen_key %}
+    <div id="panel-heygen">
+      <div id="heygen-loading" class="text-center py-6 hidden">
+        <span class="espinner cyan"></span>
+        <span class="text-sm ml-2" style="color:var(--cyan);" data-i18n="avatar.loading_txt">Se încarcă...</span>
+      </div>
+      <div id="heygen-error" class="hidden ealert-err text-xs mb-2"></div>
+      <!-- Picker button — shows selected avatar thumbnail + name -->
+      <button class="av-picker-btn" onclick="openAvatarModal('heygen')" id="heygen-picker-btn">
+        <div class="av-picker-thumb" id="heygen-thumb">🎭</div>
+        <div class="flex-1 text-left min-w-0">
+          <div class="text-xs" style="color:var(--muted);" data-i18n="avatar.pick_lbl_heygen">Avatar selectat</div>
+          <div id="heygen-picker-label" class="text-sm font-bold" style="color:var(--text);" data-i18n="avatar.pick_heygen">Apasă pentru a alege</div>
+        </div>
+        <span style="color:var(--neon);font-size:18px;">›</span>
+      </button>
+      <p class="text-xs mt-2" style="color:var(--muted);" data-i18n-html="avatar.heygen_note">
+        Avatarele sunt gestionate în
+        <a href="https://app.heygen.com" target="_blank" style="color:var(--neon);">app.heygen.com</a>.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- MAIN 2-COL LAYOUT -->
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+
+    <!-- LEFT: Platform + Options -->
+    <div class="lg:col-span-2 space-y-4">
+
+      <!-- Platform Selector -->
+      <div class="ecard p-4">
+        <div class="esec-title mb-3" data-i18n="avatar.platform_target">Platformă țintă</div>
+        <div class="grid grid-cols-2 gap-2">
+          {% for key, preset in platforms.items() %}
+          <div class="eplat {{ 'active' if key == 'tiktok' else '' }}"
+               onclick="selectPlatform('{{ key }}')" id="platform-{{ key }}" data-platform="{{ key }}">
+            <span class="text-xl">
+              {% if key == 'tiktok' %}🎵
+              {% elif 'youtube' in key %}📺
+              {% elif 'instagram' in key %}📸
+              {% elif 'facebook' in key %}👍
+              {% else %}🎬{% endif %}
+            </span>
+            <span class="text-xs font-bold" style="color:var(--text);">{{ preset.label }}</span>
+            <span style="font-size:10px;color:var(--muted);">{{ preset.aspect }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- OUTPUT OPTIONS — compact & scannable -->
+      <div class="ecard p-4">
+        <div class="esec-title mb-3" data-i18n="avatar.output_opts">Opțiuni output</div>
+
+        <!-- Subtitle Style -->
+        <div class="mb-4">
+          <div class="elabel mb-2" data-i18n="avatar.sub_style">Stil subtitrare</div>
+          <div class="opts-grid">
+            <div class="eopt-tile selected" onclick="selectOpt('sub','none',this)" data-group="sub" data-val="none">
+              <span class="ot-icon">🚫</span>
+              <span class="ot-label" data-i18n="avatar.sub_none">Fără</span>
+            </div>
+            <div class="eopt-tile" onclick="selectOpt('sub','neon',this)" data-group="sub" data-val="neon">
+              <span class="ot-icon">⚡</span>
+              <span class="ot-label">Neon Pop</span>
+              <span class="ot-desc" data-i18n="avatar.sub_neon_desc">All-caps, animat</span>
+            </div>
+            <div class="eopt-tile" onclick="selectOpt('sub','karaoke',this)" data-group="sub" data-val="karaoke">
+              <span class="ot-icon">🎤</span>
+              <span class="ot-label">Karaoke</span>
+              <span class="ot-desc" data-i18n="avatar.sub_karaoke_desc">Cuvânt cu cuvânt</span>
+            </div>
+            <div class="eopt-tile" onclick="selectOpt('sub','bold',this)" data-group="sub" data-val="bold">
+              <span class="ot-icon">✦</span>
+              <span class="ot-label">Bold</span>
+              <span class="ot-desc" data-i18n="avatar.sub_bold_desc">Clean & lizibil</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Caption Position -->
+        <div class="mb-4">
+          <div class="elabel mb-2" data-i18n="avatar.cap_pos">Poziție subtitrare</div>
+          <div class="opts-grid-3">
+            <div class="eopt-tile" onclick="selectOpt('pos','top',this)" data-group="pos" data-val="top">
+              <span class="ot-icon">⬆</span>
+              <span class="ot-label" data-i18n="avatar.pos_top">Sus</span>
+            </div>
+            <div class="eopt-tile" onclick="selectOpt('pos','center',this)" data-group="pos" data-val="center">
+              <span class="ot-icon">↕</span>
+              <span class="ot-label" data-i18n="avatar.pos_center">Centru</span>
+            </div>
+            <div class="eopt-tile selected" onclick="selectOpt('pos','bottom',this)" data-group="pos" data-val="bottom">
+              <span class="ot-icon">⬇</span>
+              <span class="ot-label" data-i18n="avatar.pos_bottom">Jos</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Voice Speed -->
+        <div class="mb-4">
+          <div class="elabel mb-2" data-i18n="avatar.voice_speed">Viteză voce</div>
+          <div class="opts-grid-3">
+            <div class="eopt-tile" onclick="selectOpt('speed','0.85',this)" data-group="speed" data-val="0.85">
+              <span class="ot-icon">🐢</span>
+              <span class="ot-label" data-i18n="avatar.speed_slow">Lent</span>
+              <span class="ot-desc">0.85×</span>
+            </div>
+            <div class="eopt-tile selected" onclick="selectOpt('speed','1.0',this)" data-group="speed" data-val="1.0">
+              <span class="ot-icon">▶</span>
+              <span class="ot-label" data-i18n="avatar.speed_normal">Normal</span>
+              <span class="ot-desc">1.0×</span>
+            </div>
+            <div class="eopt-tile" onclick="selectOpt('speed','1.15',this)" data-group="speed" data-val="1.15">
+              <span class="ot-icon">⚡</span>
+              <span class="ot-label" data-i18n="avatar.speed_fast">Rapid</span>
+              <span class="ot-desc">1.15×</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Language -->
+        <div>
+          <div class="elabel mb-2" data-i18n="avatar.language">Limbă script</div>
+          <div class="opts-grid-3">
+            <div class="eopt-tile selected" onclick="selectOpt('lang','ro',this)" data-group="lang" data-val="ro">
+              <span class="ot-icon">🇷🇴</span>
+              <span class="ot-label" data-i18n="avatar.lang_ro">Română</span>
+            </div>
+            <div class="eopt-tile" onclick="selectOpt('lang','en',this)" data-group="lang" data-val="en">
+              <span class="ot-icon">🇬🇧</span>
+              <span class="ot-label">English</span>
+            </div>
+            <div class="eopt-tile" onclick="selectOpt('lang','auto',this)" data-group="lang" data-val="auto">
+              <span class="ot-icon">🌐</span>
+              <span class="ot-label">Auto</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end left col -->
+
+    <!-- RIGHT: Script + Generate + Jobs -->
+    <div class="lg:col-span-3 space-y-4">
+
+      <!-- Script Editor -->
+      <div class="ecard p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div class="esec-title">Script</div>
+          <div class="flex gap-2">
+            <button onclick="loadLatestScript()" class="ebtn ebtn-ghost ebtn-sm" data-i18n="avatar.last_slot_btn">↓ Ultimul slot</button>
+            <button onclick="clearScript()" class="ebtn ebtn-ghost ebtn-sm" data-i18n="avatar.clear_script">✕ Șterge</button>
+          </div>
+        </div>
+        <textarea id="script-input" rows="8" class="ei monospace"
+                  placeholder="Introdu textul pe care avatarul îl va rosti..." data-i18n-ph="avatar.script_ph"
+                  oninput="updateCharCount()"></textarea>
+        <div class="flex items-center justify-between mt-2">
+          <div class="text-xs" style="color:var(--muted);">
+            <span id="char-count">0</span> caractere / <span id="est-duration">~0s</span> estimat
+          </div>
+          <div class="text-xs" style="color:var(--muted);" data-i18n="avatar.wpm">~150 cuvinte/min</div>
+        </div>
+      </div>
+
+      <!-- Selected avatar + Generate -->
+      <div class="ecard p-5">
+
+        <!-- Avatar info row -->
+        <div class="flex items-center gap-3 mb-4 p-3 rounded-xl" style="background:rgba(45,126,248,.04);border:1px solid rgba(0,255,120,.08);">
+          <div class="text-2xl">🎭</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs" style="color:var(--muted);" data-i18n="avatar.selected_lbl">Avatar selectat</div>
+            <div id="selected-profile-name" class="text-sm font-bold truncate" style="color:var(--text);">Niciunul</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs" style="color:var(--muted);">Config</div>
+            <div id="options-summary" class="text-xs font-semibold" style="color:var(--cyan);">sub:fără · 1.0× · RO</div>
+          </div>
+        </div>
+
+        <button id="generate-btn" onclick="generateVideo()"
+                class="ebtn ebtn-primary ebtn-lg w-full justify-center" style="width:100%;">
+          <span data-i18n="avatar.gen_video_btn">▶ Generează Video</span>
+        </button>
+
+        <!-- Progress -->
+        <div id="progress-section" class="mt-4 hidden">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="espinner blue" style="width:14px;height:14px;"></span>
+            <span id="progress-label" class="text-sm" style="color:var(--neon);">Inițializare...</span>
+          </div>
+          <div class="eprogress">
+            <div class="eprogress-fill" id="progress-bar" style="width:0%"></div>
+          </div>
+          <div id="progress-steps" class="mt-2 text-xs space-y-1" style="color:var(--muted);"></div>
+        </div>
+
+        <!-- Result -->
+        <div id="result-section" class="mt-4 hidden">
+          <div id="result-success" class="hidden">
+            <div class="ealert-ok flex items-center gap-2 text-sm font-bold mb-3" data-i18n="avatar.video_success">
+              ✓ Video generat cu succes!
+            </div>
+            <video id="result-video" controls
+                   class="w-full rounded-xl bg-black"
+                   style="max-width:340px;max-height:380px;margin:0 auto;display:block;border:1px solid var(--border);"></video>
+            <div class="flex gap-2 mt-4 justify-center flex-wrap">
+              <a id="download-btn" href="#" download class="ebtn ebtn-cyan ebtn-sm" data-i18n="avatar.download_btn">⬇ Descarcă</a>
+              <button onclick="copyToSlot()" class="ebtn ebtn-primary ebtn-sm" data-i18n="avatar.use_slot_btn">↗ Folosește în slot</button>
+              <button onclick="resetGenerator()" class="ebtn ebtn-ghost ebtn-sm" data-i18n="avatar.alt_video_btn">↺ Alt video</button>
+            </div>
+            <div id="result-meta" class="text-xs text-center mt-2" style="color:var(--muted);"></div>
+          </div>
+          <div id="result-error" class="hidden ealert-err">
+            <div class="font-bold text-sm mb-1" data-i18n="avatar.gen_error">Eroare la generare</div>
+            <div id="result-error-msg" class="text-xs monospace whitespace-pre-wrap"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Jobs -->
+      <div class="ecard p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div class="esec-title" data-i18n="avatar.recent_jobs_5">Ultimele 5 joburi</div>
+          <button onclick="loadJobs()" class="ebtn ebtn-ghost ebtn-sm" style="color:var(--neon);">↻ Refresh</button>
+        </div>
+        <div id="jobs-list" class="space-y-2">
+          {% if not jobs %}
+          <div class="text-sm text-center py-4" style="color:var(--muted);" data-i18n="avatar.no_jobs_txt">Niciun job încă</div>
+          {% else %}
+          {% for job in jobs %}
+          <div class="options-panel flex items-center gap-3">
+            <span class="epill {{ 'epill-cyan' if job.status == 'done' else 'epill-red' if job.status == 'failed' else 'epill-blue' if job.status == 'running' else 'epill-gold' }}">
+              {{ job.status }}
+            </span>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs truncate" style="color:var(--text);">{{ job.script[:80] }}{% if job.script|length > 80 %}...{% endif %}</div>
+              <div class="text-xs mt-0.5" style="color:var(--muted);">{{ job.platform }} · {{ job.created_at[:16] }}</div>
+            </div>
+            {% if job.output_path and job.status == 'done' %}
+            <a href="/avatar-video/{{ job.output_path.split('/')[-1] }}" target="_blank"
+               class="ebtn ebtn-ghost ebtn-sm">▶</a>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+    </div><!-- end right col -->
+  </div><!-- end grid -->
+</div>
+
+<!-- ═══ AVATAR PICKER MODAL ═══ -->
+<div id="avatar-modal-overlay" style="display:none;" onclick="closeAvatarModal(event)">
+  <div id="avatar-modal-box" onclick="event.stopPropagation()">
+    <!-- Header -->
+    <div id="avatar-modal-header">
+      <span style="font-size:20px;" id="modal-icon">🎭</span>
+      <div class="flex-1">
+        <div class="esec-title" style="margin:0;" id="modal-title">Alege avatar</div>
+        <div class="text-xs" style="color:var(--muted);" id="modal-count"></div>
+      </div>
+      <!-- Search -->
+      <input type="text" id="modal-search" placeholder="🔍 Caută după nume..." data-i18n-ph="avatar.modal_search"
+             oninput="filterModalAvatars()"
+             style="width:200px;background:rgba(5,10,20,.9);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);padding:7px 12px;font-size:12px;outline:none;transition:border-color .2s;"
+             onfocus="this.style.borderColor='rgba(0,255,120,.42)'"
+             onblur="this.style.borderColor='var(--border)'">
+      <button onclick="closeAvatarModal()" style="background:transparent;border:none;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;padding:0 4px;transition:color .15s;"
+              onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--muted)'">✕</button>
+    </div>
+    <!-- Grid (scrollable) -->
+    <div id="avatar-modal-grid-wrap">
+      <!-- filled by JS -->
+    </div>
+    <!-- Footer -->
+    <div style="padding:10px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <span class="text-xs" style="color:var(--muted);" id="modal-selected-label" data-i18n="avatar.modal_none">Niciunul selectat</span>
+      <button onclick="closeAvatarModal()" class="ebtn ebtn-primary ebtn-sm" data-i18n="avatar.modal_confirm">Confirmă ›</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let selectedHeygenAvatarId = null, selectedHeygenName = '';
+let selectedDidKey = null, selectedDidName = '', selectedDidVoice = '', selectedDidUrl = '';
+let selectedPlatform = 'tiktok';
+let currentJobId = null, pollTimer = null, pollCount = 0, pollStartTime = 0;
+let heygenLoaded = false, didLoaded = false;
+
+// Options state
+const optState = { sub: 'none', pos: 'bottom', speed: '1.0', lang: 'ro' };
+
+// ── Option tiles ──────────────────────────────────────────────────────────────
+function selectOpt(group, val, el) {
+  optState[group] = val;
+  document.querySelectorAll(`.eopt-tile[data-group="${group}"]`).forEach(t => t.classList.remove('selected'));
+  if (el) el.classList.add('selected');
+  updateOptionsSummary();
+}
+
+function updateOptionsSummary() {
+  const subLabels = { none: AP_T('avatar.sub_none'), neon:'neon', karaoke:'karaoke', bold:'bold' };
+  const el = document.getElementById('options-summary');
+  if (el) el.textContent = `sub:${subLabels[optState.sub]||optState.sub} · ${optState.speed}× · ${optState.lang.toUpperCase()}`;
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['did','heygen'].forEach(t => {
+    const btn = document.getElementById('tab-' + t);
+    const pan = document.getElementById('panel-' + t);
+    if (btn) btn.classList.toggle('active', t === tab);
+    if (pan) pan.classList.toggle('hidden', t !== tab);
+  });
+  if (tab === 'did') {
+    selectedHeygenAvatarId = null; selectedHeygenName = '';
+    document.querySelectorAll('[id^="heygen-av-"]').forEach(c => c.classList.remove('selected'));
+    if (!didLoaded) loadDidPresenters();
+  } else if (tab === 'heygen') {
+    selectedDidKey = null; selectedDidName = '';
+    document.querySelectorAll('[id^="did-pr-"]').forEach(c => c.classList.remove('selected'));
+    if (!heygenLoaded) loadHeygenAvatars();
+  }
+  updateSelectedLabel();
+}
+
+// ── Avatar Picker Modal ───────────────────────────────────────────────────────
+let _hgAvatarsCache = [];
+let _didPresentersCache = [];
+let _modalMode = 'heygen'; // 'heygen' | 'did'
+
+function openAvatarModal(mode) {
+  _modalMode = mode;
+  const overlay = document.getElementById('avatar-modal-overlay');
+  overlay.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  document.getElementById('modal-search').value = '';
+  document.getElementById('modal-icon').textContent = mode === 'heygen' ? '🎭' : '🤖';
+  document.getElementById('modal-title').textContent = mode === 'heygen' ? AP_T('avatar.modal_title_heygen') : AP_T('avatar.modal_title_did');
+
+  if (mode === 'heygen') {
+    if (!heygenLoaded) { _loadModalAvatarsHeygen(); }
+    else { _renderModal(_hgAvatarsCache, 'heygen'); }
+  } else {
+    if (!didLoaded) { _loadModalAvatarsDid(); }
+    else { _renderModal(_didPresentersCache, 'did'); }
+  }
+  setTimeout(() => document.getElementById('modal-search').focus(), 100);
+}
+
+function closeAvatarModal(evt) {
+  if (evt && evt.target !== document.getElementById('avatar-modal-overlay') && evt.type === 'click') return;
+  document.getElementById('avatar-modal-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeAvatarModal();
+});
+
+function filterModalAvatars() {
+  const q = document.getElementById('modal-search').value.toLowerCase().trim();
+  const cache = _modalMode === 'heygen' ? _hgAvatarsCache : _didPresentersCache;
+  const filtered = q ? cache.filter(av => {
+    const name = (av.avatar_name || av.avatar_id || av.name || '').toLowerCase();
+    return name.includes(q);
+  }) : cache;
+  _renderModal(filtered, _modalMode);
+}
+
+function _renderModal(items, mode) {
+  const wrap = document.getElementById('avatar-modal-grid-wrap');
+  const countEl = document.getElementById('modal-count');
+  countEl.textContent = `${items.length} avatar${items.length !== 1 ? 'e' : ''}`;
+
+  if (!items.length) {
+    wrap.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 0;color:var(--muted);font-size:13px;">${AP_T('avatar.no_avs_found')}</div>`;
+    return;
+  }
+
+  if (mode === 'heygen') {
+    const curId = selectedHeygenAvatarId;
+    wrap.innerHTML = items.map(av => {
+      const id   = av.avatar_id;
+      const name = (av.avatar_name || id || 'Avatar').replace(/['"<>]/g, '');
+      const meta = av.gender ? av.gender : '';
+      const sel  = id === curId ? 'selected' : '';
+      const img  = av.preview_image_url
+        ? `<img src="${av.preview_image_url}" loading="lazy" alt="${name}" onerror="this.parentElement.innerHTML='<div class=av-no-img>🎭</div>'">`
+        : `<div class="av-no-img">🎭</div>`;
+      return `<div class="av-card ${sel}" id="modal-av-${id}"
+                   onclick="selectHeygenAvatar('${id}','${name}','${av.preview_image_url||''}')">
+        ${img}
+        <div class="av-name" title="${name}">${name}</div>
+        ${meta ? `<div class="av-meta">${meta}</div>` : ''}
+      </div>`;
+    }).join('');
+  } else {
+    const curKey = selectedDidKey;
+    wrap.innerHTML = items.map(p => {
+      const sel = p.key === curKey ? 'selected' : '';
+      const accent = p.accent || '';
+      const gender = p.gender === 'female' ? '♀' : '♂';
+      return `<div class="av-card ${sel}" id="modal-did-${p.key}"
+                   onclick="selectDidPresenter('${p.key}','${(p.name||'').replace(/['"]/g,'')}','${p.voice_id||''}','${p.did_url||''}','${p.preview_url||''}')">
+        <img src="${p.preview_url}" loading="lazy" alt="${p.name||''}"
+             onerror="this.parentElement.innerHTML='<div class=av-no-img>🤖</div>'">
+        <div class="av-name" title="${p.name||''}">${p.name||''}</div>
+        <div class="av-meta">${accent} ${gender}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function _updateModalSelected(label) {
+  const el = document.getElementById('modal-selected-label');
+  if (el) el.textContent = label;
+}
+
+// ── HeyGen load ───────────────────────────────────────────────────────────────
+async function _loadModalAvatarsHeygen() {
+  const wrap = document.getElementById('avatar-modal-grid-wrap');
+  wrap.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 0;"><span class="espinner cyan"></span><span class="text-sm ml-2" style="color:var(--cyan);">${AP_T('avatar.loading_heygen')}</span></div>`;
+  try {
+    const r = await fetch('/api/heygen/avatars');
+    const d = await r.json();
+    if (!r.ok || d.error) {
+      wrap.innerHTML = `<div style="grid-column:1/-1;padding:20px;" class="ealert-err">${d.error||AP_T('avatar.heygen_error')}</div>`;
+      return;
+    }
+    heygenLoaded = true;
+    _hgAvatarsCache = d.avatars || [];
+    _renderModal(_hgAvatarsCache, 'heygen');
+    document.getElementById('modal-count').textContent = `${_hgAvatarsCache.length} avatare`;
+  } catch(e) {
+    wrap.innerHTML = `<div style="grid-column:1/-1;padding:20px;" class="ealert-err">Eroare: ${e}</div>`;
+  }
+}
+
+function selectHeygenAvatar(avatarId, avatarName, previewUrl) {
+  selectedHeygenAvatarId = avatarId;
+  selectedHeygenName = avatarName;
+  // Update modal selection highlight
+  document.querySelectorAll('[id^="modal-av-"]').forEach(c => c.classList.remove('selected'));
+  const el = document.getElementById('modal-av-' + avatarId);
+  if (el) el.classList.add('selected');
+  _updateModalSelected('HeyGen: ' + avatarName);
+  // Update picker button
+  const thumb = document.getElementById('heygen-thumb');
+  if (thumb) {
+    if (previewUrl) thumb.innerHTML = `<img src="${previewUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:var(--r-sm);" onerror="this.parentElement.textContent='🎭'">`;
+    else thumb.textContent = '🎭';
+  }
+  const lbl = document.getElementById('heygen-picker-label');
+  if (lbl) lbl.textContent = avatarName;
+  updateSelectedLabel();
+  // Auto-close after short delay
+  setTimeout(() => {
+    document.getElementById('avatar-modal-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+  }, 300);
+}
+
+// ── D-ID load ─────────────────────────────────────────────────────────────────
+async function _loadModalAvatarsDid() {
+  const wrap = document.getElementById('avatar-modal-grid-wrap');
+  wrap.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 0;"><span class="espinner cyan"></span><span class="text-sm ml-2" style="color:var(--cyan);">${AP_T('avatar.loading_did')}</span></div>`;
+  try {
+    const r = await fetch('/api/did/presenters');
+    const d = await r.json();
+    if (!r.ok || d.error) {
+      wrap.innerHTML = `<div style="grid-column:1/-1;padding:20px;" class="ealert-err">${d.error||AP_T('avatar.did_error')}</div>`;
+      return;
+    }
+    didLoaded = true;
+    _didPresentersCache = d.presenters || [];
+    _renderModal(_didPresentersCache, 'did');
+  } catch(e) {
+    wrap.innerHTML = `<div style="grid-column:1/-1;padding:20px;" class="ealert-err">Eroare: ${e}</div>`;
+  }
+}
+
+async function loadHeygenAvatars() { if (!heygenLoaded) await _loadModalAvatarsHeygen(); }
+async function loadDidPresenters()  { if (!didLoaded)    await _loadModalAvatarsDid(); }
+
+function selectDidPresenter(key, name, voiceId, didUrl, previewUrl) {
+  selectedDidKey = key; selectedDidName = name;
+  selectedDidVoice = voiceId || 'en-US-GuyNeural'; selectedDidUrl = didUrl || '';
+  document.querySelectorAll('[id^="modal-did-"]').forEach(c => c.classList.remove('selected'));
+  const el = document.getElementById('modal-did-' + key);
+  if (el) el.classList.add('selected');
+  _updateModalSelected('D-ID: ' + name);
+  // Update picker button
+  const thumb = document.getElementById('did-thumb');
+  if (thumb) {
+    if (previewUrl) thumb.innerHTML = `<img src="${previewUrl}" style="width:40px;height:40px;object-fit:cover;border-radius:var(--r-sm);" onerror="this.parentElement.textContent='🤖'">`;
+    else thumb.textContent = '🤖';
+  }
+  const lbl = document.getElementById('did-picker-label');
+  if (lbl) lbl.textContent = name;
+  updateSelectedLabel();
+  setTimeout(() => {
+    document.getElementById('avatar-modal-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+  }, 300);
+}
+
+function updateSelectedLabel() {
+  let label = AP_T('avatar.none');
+  if (selectedHeygenAvatarId) label = 'HeyGen: ' + selectedHeygenName;
+  else if (selectedDidKey)    label = 'D-ID: ' + selectedDidName + ' (' + (selectedDidVoice.split('-')[2] || selectedDidVoice) + ')';
+  document.getElementById('selected-profile-name').textContent = label;
+}
+
+// ── Platform ──────────────────────────────────────────────────────────────────
+function selectPlatform(key) {
+  selectedPlatform = key;
+  document.querySelectorAll('[data-platform]').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('platform-' + key);
+  if (el) el.classList.add('active');
+}
+
+// ── Script helpers ────────────────────────────────────────────────────────────
+function updateCharCount() {
+  const v  = document.getElementById('script-input').value;
+  const wc = v.trim().split(/\s+/).filter(Boolean).length;
+  document.getElementById('char-count').textContent = v.length;
+  document.getElementById('est-duration').textContent = '~' + Math.round(wc / 2.5) + 's';
+}
+async function loadLatestScript() {
+  try {
+    const r = await fetch('/api/avatar/jobs');
+    const d = await r.json();
+    const done = (d.jobs || []).find(j => j.status === 'done');
+    if (done && done.script) { document.getElementById('script-input').value = done.script; updateCharCount(); }
+    else alert(AP_T('avatar.no_prev_job'));
+  } catch(e) { console.error(e); }
+}
+function clearScript() { document.getElementById('script-input').value = ''; updateCharCount(); }
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+async function generateVideo() {
+  const script = document.getElementById('script-input').value.trim();
+  if (!script) { alert(AP_T('avatar.enter_script')); return; }
+
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="espinner" style="width:14px;height:14px;border-top-color:#fff;"></span> ' + AP_T('avatar.generating');
+  document.getElementById('progress-section').classList.remove('hidden');
+  document.getElementById('result-section').classList.add('hidden');
+  setProgress(5, AP_T('avatar.initializing'));
+  addStep('⏳ ' + new Date().toLocaleTimeString());
+
+  try {
+    const fd = new FormData();
+    fd.append('script', script);
+    fd.append('platform', selectedPlatform);
+    fd.append('subtitle_style', optState.sub);
+    fd.append('caption_pos',    optState.pos);
+    fd.append('voice_speed',    optState.speed);
+    fd.append('language',       optState.lang);
+    if (selectedHeygenAvatarId) {
+      fd.append('heygen_avatar_id', selectedHeygenAvatarId);
+    } else if (selectedDidKey) {
+      fd.append('did_presenter_name', selectedDidKey);
+      fd.append('did_voice_id', selectedDidVoice);
+      if (selectedDidUrl) fd.append('did_presenter_url', selectedDidUrl);
+    }
+    setProgress(15, AP_T('avatar.synth_voice'));
+    addStep('🎙 TTS...');
+
+    const r = await fetch('/api/avatar/generate', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok || d.error) { showError(d.error || AP_T('avatar.unknown_error')); return; }
+    if (d.status === 'done') { showResult(d); }
+    else {
+      currentJobId = d.job_id; pollCount = 0; pollStartTime = Date.now(); pollJob();
+    }
+  } catch(e) { showError(String(e)); }
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progress-bar').style.width = pct + '%';
+  if (label) document.getElementById('progress-label').textContent = label;
+}
+function addStep(text) {
+  const el = document.createElement('div'); el.textContent = text;
+  el.style.cssText = 'font-size:11px;color:var(--muted);';
+  document.getElementById('progress-steps').appendChild(el);
+}
+async function pollJob() {
+  if (!currentJobId) return;
+  try {
+    const r = await fetch('/api/avatar/job/' + currentJobId);
+    const d = await r.json();
+    if (d.status === 'running') {
+      pollCount++;
+      const elapsed = Math.round((Date.now() - pollStartTime) / 1000);
+      const err = d.error || '';
+      if (err.includes('D-ID') || err.includes('fallback')) {
+        setProgress(40, 'D-ID fallback activ... ' + elapsed + 's');
+        if (pollCount === 1) addStep('↩ Auto-switch la D-ID...');
+      } else {
+        setProgress(Math.min(85, 30 + pollCount * 2), 'HeyGen procesare... ' + elapsed + 's');
+        if (pollCount === 1) addStep('🎬 Generare avatar AI...');
+      }
+      pollTimer = setTimeout(pollJob, 3000);
+    } else if (d.status === 'done') {
+      setProgress(95, AP_T('avatar.finalizing')); addStep('✓ Compoziție ' + d.platform + (d.engine ? ' via ' + d.engine : ''));
+      showResult(d);
+    } else if (d.status === 'failed') {
+      const err = d.error || 'Job eșuat';
+      showError(err.includes('credit') ? 'HeyGen necesită credite API. Configurează D-ID în Settings pentru fallback.' : err);
+    } else {
+      pollTimer = setTimeout(pollJob, 1500);
+    }
+  } catch(e) { showError(String(e)); }
+}
+
+function showResult(d) {
+  setProgress(100, AP_T('avatar.gen_done'));
+  addStep('✅ ' + (d.duration_s||'?') + 's · ' + (d.size_mb||'?') + ' MB');
+  document.getElementById('progress-section').classList.add('hidden');
+  document.getElementById('result-section').classList.remove('hidden');
+  document.getElementById('result-success').classList.remove('hidden');
+  document.getElementById('result-error').classList.add('hidden');
+  const filename = (d.output_path || '').split('/').pop().split('\\').pop();
+  const videoUrl = '/avatar-video/' + filename;
+  document.getElementById('result-video').src = videoUrl;
+  document.getElementById('download-btn').href = videoUrl;
+  document.getElementById('download-btn').download = filename;
+  document.getElementById('result-meta').textContent =
+    d.platform + ' · ' + (d.duration_s||'?') + 's · ' + (d.size_mb||'?') + ' MB · ' + (d.elapsed_s||'?') + 's procesare' + (d.engine ? ' · ' + d.engine : '');
+  resetGenerateBtn(); loadJobs();
+}
+function showError(msg) {
+  document.getElementById('progress-section').classList.add('hidden');
+  document.getElementById('result-section').classList.remove('hidden');
+  document.getElementById('result-success').classList.add('hidden');
+  document.getElementById('result-error').classList.remove('hidden');
+  document.getElementById('result-error-msg').textContent = msg;
+  resetGenerateBtn();
+}
+function resetGenerateBtn() {
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = false; btn.innerHTML = AP_T('avatar.gen_video_btn');
+}
+function resetGenerator() {
+  document.getElementById('result-section').classList.add('hidden');
+  document.getElementById('progress-section').classList.add('hidden');
+  document.getElementById('progress-steps').innerHTML = '';
+  setProgress(0, '');
+  if (pollTimer) clearTimeout(pollTimer);
+}
+
+// ── Jobs ──────────────────────────────────────────────────────────────────────
+async function loadJobs() {
+  try {
+    const r = await fetch('/api/avatar/jobs');
+    const d = await r.json();
+    const list = document.getElementById('jobs-list');
+    if (!d.jobs || !d.jobs.length) {
+      list.innerHTML = `<div class="text-sm text-center py-4" style="color:var(--muted);">${AP_T('avatar.no_jobs_txt')}</div>`; return;
+    }
+    const pillCls = { done:'epill-cyan', failed:'epill-red', running:'epill-blue', queued:'epill-gold' };
+    list.innerHTML = d.jobs.map(job => {
+      const filename = (job.output_path || '').split('/').pop().split('\\').pop();
+      return `
+      <div class="options-panel flex items-center gap-3">
+        <span class="epill ${pillCls[job.status]||'epill-muted'}">${job.status}</span>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs truncate" style="color:var(--text);">${job.script.substring(0,80)}${job.script.length>80?'...':''}</div>
+          <div class="text-xs mt-0.5" style="color:var(--muted);">${job.platform} · ${(job.created_at||'').substring(0,16)}</div>
+        </div>
+        ${job.status==='done'&&filename ? `<a href="/avatar-video/${filename}" target="_blank" class="ebtn ebtn-ghost ebtn-sm">▶</a>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+function copyToSlot() { alert(AP_T('avatar.copy_slot_hint')); }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+updateCharCount();
+updateOptionsSummary();
+loadJobs();
+setInterval(loadJobs, 30000);
+</script>
+<script src="/static/i18n.js"></script>
+</div><!-- /main-wrap -->
+</body>
+</html>

@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMD AutoPost — Plans & Pricing</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/elite.css">
+<style>
+body { display:flex; min-height:100vh; }
+.sidebar {
+  width:200px; flex-shrink:0; position:fixed; top:0; left:0; bottom:0;
+  background:rgba(2,8,6,.98); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; z-index:20; overflow-y:auto;
+}
+.main-wrap { margin-left:200px; flex:1; min-width:0; }
+.top-bar {
+  position:sticky; top:0; z-index:10;
+  background:rgba(2,8,6,.96); border-bottom:1px solid var(--border);
+  padding:8px 24px; display:flex; align-items:center; justify-content:space-between;
+  backdrop-filter:blur(8px);
+}
+.main-content { padding:28px 28px 60px; max-width:1200px; margin:0 auto; }
+
+.snav-section { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); padding:12px 16px 4px; }
+.snav-item {
+  display:flex; align-items:center; gap:10px; padding:9px 14px;
+  font-size:13px; font-weight:600; color:var(--muted);
+  text-decoration:none; border-radius:8px; margin:1px 8px;
+  transition:all .15s;
+}
+.snav-item:hover { color:var(--text); background:rgba(255,255,255,.04); }
+.snav-item.active { color:var(--cyan); background:rgba(6,214,160,.09); }
+.snav-badge { margin-left:auto; font-size:11px; font-weight:800; color:var(--gold); }
+
+/* ── Toggle billing ── */
+.bill-toggle { display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:4px 6px; }
+.bill-btn { padding:6px 18px; border-radius:999px; font-size:12px; font-weight:700; cursor:pointer; transition:all .2s; border:none; color:var(--muted); background:none; }
+.bill-btn.active { background:var(--cyan); color:#020806; }
+.save-badge { font-size:11px; font-weight:800; background:rgba(251,191,36,.12); color:var(--gold); border:1px solid rgba(251,191,36,.25); border-radius:999px; padding:3px 10px; }
+
+/* ── Plan cards ── */
+.plans-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; margin-top:36px; }
+@media(max-width:900px){ .plans-grid{grid-template-columns:1fr 1fr;} }
+@media(max-width:580px) { .plans-grid{grid-template-columns:1fr;} }
+
+.plan-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:20px;
+  padding:36px 28px 28px; display:flex; flex-direction:column; position:relative;
+  transition:border-color .25s, box-shadow .25s, transform .2s;
+}
+.plan-card:hover { border-color:var(--border-h); box-shadow:0 0 40px rgba(0,255,120,.07); transform:translateY(-3px); }
+.plan-card.popular {
+  border-color:rgba(0,255,120,.5);
+  box-shadow:0 0 48px rgba(0,255,120,.12);
+  background:linear-gradient(160deg, rgba(3,12,8,.99) 0%, rgba(2,9,6,.99) 100%);
+}
+.plan-card.popular:hover { transform:translateY(-5px); box-shadow:0 0 56px rgba(0,255,120,.18); }
+.plan-card.elite-card {
+  border-color:rgba(251,191,36,.4);
+  box-shadow:0 0 48px rgba(251,191,36,.08);
+  background:linear-gradient(160deg, rgba(6,14,7,.99) 0%, rgba(12,10,0,.99) 100%);
+}
+.plan-card.elite-card:hover { transform:translateY(-5px); box-shadow:0 0 56px rgba(251,191,36,.16); }
+.popular-badge {
+  position:absolute; top:-14px; left:50%; transform:translateX(-50%);
+  background:var(--neon); color:#020806; font-size:11px; font-weight:900;
+  letter-spacing:.1em; padding:5px 18px; border-radius:999px;
+  text-transform:uppercase; white-space:nowrap;
+  box-shadow:0 0 20px rgba(0,255,120,.4);
+}
+.plan-name { font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
+.plan-price { font-size:52px; font-weight:900; line-height:1; margin:12px 0 4px; color:var(--text); }
+.plan-price sup { font-size:22px; font-weight:700; vertical-align:top; margin-top:10px; display:inline-block; }
+.plan-price .period { font-size:15px; font-weight:500; color:var(--muted); }
+.plan-annual { font-size:12px; color:var(--muted); margin-bottom:4px; min-height:18px; }
+.plan-desc { font-size:13px; color:var(--muted); line-height:1.55; min-height:40px; }
+.plan-divider { border:none; border-top:1px solid var(--border); margin:20px 0; }
+.feat-list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px; flex:1; }
+.feat-list li { display:flex; align-items:flex-start; gap:9px; font-size:13px; color:var(--text); line-height:1.4; }
+.feat-list li .ico { flex-shrink:0; font-size:14px; margin-top:1px; }
+.feat-list li.dim { color:var(--muted); }
+.feat-list li.dim .ico { opacity:.35; }
+
+.plan-btn {
+  display:block; text-align:center; padding:14px 0; border-radius:12px; font-size:14px; font-weight:800;
+  cursor:pointer; text-decoration:none; transition:all .2s; margin-top:24px;
+  border:none; letter-spacing:.02em;
+}
+.btn-starter { background:rgba(0,255,120,.1); color:var(--neon); border:1px solid rgba(0,255,120,.3); }
+.btn-starter:hover { background:rgba(0,255,120,.18); box-shadow:0 0 16px rgba(0,255,120,.15); }
+.btn-pro     { background:var(--neon); color:#020806; }
+.btn-pro:hover { opacity:.9; box-shadow:0 0 28px rgba(0,255,120,.4); }
+.btn-elite   { background:linear-gradient(135deg,var(--gold),#e6a817); color:#020806; }
+.btn-elite:hover { box-shadow:0 0 28px rgba(251,191,36,.45); opacity:.92; }
+
+/* ── Current plan badge ── */
+.current-badge {
+  position:absolute; top:12px; right:12px;
+  font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+  background:rgba(6,214,160,.12); color:var(--cyan); border:1px solid rgba(6,214,160,.25);
+  border-radius:999px; padding:3px 9px;
+}
+
+/* ── Add-ons ── */
+.addons-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+@media(max-width:900px){ .addons-grid{grid-template-columns:repeat(2,1fr);} }
+@media(max-width:600px){ .addons-grid{grid-template-columns:1fr;} }
+
+.addon-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:16px 18px; display:flex; align-items:flex-start; gap:12px;
+  transition:border-color .2s;
+}
+.addon-card:hover { border-color:var(--border-h); }
+.addon-icon { font-size:22px; flex-shrink:0; }
+.addon-name { font-size:13px; font-weight:700; color:var(--text); }
+.addon-desc { font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.4; }
+.addon-price { font-size:13px; font-weight:800; color:var(--gold); margin-top:6px; }
+
+/* ── Coming soon ── */
+.soon-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+@media(max-width:900px){ .soon-grid{grid-template-columns:repeat(2,1fr);} }
+@media(max-width:600px){ .soon-grid{grid-template-columns:1fr;} }
+
+.soon-card {
+  background:rgba(255,255,255,.015); border:1px solid rgba(255,255,255,.06); border-radius:12px;
+  padding:16px 18px; display:flex; align-items:flex-start; gap:12px;
+  position:relative; overflow:hidden;
+}
+.soon-label {
+  position:absolute; top:10px; right:10px; font-size:9px; font-weight:800; text-transform:uppercase;
+  letter-spacing:.08em; background:rgba(139,92,246,.12); color:var(--purple);
+  border:1px solid rgba(139,92,246,.22); border-radius:999px; padding:2px 8px;
+}
+.soon-icon { font-size:22px; flex-shrink:0; opacity:.6; }
+.soon-name { font-size:13px; font-weight:700; color:var(--muted); }
+.soon-desc { font-size:11.5px; color:var(--dim); margin-top:3px; line-height:1.4; }
+
+/* ── Section header ── */
+.sec-h { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; color:var(--dim); margin-bottom:4px; }
+.sec-title { font-size:22px; font-weight:900; color:var(--text); }
+.sec-sub { font-size:13px; color:var(--muted); margin-top:4px; }
+
+/* ── FAQ ── */
+.faq-item { border-bottom:1px solid var(--border); padding:16px 0; }
+.faq-q { font-size:13px; font-weight:700; color:var(--text); cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
+.faq-a { font-size:12.5px; color:var(--muted); line-height:1.6; margin-top:10px; display:none; }
+.faq-item.open .faq-a { display:block; }
+.faq-item.open .faq-arr { transform:rotate(180deg); }
+.faq-arr { transition:transform .2s; color:var(--dim); }
+
+/* Compare table */
+.cmp-table { width:100%; border-collapse:collapse; margin-top:16px; }
+.cmp-table th { padding:10px 14px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); background:rgba(0,0,0,.3); border-bottom:1px solid var(--border); text-align:center; }
+.cmp-table th:first-child { text-align:left; }
+.cmp-table td { padding:10px 14px; font-size:12.5px; color:var(--text); border-bottom:1px solid rgba(255,255,255,.04); text-align:center; }
+.cmp-table td:first-child { text-align:left; color:var(--muted); font-weight:600; }
+.cmp-table tr:hover td { background:rgba(0,255,120,.015); }
+.cmp-table .yes { color:var(--neon); }
+.cmp-table .no  { color:var(--dim); }
+.cmp-table .pro-col { background:rgba(0,255,120,.015); }
+</style>
+</head>
+<body style="background:var(--bg);">
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div style="padding:18px 16px 10px;">
+    <div class="elite-logo" style="font-size:13px;line-height:1.2;">ELITEMARGINDESK</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:2px;letter-spacing:.06em;">AutoPost System</div>
+  </div>
+
+  <nav style="margin-top:8px;flex:1;">
+    <div class="snav-section">Main</div>
+    <a href="/" class="snav-item">🏠 Dashboard</a>
+    <a href="/settings" class="snav-item">⚙️ Settings</a>
+    <a href="/pricing" class="snav-item active">💎 Plans</a>
+    <a href="/viral" class="snav-item">📊 Viral Scout</a>
+    <a href="/competitor-tracker" class="snav-item">🕵️ Competitors</a>
+    <a href="/avatar-studio" class="snav-item">🎭 Avatar Studio</a>
+
+    {% if current_user.is_admin %}
+    <div class="snav-section" style="margin-top:8px;">Admin</div>
+    <a href="/admin/backoffice" class="snav-item">🖥️ Backoffice</a>
+    <a href="/admin/users" class="snav-item">👥 Users</a>
+    {% endif %}
+  </nav>
+
+  <div style="padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);">
+    {{ current_user.email }}
+  </div>
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main-wrap">
+  <div class="top-bar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:15px;font-weight:800;color:var(--text);">💎 Plans & Pricing</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      {% if current_plan %}
+      <span style="font-size:12px;color:var(--cyan);font-weight:700;">
+        Current plan: <strong>{{ current_plan|upper }}</strong>
+        {% if plan_expires_at %}<span style="color:var(--muted);font-weight:400;"> · expires {{ plan_expires_at[:10] }}</span>{% endif %}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="main-content">
+
+    <!-- Hero -->
+    <div style="text-align:center;padding:20px 0 8px;">
+      <div class="sec-h">Pricing</div>
+      <h1 style="font-size:34px;font-weight:900;color:var(--text);line-height:1.15;margin:6px 0;">
+        Automated Social Media,<br><span style="color:var(--neon);">From $19 to $149/month</span>
+      </h1>
+      <p style="font-size:14px;color:var(--muted);max-width:520px;margin:12px auto 0;line-height:1.6;">
+        One platform posts for you on X, Telegram, Instagram, TikTok and YouTube —
+        every morning and evening, with AI-generated images and videos.
+      </p>
+
+      <!-- Billing toggle -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:20px;">
+        <div class="bill-toggle">
+          <button class="bill-btn active" id="btn-monthly" onclick="setBilling('monthly')">Monthly</button>
+          <button class="bill-btn" id="btn-annual" onclick="setBilling('annual')">Annual</button>
+        </div>
+        <span class="save-badge">Save 20% annually</span>
+      </div>
+    </div>
+
+    <!-- ═══ PLAN CARDS ═══ -->
+    <div class="plans-grid">
+
+      <!-- STARTER -->
+      <div class="plan-card">
+        {% if current_plan == 'starter' %}<div class="current-badge">Current Plan</div>{% endif %}
+        <div class="plan-name">Starter</div>
+        <div class="plan-price" id="price-starter"><sup>$</sup><span class="p-val">19</span><span class="period"> / mo</span></div>
+        <div class="plan-annual" id="ann-starter" style="display:none;color:var(--gold);font-size:12px;font-weight:600;">$15/mo · billed $180/yr — save $48</div>
+        <div class="plan-desc" style="margin-top:10px;">For solo creators who want consistent daily presence on X and Telegram.</div>
+        <hr class="plan-divider">
+        <ul class="feat-list">
+          <li><span class="ico">📡</span> 2 platforms — Telegram + X</li>
+          <li><span class="ico">⏰</span> 2 posts / day (morning + evening)</li>
+          <li><span class="ico">🗞️</span> AI news scouting — 1 niche</li>
+          <li><span class="ico">🖼️</span> AI image cards + short reels</li>
+          <li><span class="ico">📊</span> Viral Scout — basic view</li>
+          <li><span class="ico">🔔</span> Failure alerts on Telegram</li>
+          <li><span class="ico">🔁</span> Auto-retry on failure</li>
+          <li class="dim"><span class="ico">❌</span> No avatar video</li>
+          <li class="dim"><span class="ico">❌</span> No competitor tracking</li>
+        </ul>
+        {% if current_plan == 'starter' %}
+        <a href="/billing/portal" class="plan-btn btn-starter" style="margin-top:auto;">Manage Subscription</a>
+        {% else %}
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto;padding-top:24px;">
+          <a href="#" class="plan-btn btn-starter" style="margin-top:0;" onclick="checkout('starter')">💳 Pay with Card</a>
+          <button onclick="openCryptoModal('starter')" style="width:100%;padding:12px 14px;border-radius:12px;background:rgba(0,255,120,.05);border:1px solid rgba(0,255,120,.2);color:#4d9966;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='rgba(0,255,120,.4)';this.style.color='var(--neon)'" onmouseout="this.style.borderColor='rgba(0,255,120,.2)';this.style.color='#4d9966'">🔷 Pay with USDC</button>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- PRO — popular -->
+      <div class="plan-card popular">
+        <div class="popular-badge">⚡ Most Popular</div>
+        {% if current_plan == 'pro' %}<div class="current-badge">Current Plan</div>{% endif %}
+        <div class="plan-name" style="color:var(--neon);">Pro</div>
+        <div class="plan-price" id="price-pro"><sup>$</sup><span class="p-val">49</span><span class="period"> / mo</span></div>
+        <div class="plan-annual" id="ann-pro" style="display:none;color:var(--gold);font-size:12px;font-weight:600;">$39/mo · billed $468/yr — save $120</div>
+        <div class="plan-desc" style="margin-top:10px;">Full automation across all platforms with AI avatars, analytics, and competitor tracking.</div>
+        <hr class="plan-divider" style="border-color:rgba(0,255,120,.15);">
+        <ul class="feat-list">
+          <li><span class="ico">📡</span> All 6 platforms incl. Instagram + TikTok + YouTube</li>
+          <li><span class="ico">⏰</span> 2 posts / day per platform</li>
+          <li><span class="ico">🎯</span> 3 niches (your choice)</li>
+          <li><span class="ico">🖼️</span> Images + Reels + <strong>Avatar video (D-ID)</strong></li>
+          <li><span class="ico">📊</span> Full Viral Scout + Trend Predictor</li>
+          <li><span class="ico">🕵️</span> Competitor Tracker — up to 5 accounts</li>
+          <li><span class="ico">🔬</span> A/B Testing + Engagement Optimizer</li>
+          <li><span class="ico">🎬</span> Ad Studio — 12 industries</li>
+          <li><span class="ico">🌐</span> Daily Web Learner (AI research)</li>
+          <li><span class="ico">⚡</span> Pre-Post Hook Optimizer</li>
+        </ul>
+        {% if current_plan == 'pro' %}
+        <a href="/billing/portal" class="plan-btn btn-pro" style="margin-top:auto;">Manage Subscription</a>
+        {% else %}
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto;padding-top:24px;">
+          <a href="#" class="plan-btn btn-pro" style="margin-top:0;" onclick="checkout('pro')">💳 Pay with Card</a>
+          <button onclick="openCryptoModal('pro')" style="width:100%;padding:12px 14px;border-radius:12px;background:rgba(0,255,122,.06);border:1px solid rgba(0,255,122,.3);color:var(--neon);font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(0,255,122,.14)'" onmouseout="this.style.background='rgba(0,255,122,.06)'">🔷 Pay with USDC</button>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- ELITE -->
+      <div class="plan-card elite-card">
+        {% if current_plan == 'elite' %}<div class="current-badge" style="background:rgba(251,191,36,.12);color:var(--gold);border-color:rgba(251,191,36,.3);">Current Plan</div>{% endif %}
+        <div class="plan-name" style="color:var(--gold);">Elite</div>
+        <div class="plan-price" id="price-elite" style="color:var(--gold);"><sup>$</sup><span class="p-val">149</span><span class="period"> / mo</span></div>
+        <div class="plan-annual" id="ann-elite" style="display:none;color:var(--gold);font-size:12px;font-weight:600;">$119/mo · billed $1,428/yr — save $360</div>
+        <div class="plan-desc" style="margin-top:10px;">For agencies and power users who need the full AI stack — unlimited, white-label ready.</div>
+        <hr class="plan-divider" style="border-color:rgba(251,191,36,.15);">
+        <ul class="feat-list">
+          <li><span class="ico">📡</span> All 6 platforms — unlimited posts</li>
+          <li><span class="ico">🎯</span> All 10 niches simultaneously</li>
+          <li><span class="ico">🎬</span> <strong>HeyGen premium avatars</strong></li>
+          <li><span class="ico">🕵️</span> Competitor Tracker — unlimited accounts</li>
+          <li><span class="ico">📊</span> Advanced analytics dashboard</li>
+          <li><span class="ico">🧠</span> Priority AI brain cycles</li>
+          <li><span class="ico">🏢</span> White-label option (+$99/mo)</li>
+          <li><span class="ico">👥</span> Team seats — up to 3 users</li>
+          <li><span class="ico">📞</span> Onboarding call + priority support</li>
+          <li><span class="ico">⚙️</span> Custom RSS feeds + webhooks</li>
+        </ul>
+        {% if current_plan == 'elite' %}
+        <a href="/billing/portal" class="plan-btn btn-elite" style="margin-top:auto;">Manage Subscription</a>
+        {% else %}
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto;padding-top:24px;">
+          <a href="#" class="plan-btn btn-elite" style="margin-top:0;" onclick="checkout('elite')">💳 Pay with Card</a>
+          <button onclick="openCryptoModal('elite')" style="width:100%;padding:12px 14px;border-radius:12px;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(251,191,36,.16)'" onmouseout="this.style.background='rgba(251,191,36,.07)'">🔷 Pay with USDC</button>
+        </div>
+        {% endif %}
+      </div>
+
+    </div><!-- /plans-grid -->
+
+    <!-- ═══ ADD-ONS ═══ -->
+    <div style="margin-top:52px;">
+      <div class="sec-h">Add-ons</div>
+      <div class="sec-title">Enhance any plan</div>
+      <div class="sec-sub">Available as monthly add-ons on Starter, Pro, or Elite.</div>
+
+      <div class="addons-grid">
+        <div class="addon-card">
+          <div class="addon-icon">🧠</div>
+          <div>
+            <div class="addon-name">AI Rewrite (Claude)</div>
+            <div class="addon-desc">Every post is rewritten by Claude AI before publishing — better hooks, higher reach.</div>
+            <div class="addon-price">+$10 / month</div>
+          </div>
+        </div>
+
+        <div class="addon-card">
+          <div class="addon-icon">🎯</div>
+          <div>
+            <div class="addon-name">Extra Niche</div>
+            <div class="addon-desc">Add a new niche (fitness, finance, fashion etc.) to your existing plan.</div>
+            <div class="addon-price">+$10 / niche / month</div>
+          </div>
+        </div>
+
+        <div class="addon-card">
+          <div class="addon-icon">📡</div>
+          <div>
+            <div class="addon-name">Custom RSS Feeds</div>
+            <div class="addon-desc">Add your own news sources — blogs, newsletters, trade publications.</div>
+            <div class="addon-price">+$5 / month</div>
+          </div>
+        </div>
+
+        <div class="addon-card">
+          <div class="addon-icon">⏰</div>
+          <div>
+            <div class="addon-name">Extra Post Slot</div>
+            <div class="addon-desc">Add a third posting window (midday, night, or custom time).</div>
+            <div class="addon-price">+$5 / slot / month</div>
+          </div>
+        </div>
+
+        <div class="addon-card">
+          <div class="addon-icon">🏢</div>
+          <div>
+            <div class="addon-name">White-Label Agency</div>
+            <div class="addon-desc">Your logo, your domain, your brand — resell AutoPost to your clients. (Elite only)</div>
+            <div class="addon-price">+$99 / month</div>
+          </div>
+        </div>
+
+        <div class="addon-card">
+          <div class="addon-icon">🚀</div>
+          <div>
+            <div class="addon-name">Setup & Onboarding</div>
+            <div class="addon-desc">We configure everything for you — credentials, niches, schedule, platforms.</div>
+            <div class="addon-price">$99 one-time</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ COMING SOON ═══ -->
+    <div style="margin-top:52px;">
+      <div class="sec-h">Roadmap</div>
+      <div class="sec-title">Coming soon</div>
+      <div class="sec-sub">Features in development — available free to all active subscribers when released.</div>
+
+      <div class="soon-grid">
+        <div class="soon-card">
+          <div class="soon-label">Soon</div>
+          <div class="soon-icon">📅</div>
+          <div>
+            <div class="soon-name">Content Calendar</div>
+            <div class="soon-desc">Plan exactly what to post and when — manual scheduling alongside auto-posts.</div>
+          </div>
+        </div>
+
+        <div class="soon-card">
+          <div class="soon-label">Soon</div>
+          <div class="soon-icon">💬</div>
+          <div>
+            <div class="soon-name">Auto-Reply Bot</div>
+            <div class="soon-desc">AI replies to DMs and comments on X and Instagram on your behalf.</div>
+          </div>
+        </div>
+
+        <div class="soon-card">
+          <div class="soon-label">Soon</div>
+          <div class="soon-icon">⚡</div>
+          <div>
+            <div class="soon-name">Price Alert Trigger</div>
+            <div class="soon-desc">Post automatically when BTC, ETH or any coin crosses a price level.</div>
+          </div>
+        </div>
+
+        <div class="soon-card">
+          <div class="soon-label">Soon</div>
+          <div class="soon-icon">📈</div>
+          <div>
+            <div class="soon-name">Monthly Analytics Report</div>
+            <div class="soon-desc">Automated PDF with your real engagement stats, top posts, and AI recommendations.</div>
+          </div>
+        </div>
+
+        <div class="soon-card">
+          <div class="soon-label">Soon</div>
+          <div class="soon-icon">👥</div>
+          <div>
+            <div class="soon-name">Team Seats</div>
+            <div class="soon-desc">Multiple collaborators on one account — perfect for agencies and trading desks.</div>
+          </div>
+        </div>
+
+        <div class="soon-card">
+          <div class="soon-label">Soon</div>
+          <div class="soon-icon">🔔</div>
+          <div>
+            <div class="soon-name">Webhook Triggers</div>
+            <div class="soon-desc">Connect any external system — post when a signal fires, trade executes, or event happens.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ COMPARE TABLE ═══ -->
+    <div style="margin-top:52px;">
+      <div class="sec-h">Compare</div>
+      <div class="sec-title">Full feature comparison</div>
+
+      <div style="overflow-x:auto;margin-top:16px;">
+        <table class="cmp-table">
+          <thead>
+            <tr>
+              <th style="width:36%;">Feature</th>
+              <th>Free</th>
+              <th>Starter</th>
+              <th class="pro-col" style="color:var(--neon);">Pro ⚡</th>
+              <th style="color:var(--gold);">Elite</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="5" style="padding:6px 14px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);background:rgba(0,0,0,.2);">Platforms & Posting</td></tr>
+            <tr><td>Platforms</td><td>Telegram</td><td>Telegram, X</td><td class="pro-col">All 6 incl. Facebook</td><td>All 6 incl. Facebook</td></tr>
+            <tr><td>Post slots / day</td><td>1</td><td>2</td><td class="pro-col">2</td><td>Unlimited</td></tr>
+            <tr><td>Niches</td><td>1</td><td>1</td><td class="pro-col">3</td><td>All 10</td></tr>
+            <tr><td>Auto-retry failed posts</td><td class="yes">✓</td><td class="yes">✓</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+            <tr><td>Failure alerts (Telegram)</td><td class="no">—</td><td class="yes">✓</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+
+            <tr><td colspan="5" style="padding:6px 14px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);background:rgba(0,0,0,.2);">Content Generation</td></tr>
+            <tr><td>AI image cards</td><td class="yes">✓</td><td class="yes">✓</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+            <tr><td>Short reels (text video)</td><td class="no">—</td><td class="yes">✓</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+            <tr><td>Avatar video (D-ID)</td><td class="no">—</td><td class="no">—</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+            <tr><td>HeyGen premium avatars</td><td class="no">—</td><td class="no">—</td><td class="pro-col no">—</td><td class="yes">✓</td></tr>
+            <tr><td>Platform-specific captions</td><td class="no">—</td><td class="yes">✓</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+            <tr><td>Pre-Post Optimizer</td><td class="no">—</td><td class="no">—</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+            <tr><td>Ad Studio (12 industries)</td><td class="no">—</td><td class="no">—</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+
+            <tr><td colspan="5" style="padding:6px 14px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);background:rgba(0,0,0,.2);">Intelligence & Analytics</td></tr>
+            <tr><td>Viral Scout</td><td class="no">—</td><td>Basic</td><td class="pro-col yes">Full</td><td class="yes">Full</td></tr>
+            <tr><td>Trend Predictor</td><td class="no">—</td><td class="no">—</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+            <tr><td>A/B Testing</td><td class="no">—</td><td class="no">—</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+            <tr><td>Competitor Tracker</td><td class="no">—</td><td class="no">—</td><td class="pro-col">5 accounts</td><td>Unlimited</td></tr>
+            <tr><td>Daily Web Learner</td><td class="no">—</td><td class="no">—</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+            <tr><td>Engagement Optimizer</td><td class="no">—</td><td class="no">—</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+            <tr><td>Self-learning AI agents</td><td class="no">—</td><td class="no">—</td><td class="pro-col yes">✓</td><td class="yes">✓</td></tr>
+
+            <tr><td colspan="5" style="padding:6px 14px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);background:rgba(0,0,0,.2);">Support & Business</td></tr>
+            <tr><td>Support</td><td class="no">—</td><td>Email</td><td class="pro-col">Priority email</td><td>Call + Priority</td></tr>
+            <tr><td>Onboarding call</td><td class="no">—</td><td class="no">—</td><td class="pro-col no">—</td><td class="yes">✓</td></tr>
+            <tr><td>White-label option</td><td class="no">—</td><td class="no">—</td><td class="pro-col no">—</td><td>+$99/mo</td></tr>
+            <tr><td>Team seats</td><td class="no">—</td><td class="no">—</td><td class="pro-col no">—</td><td>Up to 3</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══ FAQ ═══ -->
+    <div style="margin-top:52px;max-width:720px;">
+      <div class="sec-h">FAQ</div>
+      <div class="sec-title">Common questions</div>
+
+      <div style="margin-top:16px;">
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">Can I switch plans at any time? <span class="faq-arr">▾</span></div>
+          <div class="faq-a">Yes. Upgrades take effect immediately. Downgrades apply at the next billing cycle.</div>
+        </div>
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">Do I need to provide API keys for each platform? <span class="faq-arr">▾</span></div>
+          <div class="faq-a">Yes. Each platform (X, Instagram, TikTok, YouTube) requires your own credentials in Settings. We never share accounts between users. Telegram only needs a bot token.</div>
+        </div>
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">Is avatar video included in Pro? <span class="faq-arr">▾</span></div>
+          <div class="faq-a">Yes — D-ID avatar videos are included in Pro. You need your own D-ID API key (Lite plan ~$9/month) and optionally ElevenLabs for voice.</div>
+        </div>
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">What niches are supported? <span class="faq-arr">▾</span></div>
+          <div class="faq-a">10 niches: Crypto, Fitness, Business, Food, Fashion, Travel, Technology, Marketing, Real Estate, Entertainment. Each niche has its own news sources, hashtags, image styles, and tone.</div>
+        </div>
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">Can I see a demo before subscribing? <span class="faq-arr">▾</span></div>
+          <div class="faq-a">Contact us at lcstwist@gmail.com and we'll walk you through the platform live.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CRYPTO MODAL ═══ -->
+    <div id="crypto-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10000;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)closeCryptoModal()">
+      <div style="background:#030d07;border:1px solid rgba(139,92,246,.35);border-radius:20px;padding:32px;max-width:500px;width:100%;position:relative;box-shadow:0 0 40px rgba(139,92,246,.12);">
+        <button onclick="closeCryptoModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;">✕</button>
+
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#a78bfa;margin-bottom:4px;">Pay with USDC · Solana</div>
+        <div style="font-size:20px;font-weight:900;color:var(--text);" id="cm-title">Activate Pro Plan</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px;" id="cm-amount-line">Send $49.00 USDC to activate</div>
+
+        <!-- Step 1: Send -->
+        <div style="margin-top:20px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:12px;padding:16px;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:8px;">Step 1 — Send exactly this amount</div>
+          <div style="font-size:28px;font-weight:900;color:#a78bfa;" id="cm-amount">$49.00 USDC</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">On Solana mainnet · USDC token</div>
+        </div>
+
+        <!-- Step 2: Address -->
+        <div style="margin-top:12px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:12px;padding:16px;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:8px;">Step 2 — To this wallet address</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <code style="font-size:11px;color:#a78bfa;word-break:break-all;flex:1;line-height:1.5;">8znfTyUF6JBEfz9eyGJ2MpEJkVcSurggnVmMSmmt8EKR</code>
+            <button onclick="copyWallet()" id="copy-btn" style="flex-shrink:0;padding:6px 10px;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.25);border-radius:8px;color:#a78bfa;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Copy</button>
+          </div>
+          <div style="font-size:11px;color:var(--dim);margin-top:8px;">⚠️ USDC on Solana only. Do NOT send SOL or other tokens.</div>
+        </div>
+
+        <!-- Step 3: TX -->
+        <div style="margin-top:12px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:12px;padding:16px;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:8px;">Step 3 — Paste your transaction signature</div>
+          <input type="text" id="cm-tx" placeholder="5tGx3...your Solana tx signature..." style="width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;font-size:12px;font-family:monospace;outline:none;" oninput="document.getElementById('cm-error').style.display='none'">
+        </div>
+
+        <!-- Plan selection inside modal -->
+        <input type="hidden" id="cm-plan" value="">
+        <input type="hidden" id="cm-billing-hidden" value="monthly">
+
+        <!-- Billing toggle inside modal -->
+        <div style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+          <span style="font-size:12px;color:var(--muted);">Billing:</span>
+          <button id="cm-btn-mo" onclick="setCryptoBilling('monthly')" style="padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;background:rgba(139,92,246,.2);border:1px solid rgba(139,92,246,.4);color:#a78bfa;">Monthly</button>
+          <button id="cm-btn-an" onclick="setCryptoBilling('annual')" style="padding:5px 14px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;background:none;border:1px solid var(--border);color:var(--muted);">Annual (save 20%)</button>
+        </div>
+
+        <!-- Error -->
+        <div id="cm-error" style="display:none;margin-top:12px;padding:10px 14px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;font-size:12.5px;color:#f87171;"></div>
+
+        <!-- Confirm button -->
+        <button onclick="confirmCryptoPayment()" id="cm-confirm-btn" style="width:100%;margin-top:16px;padding:14px;border-radius:10px;background:linear-gradient(135deg,#6d28d9,#4c1d95);border:none;color:#fff;font-size:14px;font-weight:800;cursor:pointer;transition:all .2s;" onmouseover="this.style.boxShadow='0 0 20px rgba(139,92,246,.4)'" onmouseout="this.style.boxShadow=''">
+          🔷 Verify & Activate Plan
+        </button>
+        <div style="font-size:11px;color:var(--dim);text-align:center;margin-top:10px;">Verification is instant via Solana blockchain. No manual review needed.</div>
+      </div>
+    </div>
+
+    <!-- ═══ CTA ═══ -->
+    <div style="margin-top:52px;text-align:center;padding:40px;background:var(--surface);border:1px solid var(--border);border-radius:20px;">
+      <div style="font-size:28px;font-weight:900;color:var(--text);">Ready to automate your social media?</div>
+      <div style="font-size:14px;color:var(--muted);margin-top:8px;">Choose your plan and start posting on autopilot today.</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:24px;">
+        <a href="/settings" style="padding:13px 32px;background:var(--neon);color:#020806;font-size:14px;font-weight:800;border-radius:10px;text-decoration:none;transition:all .2s;" onmouseover="this.style.boxShadow='0 0 24px rgba(0,255,120,.4)'" onmouseout="this.style.boxShadow=''">Get Started</a>
+        <a href="/admin/backoffice" style="padding:13px 28px;background:rgba(255,255,255,.05);color:var(--muted);font-size:14px;font-weight:700;border-radius:10px;text-decoration:none;border:1px solid var(--border);">View Dashboard</a>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /main-wrap -->
+
+<script>
+// ── Billing toggle ──
+const PRICES = {
+  starter: { monthly: 19, annual: 15 },
+  pro:     { monthly: 49, annual: 39 },
+  elite:   { monthly: 149, annual: 119 },
+};
+
+let _billingMode = 'monthly';
+
+function setBilling(mode) {
+  _billingMode = mode;
+  document.getElementById('btn-monthly').classList.toggle('active', mode === 'monthly');
+  document.getElementById('btn-annual').classList.toggle('active', mode === 'annual');
+  ['starter','pro','elite'].forEach(p => {
+    const el = document.getElementById('price-' + p);
+    if (!el) return;
+    el.querySelector('.p-val').textContent = PRICES[p][mode];
+    el.querySelector('.period').textContent = ' / mo';
+    const ann = document.getElementById('ann-' + p);
+    if (ann) ann.style.display = mode === 'annual' ? 'block' : 'none';
+  });
+}
+
+// ── Crypto prices (used by modal) ──
+const CRYPTO_PRICES = {
+  starter: { monthly: 19,   annual: 180  },
+  pro:     { monthly: 49,   annual: 468  },
+  elite:   { monthly: 149,  annual: 1428 },
+};
+
+// ── Crypto modal ──
+const WALLET = '8znfTyUF6JBEfz9eyGJ2MpEJkVcSurggnVmMSmmt8EKR';
+const PLAN_NAMES = { starter: 'Starter', pro: 'Pro', elite: 'Elite' };
+
+function openCryptoModal(plan) {
+  document.getElementById('cm-plan').value = plan;
+  setCryptoBilling(_billingMode);
+  document.getElementById('cm-tx').value = '';
+  document.getElementById('cm-error').style.display = 'none';
+  const modal = document.getElementById('crypto-modal');
+  modal.style.display = 'flex';
+  document.getElementById('cm-confirm-btn').disabled = false;
+  document.getElementById('cm-confirm-btn').textContent = '🔷 Verify & Activate Plan';
+}
+
+function closeCryptoModal() {
+  document.getElementById('crypto-modal').style.display = 'none';
+}
+
+function setCryptoBilling(mode) {
+  document.getElementById('cm-billing-hidden').value = mode;
+  const plan = document.getElementById('cm-plan').value || 'pro';
+  const usd  = CRYPTO_PRICES[plan] ? CRYPTO_PRICES[plan][mode] : 0;
+  document.getElementById('cm-title').textContent = 'Activate ' + PLAN_NAMES[plan] + ' Plan';
+  document.getElementById('cm-amount').textContent = '$' + usd + '.00 USDC';
+  document.getElementById('cm-amount-line').textContent =
+    'Send $' + usd + '.00 USDC to activate' + (mode === 'annual' ? ' (12 months)' : ' (monthly)');
+  document.getElementById('cm-btn-mo').style.background = mode === 'monthly' ? 'rgba(139,92,246,.2)' : 'none';
+  document.getElementById('cm-btn-mo').style.borderColor = mode === 'monthly' ? 'rgba(139,92,246,.4)' : 'var(--border)';
+  document.getElementById('cm-btn-mo').style.color = mode === 'monthly' ? '#a78bfa' : 'var(--muted)';
+  document.getElementById('cm-btn-an').style.background = mode === 'annual'  ? 'rgba(139,92,246,.2)' : 'none';
+  document.getElementById('cm-btn-an').style.borderColor = mode === 'annual'  ? 'rgba(139,92,246,.4)' : 'var(--border)';
+  document.getElementById('cm-btn-an').style.color = mode === 'annual'  ? '#a78bfa' : 'var(--muted)';
+}
+
+function copyWallet() {
+  navigator.clipboard.writeText(WALLET).then(function() {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!';
+    btn.style.color = '#00ff7a';
+    setTimeout(function(){ btn.textContent = 'Copy'; btn.style.color = '#a78bfa'; }, 2000);
+  });
+}
+
+async function confirmCryptoPayment() {
+  const tx      = document.getElementById('cm-tx').value.trim();
+  const plan    = document.getElementById('cm-plan').value;
+  const billing = document.getElementById('cm-billing-hidden').value;
+  const errEl   = document.getElementById('cm-error');
+  const btn     = document.getElementById('cm-confirm-btn');
+
+  if (!tx) {
+    errEl.textContent = 'Please paste your transaction signature.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Verifying on Solana...';
+  errEl.style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('tx_sig',  tx);
+    fd.append('plan',    plan);
+    fd.append('billing', billing);
+    const resp = await fetch('/billing/crypto/confirm', { method: 'POST', body: fd });
+    const data = await resp.json();
+
+    if (data.status === 'ok') {
+      btn.textContent = '✅ Plan Activated!';
+      btn.style.background = 'linear-gradient(135deg,#065c28,#16a34a)';
+      setTimeout(function() {
+        closeCryptoModal();
+        window.location.href = '/billing/success';
+      }, 1500);
+    } else {
+      errEl.textContent = data.error || 'Verification failed.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = '🔷 Verify & Activate Plan';
+    }
+  } catch(e) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '🔷 Verify & Activate Plan';
+  }
+}
+
+// ── Checkout redirect ──
+function checkout(plan) {
+  {% if not stripe_ok %}
+  if (!confirm('Stripe is not configured yet.\n\nGo to the billing error page for setup instructions?')) return;
+  {% endif %}
+  window.location.href = '/billing/checkout/' + plan + '/' + _billingMode;
+}
+</script>
+</body>
+</html>

@@ -3,232 +3,412 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Backoffice — AutoPost</title>
+<title>Backoffice — EMD AutoPost</title>
 <script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/elite.css">
 <style>
-  body { background: #0a0f1a; }
-  .card  { background: #111827; border: 1px solid #1f2937; }
-  .stat-card { background: #0d1423; border: 1px solid #1f2937; border-radius: 16px; padding: 20px; }
-  .log-line  { font-family: monospace; font-size: 11px; line-height: 1.8; }
-  .log-error { color: #f87171; }
-  .log-warn  { color: #fbbf24; }
-  .log-info  { color: #6b7280; }
-  .log-ok    { color: #34d399; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .spinner { display:inline-block; width:14px; height:14px; border:2px solid #60a5fa;
-             border-top-color:transparent; border-radius:50%;
-             animation:spin .7s linear infinite; }
-  .section-title { font-size:11px; color:#6b7280; text-transform:uppercase;
-                   letter-spacing:.08em; font-weight:700; }
+/* ── Layout: fixed header + fixed control strip + scrollable tabs ── */
+html, body { height: 100%; overflow: hidden; }
+
+.log-line  { font-family:'JetBrains Mono','Fira Code',monospace; font-size:11px; line-height:1.7; }
+.log-error { color:#f87171; }
+.log-warn  { color:var(--gold); }
+.log-info  { color:var(--muted); }
+.log-ok    { color:var(--cyan); }
+.spinner   { display:inline-block; width:12px; height:12px; border:2px solid rgba(0,212,170,.15); border-top-color:var(--cyan); border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
+@keyframes spin { to{transform:rotate(360deg);} }
+
+/* Tab panel content */
+.tab-pane   { display:none; height:100%; overflow-y:auto; }
+.tab-pane.active { display:block; }
+
+/* Compact stat inline */
+.cstat { display:flex; flex-direction:column; align-items:center; padding:8px 16px; border-right:1px solid var(--border); }
+.cstat:last-child { border-right:none; }
+.cstat-val  { font-size:22px; font-weight:800; line-height:1; }
+.cstat-lbl  { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-top:3px; }
+
+/* Platform health mini */
+.plat-health { display:flex; align-items:center; gap:5px; padding:4px 10px; border-radius:var(--r-sm); border:1px solid var(--border); font-size:11px; font-weight:700; }
+
+/* Log tab buttons */
+.log-tab-btn { padding:4px 12px; border-radius:var(--r-sm); font-size:11px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:transparent; color:var(--muted); transition:all .15s; }
+.log-tab-btn.active { background:rgba(0,255,120,.08); color:var(--neon); border-color:rgba(0,255,120,.25); }
+
+/* Bot status row */
+.bot-row { display:flex; align-items:center; gap:8px; padding:6px 12px; border-radius:var(--r-md); border:1px solid var(--border); background:rgba(5,10,20,.6); }
+
+/* Brain card compact */
+.brain-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:12px 14px; transition:border-color .2s; }
+.brain-card:hover { border-color:var(--border-h); }
+
+/* User row compact */
+.user-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--border); }
+.user-row:last-child { border-bottom:none; }
+.user-av { width:28px; height:28px; border-radius:50%; background:rgba(0,255,120,.08); color:var(--neon); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; flex-shrink:0; }
+
+input[type=time] { background:rgba(5,10,20,.9); color:var(--text); border:1px solid var(--border); border-radius:var(--r-sm); padding:5px 10px; font-size:12px; font-family:monospace; outline:none; }
+input[type=time]:focus { border-color:rgba(45,126,248,.45); }
 </style>
 </head>
-<body class="text-gray-100 min-h-screen">
+<body style="display:flex;height:100%;overflow:hidden;">
+<div class="grid-floor" aria-hidden="true"></div>
+{% include '_sidebar.html' %}
+<div class="main-wrap" style="overflow:hidden;height:100vh;flex:1;min-width:0;">
+<!-- Hidden schedule inputs (kept for JS compatibility) -->
+<input type="time" id="schedMorning" value="08:00" style="display:none;">
+<input type="time" id="schedEvening" value="18:00" style="display:none;">
 
-<header class="sticky top-0 z-10 border-b border-gray-800" style="background:#0d1423;">
-  <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <a href="/" class="text-gray-400 hover:text-white text-sm">← Dashboard</a>
-      <span class="text-gray-700">/</span>
-      <span class="font-bold text-white">⚙ Backoffice</span>
-      <span class="text-xs text-yellow-400 font-bold px-2 py-0.5 rounded" style="background:#1a1400;border:1px solid #713f12;">ADMIN</span>
+<!-- ═══ HEADER — simplified ═══ -->
+<header class="elite-header" style="position:relative;">
+  <div class="max-w-full px-4 py-2 flex items-center gap-3">
+
+    <!-- Logo + back -->
+    <a href="/" class="ebtn ebtn-ghost ebtn-sm" style="flex-shrink:0;">← Dashboard</a>
+    <div style="width:1px;height:24px;background:var(--dim);flex-shrink:0;"></div>
+    <div style="flex-shrink:0;">
+      <div class="elite-logo" style="font-size:12px;line-height:1.2;">ELITEMARGINDESK</div>
+      <div class="elite-logo-tag">Backoffice</div>
     </div>
-    <div class="flex items-center gap-3">
-      <a href="/admin/users" class="text-xs text-gray-500 hover:text-gray-300">
-        👥 Users
-        {% if pending_count > 0 %}
-        <span class="ml-1 text-yellow-400 font-bold">({{ pending_count }})</span>
+    <span class="epill epill-gold" style="font-size:9px;flex-shrink:0;">ADMIN</span>
+
+    <!-- Stats strip -->
+    <div class="flex items-stretch ml-2" style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface);flex-shrink:0;">
+      <div class="cstat"><span class="cstat-val">{{ stats.total_users }}</span><span class="cstat-lbl">Users</span></div>
+      <div class="cstat"><span class="cstat-val {{ 'text-gold' if stats.pending_users > 0 else '' }}">{{ stats.pending_users }}</span><span class="cstat-lbl">Pending</span></div>
+      <div class="cstat"><span class="cstat-val text-blue">{{ stats.total_slots }}</span><span class="cstat-lbl">Slots</span></div>
+      <div class="cstat"><span class="cstat-val text-cyan">{{ stats.published_today }}</span><span class="cstat-lbl">Published</span></div>
+    </div>
+
+    <!-- Platform health -->
+    <div id="healthRow" class="hidden md:flex items-center gap-1.5 flex-wrap" style="flex:1;min-width:0;">
+      <span style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;">Platforms</span>
+    </div>
+
+    <!-- Bot status (compact) -->
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <div class="bot-row" style="padding:4px 10px;">
+        <span class="edot {{ 'edot-live' if bot.running else 'edot-red' }}"></span>
+        <span style="font-size:11px;font-weight:700;color:{{ 'var(--cyan)' if bot.running else '#f87171' }};">Bot {{ 'ON' if bot.running else 'OFF' }}</span>
+        {% if bot.running %}
+        <form method="post" action="/bot/stop" style="margin:0;">
+          <button type="submit" onclick="return confirm(AP_T('bo.confirm_stop_bot'))" class="ebtn ebtn-danger ebtn-sm" title="Stop bot">⏹</button>
+        </form>
+        {% else %}
+        <form method="post" action="/bot/start" style="margin:0;">
+          <button type="submit" class="ebtn ebtn-primary ebtn-sm" title="Start bot">▶</button>
+        </form>
         {% endif %}
+      </div>
+
+      <!-- Hidden emergency buttons (kept for JS) -->
+      <button id="btnStopAll"   onclick="emergencyStop()"   class="ebtn ebtn-danger ebtn-sm"  title="Emergency stop">🛑</button>
+      <button id="btnStartAll"  onclick="emergencyResume()" class="ebtn ebtn-primary ebtn-sm" title="Resume all">▶</button>
+      <button id="btnSysRestart" onclick="sysRestart()"     class="ebtn ebtn-ghost ebtn-sm"   title="Restart server" style="color:var(--purple);">⚡</button>
+
+      <div style="width:1px;height:20px;background:var(--dim);margin:0 2px;"></div>
+      <a href="/admin/users" class="ebtn ebtn-ghost ebtn-sm" title="Users">
+        👥{% if pending_count > 0 %}<span style="color:var(--gold);font-size:10px;"> {{ pending_count }}</span>{% endif %}
       </a>
-      <a href="/settings" class="text-xs text-gray-500 hover:text-gray-300">⚙ Settings</a>
-      <form method="post" action="/logout">
-        <button type="submit" class="text-xs text-gray-600 hover:text-red-400 px-2 py-1 rounded border border-gray-800">Logout</button>
+      <a href="/settings" class="ebtn ebtn-ghost ebtn-sm" title="Settings">⚙</a>
+      <form method="post" action="/logout" style="margin:0;">
+        <button type="submit" class="ebtn ebtn-danger ebtn-sm">Out</button>
       </form>
+      <div class="flex gap-1">
+        <button class="lang-btn ebtn ebtn-ghost ebtn-sm" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn ebtn ebtn-ghost ebtn-sm" data-lang="ro" onclick="setLang('ro')">RO</button>
+      </div>
     </div>
   </div>
+  <div id="schedMsg" class="hidden text-xs text-center py-1 font-semibold" style="background:rgba(0,212,170,.08);color:var(--cyan);"></div>
+  <div id="emergencyStatus" class="hidden text-xs text-center py-1 font-semibold"></div>
 </header>
 
-<div class="max-w-6xl mx-auto px-6 py-8 space-y-8">
+<!-- ═══ TAB BAR ═══ -->
+<div style="background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;" class="flex items-center gap-1 z-10 relative">
+  <button class="etab active" onclick="switchMainTab('logs')" id="main-tab-logs">📋 Logs</button>
+  <button class="etab" onclick="switchMainTab('brains')" id="main-tab-brains">🧠 Agent Brains <span id="brain-status-short" class="text-xs ml-1" style="color:var(--muted);"></span></button>
+  <button class="etab" onclick="switchMainTab('intel')" id="main-tab-intel">📈 Intelligence</button>
+  <button class="etab" onclick="switchMainTab('users')" id="main-tab-users">👥 Users</button>
+  {% if recent_videos %}<button class="etab" onclick="switchMainTab('videos')" id="main-tab-videos">🎬 Videos</button>{% endif %}
+  <button class="etab" onclick="switchMainTab('triggers')" id="main-tab-triggers">⚡ Triggers</button>
 
-  <!-- ═══ SYSTEM STATS ═══ -->
-  <div>
-    <p class="section-title mb-4">System Overview</p>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="stat-card">
-        <p class="text-2xl font-bold text-white">{{ stats.total_users }}</p>
-        <p class="text-xs text-gray-500 mt-1">Total Users</p>
-      </div>
-      <div class="stat-card">
-        <p class="text-2xl font-bold {{ 'text-yellow-400' if stats.pending_users > 0 else 'text-gray-500' }}">{{ stats.pending_users }}</p>
-        <p class="text-xs text-gray-500 mt-1">Pending Approval</p>
-      </div>
-      <div class="stat-card">
-        <p class="text-2xl font-bold text-blue-400">{{ stats.total_slots }}</p>
-        <p class="text-xs text-gray-500 mt-1">Total Slots (all users)</p>
-      </div>
-      <div class="stat-card">
-        <p class="text-2xl font-bold text-green-400">{{ stats.published_today }}</p>
-        <p class="text-xs text-gray-500 mt-1">Published Today</p>
-      </div>
-    </div>
+  <!-- Manual triggers inline in tab bar -->
+  <div class="ml-auto flex items-center gap-2 pb-1">
+    <form method="post" action="/run-now/morning" style="margin:0;">
+      <button type="submit" class="ebtn ebtn-gold ebtn-sm">🌅 Morning Now</button>
+    </form>
+    <form method="post" action="/run-now/evening" style="margin:0;">
+      <button type="submit" class="ebtn ebtn-ghost ebtn-sm" style="color:var(--purple);">🌇 Evening Now</button>
+    </form>
   </div>
-
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-    <!-- ═══ BOT CONTROL ═══ -->
-    <div>
-      <p class="section-title mb-4">Scheduler Bot</p>
-      <div class="card rounded-2xl p-6 space-y-5">
-
-        <!-- Status -->
-        <div class="flex items-center gap-4 p-4 rounded-xl" style="background:#0a0f1a;border:1px solid #374151;">
-          <div class="w-4 h-4 rounded-full {{ 'bg-green-400 shadow-lg' if bot.running else 'bg-gray-600' }}"
-               style="{{ 'box-shadow:0 0 8px #34d399' if bot.running else '' }}"></div>
-          <div>
-            <p class="font-bold text-sm {{ 'text-green-400' if bot.running else 'text-gray-400' }}">
-              Bot {{ 'RUNNING' if bot.running else 'STOPPED' }}
-            </p>
-            <p class="text-xs text-gray-600">
-              {% if bot.running %}PID: {{ bot.pid }} — running since startup{% else %}Not started{% endif %}
-            </p>
-          </div>
-          <div class="ml-auto">
-            {% if bot.running %}
-            <form method="post" action="/bot/stop">
-              <button type="submit" onclick="return confirm('Stop the scheduler?')"
-                class="px-4 py-2 rounded-lg text-sm font-semibold"
-                style="background:#1c0a0a;color:#f87171;border:1px solid #7f1d1d;cursor:pointer;">
-                ⏹ Stop Bot
-              </button>
-            </form>
-            {% else %}
-            <form method="post" action="/bot/start">
-              <button type="submit"
-                class="px-4 py-2 rounded-lg text-sm font-semibold"
-                style="background:#064e3b;color:#34d399;border:1px solid #065f46;cursor:pointer;">
-                ▶ Start Bot
-              </button>
-            </form>
-            {% endif %}
-          </div>
-        </div>
-
-        <!-- Schedule info -->
-        <div class="grid grid-cols-2 gap-3">
-          <div class="p-3 rounded-lg" style="background:#0d1e35;border:1px solid #1e3a5f;">
-            <p class="text-xs text-blue-400 font-bold mb-1">🌅 Morning Slot</p>
-            <p class="text-sm text-white font-semibold">08:00 GMT+2</p>
-            <p class="text-xs text-gray-500">News before 08:00</p>
-          </div>
-          <div class="p-3 rounded-lg" style="background:#1a0d35;border:1px solid #3b1f5e;">
-            <p class="text-xs text-purple-400 font-bold mb-1">🌇 Evening Slot</p>
-            <p class="text-sm text-white font-semibold">18:00 GMT+2</p>
-            <p class="text-xs text-gray-500">News 08:00–18:00</p>
-          </div>
-        </div>
-
-        <!-- Manual triggers -->
-        <div>
-          <p class="text-xs text-gray-500 mb-3 font-semibold uppercase tracking-wider">Manual Trigger</p>
-          <div class="flex gap-2">
-            <form method="post" action="/run-now/morning" class="flex-1">
-              <button type="submit"
-                class="w-full py-2.5 rounded-lg text-sm font-semibold"
-                style="background:#1e3a5f;color:#60a5fa;border:1px solid #2563eb;cursor:pointer;">
-                ▶ Run Morning Now
-              </button>
-            </form>
-            <form method="post" action="/run-now/evening" class="flex-1">
-              <button type="submit"
-                class="w-full py-2.5 rounded-lg text-sm font-semibold"
-                style="background:#3b1f5e;color:#c084fc;border:1px solid #7c3aed;cursor:pointer;">
-                ▶ Run Evening Now
-              </button>
-            </form>
-          </div>
-          <p class="text-xs text-gray-600 mt-2">Triggers run the pipeline in background using admin credentials from .env</p>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ═══ USER ACTIVITY ═══ -->
-    <div>
-      <p class="section-title mb-4">User Activity</p>
-      <div class="card rounded-2xl overflow-hidden">
-        {% for u in all_users %}
-        <div class="flex items-center justify-between px-5 py-3 {% if not loop.first %}border-t border-gray-800{% endif %}">
-          <div class="flex items-center gap-3">
-            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-                 style="background:#1e3a5f;color:#60a5fa;">
-              {{ (u.display_name or u.email)[0].upper() }}
-            </div>
-            <div>
-              <p class="text-sm text-white font-medium">{{ u.display_name or u.email.split('@')[0] }}</p>
-              <p class="text-xs text-gray-600">{{ u.email }}</p>
-            </div>
-          </div>
-          <div class="flex items-center gap-3 text-right">
-            <div>
-              <p class="text-sm font-bold text-blue-400">{{ u.slot_count }}</p>
-              <p class="text-xs text-gray-600">slots</p>
-            </div>
-            <div>
-              <p class="text-sm font-bold text-green-400">{{ u.published_count }}</p>
-              <p class="text-xs text-gray-600">published</p>
-            </div>
-            <span class="text-xs px-2 py-0.5 rounded {{ 'text-green-400' if u.is_approved else 'text-yellow-400' }}"
-                  style="background:{{ '#0a1a0a' if u.is_approved else '#1a1400' }}">
-              {{ 'Active' if u.is_approved else 'Pending' }}
-            </span>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-
-  </div>
-
-  <!-- ═══ LIVE LOGS ═══ -->
-  <div>
-    <div class="flex items-center justify-between mb-3">
-      <p class="section-title">Scheduler Logs</p>
-      <div class="flex items-center gap-3">
-        <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
-          <input type="checkbox" id="auto-refresh" checked class="accent-blue-500">
-          Auto-refresh (5s)
-        </label>
-        <button onclick="loadLogs()" class="text-xs text-blue-400 hover:text-blue-300">↻ Refresh</button>
-      </div>
-    </div>
-    <div class="card rounded-2xl p-4 overflow-auto font-mono" style="max-height:400px;" id="log-box">
-      {% for line in log_tail %}
-      <div class="log-line {% if 'ERROR' in line %}log-error{% elif 'WARNING' in line %}log-warn{% elif 'OK' in line or 'completed' in line %}log-ok{% else %}log-info{% endif %}">{{ line }}</div>
-      {% endfor %}
-      {% if not log_tail %}<p class="text-gray-600 text-sm">No logs yet.</p>{% endif %}
-    </div>
-  </div>
-
 </div>
 
+<!-- ═══ TAB CONTENT ═══ -->
+<div style="height:calc(100vh - 110px);overflow:hidden;position:relative;z-index:1;">
+
+  <!-- LOGS TAB -->
+  <div class="tab-pane active" id="pane-logs" style="padding:12px 20px;display:flex;flex-direction:column;gap:8px;height:100%;">
+    <div class="flex items-center gap-2">
+      <button onclick="switchLog('scheduler')" id="tab-scheduler" class="log-tab-btn active">📅 Scheduler</button>
+      <button onclick="switchLog('watchdog')" id="tab-watchdog" class="log-tab-btn">🐕 Watchdog</button>
+      <button onclick="switchLog('server')" id="tab-server" class="log-tab-btn">🌐 Server</button>
+      <div class="ml-auto flex items-center gap-3">
+        <label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--muted);">
+          <input type="checkbox" id="auto-refresh" checked style="accent-color:var(--blue);">
+          <span>Auto-refresh (5s)</span>
+        </label>
+        <button onclick="loadLogs()" class="ebtn ebtn-ghost ebtn-sm" style="color:var(--neon);">↻ Refresh</button>
+      </div>
+    </div>
+    <div id="log-box" class="flex-1 rounded-xl p-3 overflow-auto monospace"
+         style="background:rgba(4,7,15,.98);border:1px solid var(--border);min-height:0;">
+      {% for line in log_tail %}
+      <div class="log-line {% if 'ERROR' in line or 'error' in line %}log-error{% elif 'WARNING' in line or 'warn' in line.lower() %}log-warn{% elif 'OK' in line or 'completed' in line or 'started' in line.lower() %}log-ok{% else %}log-info{% endif %}">{{ line }}</div>
+      {% endfor %}
+      {% if not log_tail %}<p class="text-sm" style="color:var(--dim);">No logs yet.</p>{% endif %}
+    </div>
+  </div>
+
+  <!-- BRAINS TAB -->
+  <div class="tab-pane" id="pane-brains" style="padding:12px 20px;">
+    <div class="flex items-center gap-3 mb-3">
+      <span id="brain-status" class="text-xs italic" style="color:var(--muted);">Loading…</span>
+      <div class="ml-auto flex gap-2">
+        <button onclick="triggerLearning()" id="learn-btn" class="ebtn ebtn-primary ebtn-sm">⚡ Run Cycle</button>
+        <button onclick="triggerWebLearning()" id="weblearn-btn" class="ebtn ebtn-cyan ebtn-sm">🌐 Web Learn</button>
+        <a href="/competitor-tracker" class="ebtn ebtn-gold ebtn-sm">🕵️ Competitors</a>
+      </div>
+    </div>
+    <div id="brain-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      <div class="brain-card flex items-center gap-2"><span class="spinner"></span><span class="text-sm" style="color:var(--muted);">Loading agent brains…</span></div>
+    </div>
+  </div>
+
+  <!-- INTELLIGENCE TAB -->
+  <div class="tab-pane" id="pane-intel" style="padding:12px 20px;overflow-y:auto;">
+    <!-- Row 1: Trends + Engagement + A/B -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3" style="min-height:200px;">
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <span class="esec-title">📈 Trends & Market Pulse</span>
+          <button onclick="refreshTrends()" class="ebtn ebtn-ghost ebtn-sm">↺</button>
+        </div>
+        <div id="trendForecast" class="ecard p-3 flex-1 overflow-auto" style="min-height:160px;">
+          <div class="flex items-center gap-2"><span class="spinner"></span><span class="text-xs" style="color:var(--muted);">Loading…</span></div>
+        </div>
+      </div>
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <span class="esec-title">🎯 Engagement Feedback</span>
+          <button onclick="refreshEngagement()" class="ebtn ebtn-ghost ebtn-sm">↺</button>
+        </div>
+        <div id="engagementInsights" class="ecard p-3 flex-1 overflow-auto" style="min-height:160px;">
+          <div class="flex items-center gap-2"><span class="spinner"></span><span class="text-xs" style="color:var(--muted);">Loading…</span></div>
+        </div>
+      </div>
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <span class="esec-title">⚗️ A/B Test</span>
+          <button onclick="refreshABTest()" class="ebtn ebtn-ghost ebtn-sm">↺</button>
+        </div>
+        <div id="abTestWidget" class="ecard p-3 flex-1 overflow-auto" style="min-height:160px;">
+          <div class="flex items-center gap-2"><span class="spinner"></span><span class="text-xs" style="color:var(--muted);">Loading…</span></div>
+        </div>
+      </div>
+    </div>
+    <!-- Row 2: Platform Timing -->
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <span class="esec-title">🕐 Optimal Posting Hours per Platform</span>
+        <button onclick="refreshPlatformTiming()" class="ebtn ebtn-ghost ebtn-sm">↺</button>
+      </div>
+      <div id="platformTiming" class="ecard p-3">
+        <div class="flex items-center gap-2"><span class="spinner"></span><span class="text-xs" style="color:var(--muted);">Loading platform timing…</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- USERS TAB -->
+  <div class="tab-pane" id="pane-users" style="padding:12px 20px;overflow-y:auto;">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- User list -->
+      <div>
+        <div class="esec-title mb-2">👥 Users</div>
+        <div class="ecard overflow-hidden">
+          {% for u in all_users %}
+          <div class="user-row">
+            <div class="user-av">{{ (u.display_name or u.email)[0].upper() }}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-semibold" style="color:var(--text);">{{ u.display_name or u.email.split('@')[0] }}</div>
+              <div class="text-xs" style="color:var(--dim);">{{ u.email }}</div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="text-center">
+                <div class="text-sm font-bold text-blue">{{ u.slot_count }}</div>
+                <div class="text-xs" style="color:var(--dim);">slots</div>
+              </div>
+              <div class="text-center">
+                <div class="text-sm font-bold text-cyan">{{ u.published_count }}</div>
+                <div class="text-xs" style="color:var(--dim);">published</div>
+              </div>
+              <span class="epill {{ 'epill-cyan' if u.is_approved else 'epill-gold' }}">
+                {{ 'Active' if u.is_approved else 'Pending' }}
+              </span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <!-- Security Log (IPStack powered) -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="esec-title">🛡️ Security Log (IPStack)</span>
+          <button onclick="refreshSecurityLog()" class="ebtn ebtn-ghost ebtn-sm">↺</button>
+        </div>
+        <div id="securityLog" class="ecard p-3">
+          <div class="flex items-center gap-2"><span class="spinner"></span><span class="text-xs" style="color:var(--muted);">Loading…</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIDEOS TAB -->
+  {% if recent_videos %}
+  <div class="tab-pane" id="pane-videos" style="padding:12px 20px;">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {% for v in recent_videos %}
+      <div class="ecard overflow-hidden flex flex-col">
+        <div style="background:#000;aspect-ratio:9/16;max-height:220px;overflow:hidden;">
+          <video src="{{ v.url }}" controls preload="none"
+                 style="width:100%;height:100%;object-fit:contain;display:block;"></video>
+        </div>
+        <div class="p-2">
+          <div class="text-xs font-bold truncate" style="color:var(--text);">{{ v.topic[:30] }}{% if v.topic|length > 30 %}…{% endif %}</div>
+          <div class="text-xs mt-1" style="color:var(--muted);">{{ v.user }} · {{ v.size_mb }}MB</div>
+          <span class="epill {{ 'epill-blue' if v.type == 'avatar' else 'epill-cyan' if v.type == 'final' else 'epill-muted' }}" style="font-size:9px;margin-top:4px;">{{ v.type }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- TRIGGERS TAB -->
+  <div class="tab-pane" id="pane-triggers" style="padding:12px 20px;">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" style="max-width:700px;">
+
+      <!-- Bot status card -->
+      <div class="ecard p-4">
+        <div class="esec-title mb-3">Scheduler Bot</div>
+        <div class="flex items-center gap-3 mb-4">
+          <span class="edot {{ 'edot-live' if bot.running else 'edot-red' }}" style="width:10px;height:10px;"></span>
+          <div>
+            <div class="text-sm font-bold" style="color:{{ 'var(--cyan)' if bot.running else '#f87171' }};">Bot {{ 'RUNNING' if bot.running else 'STOPPED' }}</div>
+            <div class="text-xs" style="color:var(--dim);">{% if bot.running %}PID: {{ bot.pid }}{% else %}Not started{% endif %}</div>
+          </div>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          {% if bot.running %}
+          <form method="post" action="/bot/stop" style="margin:0;">
+            <button type="submit" onclick="return confirm(AP_T('bo.confirm_stop_bot'))" class="ebtn ebtn-danger ebtn-sm">⏹ Stop</button>
+          </form>
+          <form method="post" action="/bot/restart" style="margin:0;">
+            <button type="submit" onclick="return confirm(AP_T('bo.confirm_restart_bot'))" class="ebtn ebtn-ghost ebtn-sm" style="color:var(--gold);">↺ Restart</button>
+          </form>
+          {% else %}
+          <form method="post" action="/bot/start" style="margin:0;">
+            <button type="submit" class="ebtn ebtn-primary ebtn-sm">▶ Start Bot</button>
+          </form>
+          {% endif %}
+          <button id="btnSysRestart2" onclick="sysRestart()" class="ebtn ebtn-ghost ebtn-sm" style="color:var(--purple);">⚡ Restart Server</button>
+        </div>
+      </div>
+
+      <!-- Manual triggers card -->
+      <div class="ecard p-4">
+        <div class="esec-title mb-3">Manual Triggers</div>
+        <div class="flex flex-col gap-2">
+          <form method="post" action="/run-now/morning">
+            <button type="submit" class="ebtn ebtn-gold w-full justify-center" style="width:100%;">🌅 Run Morning Now</button>
+          </form>
+          <form method="post" action="/run-now/evening">
+            <button type="submit" class="ebtn ebtn-ghost w-full justify-center" style="width:100%;color:var(--purple);">🌇 Run Evening Now</button>
+          </form>
+        </div>
+        <p class="text-xs mt-3" style="color:var(--dim);">Pipeline runs in background using admin credentials from .env</p>
+      </div>
+
+      <!-- Schedule card -->
+      <div class="ecard p-4 md:col-span-2">
+        <div class="esec-title mb-3">⏰ Posting Schedule</div>
+        <div class="flex items-center gap-4 flex-wrap">
+          <div>
+            <label class="elabel">Morning</label>
+            <input type="time" id="schedMorning2" value="08:00">
+          </div>
+          <div>
+            <label class="elabel">Evening</label>
+            <input type="time" id="schedEvening2" value="18:00">
+          </div>
+          <button onclick="saveScheduleTimes()" class="ebtn ebtn-primary">💾 Save Schedule</button>
+          <p class="text-xs" style="color:var(--muted);">Times apply to all users. Changes take effect within 5 minutes.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /tab content -->
+
 <script>
+// ── Tab switching ──────────────────────────────────────────────────────────────
+function switchMainTab(name) {
+  // Force hide all panes via inline style so we override any inline display:flex on logs pane
+  document.querySelectorAll('.tab-pane').forEach(p => { p.style.display = 'none'; p.classList.remove('active'); });
+  document.querySelectorAll('.etab[id^="main-tab-"]').forEach(b => b.classList.remove('active'));
+  const pane = document.getElementById('pane-' + name);
+  const btn  = document.getElementById('main-tab-' + name);
+  if (pane) {
+    pane.style.display = (name === 'logs') ? 'flex' : 'block';
+    pane.classList.add('active');
+  }
+  if (btn) btn.classList.add('active');
+  // lazy-load on first open
+  if (name === 'brains' && !window._brainsLoaded) { loadBrains(); window._brainsLoaded = true; }
+  if (name === 'intel'  && !window._intelLoaded)  { refreshTrendsFull(); refreshEngagement(); refreshABTest(); refreshPlatformTiming(); window._intelLoaded = true; }
+  if (name === 'users'  && !window._usersLoaded)  { refreshSecurityLog(); window._usersLoaded = true; }
+}
+
+// ── Log tabs ──────────────────────────────────────────────────────────────────
+let _currentLog = 'scheduler';
+function switchLog(name) {
+  _currentLog = name;
+  document.querySelectorAll('.log-tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  loadLogs();
+}
+
 async function loadLogs() {
   const box = document.getElementById('log-box');
   try {
-    const r = await fetch('/api/logs?lines=80');
+    const r = await fetch('/api/logs?lines=200&file=' + _currentLog);
     const data = await r.json();
     const lines = data.lines || [];
-    box.innerHTML = lines.map(l => {
-      const cls = l.includes('ERROR') ? 'log-error'
-                : l.includes('WARNING') ? 'log-warn'
-                : (l.includes('OK') || l.includes('completed')) ? 'log-ok'
-                : 'log-info';
-      return `<div class="log-line ${cls}">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>`;
-    }).join('') || '<p class="text-gray-600 text-sm">No logs yet.</p>';
+    box.innerHTML = lines.length
+      ? lines.map(l => {
+          const e = l.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+          const cls = l.includes('ERROR')||l.includes('error') ? 'log-error'
+                    : l.includes('WARNING')||l.toLowerCase().includes('warn') ? 'log-warn'
+                    : l.includes('OK')||l.includes('completed')||l.toLowerCase().includes('start') ? 'log-ok'
+                    : 'log-info';
+          return `<div class="log-line ${cls}">${e}</div>`;
+        }).join('')
+      : '<p class="text-sm" style="color:var(--dim);">No logs yet.</p>';
     box.scrollTop = box.scrollHeight;
   } catch(e) { console.error(e); }
 }
 
-// Auto-refresh
 let _timer;
 function setupAutoRefresh() {
   clearInterval(_timer);
@@ -238,9 +418,460 @@ function setupAutoRefresh() {
 }
 document.getElementById('auto-refresh').addEventListener('change', setupAutoRefresh);
 setupAutoRefresh();
+loadLogs();
+setTimeout(() => { const b = document.getElementById('log-box'); if(b) b.scrollTop = b.scrollHeight; }, 300);
 
-// Scroll logs to bottom on load
-document.getElementById('log-box').scrollTop = document.getElementById('log-box').scrollHeight;
+// ── Schedule ──────────────────────────────────────────────────────────────────
+async function loadScheduleTimes() {
+  try {
+    const r = await fetch('/api/schedule-times');
+    const d = await r.json();
+    const m = d.post_time_morning || '08:00';
+    const e = d.post_time_evening || '18:00';
+    document.getElementById('schedMorning').value  = m;
+    document.getElementById('schedEvening').value  = e;
+    document.getElementById('schedMorning2').value = m;
+    document.getElementById('schedEvening2').value = e;
+  } catch(e) {}
+}
+
+async function saveScheduleTimes() {
+  // read from whichever inputs are visible
+  const activePane = document.querySelector('.tab-pane.active');
+  const isPaneTrigs = activePane && activePane.id === 'pane-triggers';
+  const morning = isPaneTrigs
+    ? document.getElementById('schedMorning2').value
+    : document.getElementById('schedMorning').value;
+  const evening = isPaneTrigs
+    ? document.getElementById('schedEvening2').value
+    : document.getElementById('schedEvening').value;
+  const msg = document.getElementById('schedMsg');
+  try {
+    const r = await fetch('/api/schedule-times', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({post_time_morning: morning, post_time_evening: evening})
+    });
+    const d = await r.json();
+    msg.textContent = d.ok ? `✓ Schedule saved: ${morning} / ${evening}` : (d.detail || 'Error');
+    msg.style.color = d.ok ? 'var(--cyan)' : '#f87171';
+    msg.style.background = d.ok ? 'rgba(0,212,170,.06)' : 'rgba(239,68,68,.06)';
+    msg.classList.remove('hidden');
+    setTimeout(() => msg.classList.add('hidden'), 3000);
+    // sync both inputs
+    document.getElementById('schedMorning').value  = morning;
+    document.getElementById('schedEvening').value  = evening;
+    document.getElementById('schedMorning2').value = morning;
+    document.getElementById('schedEvening2').value = evening;
+  } catch(e) {
+    msg.textContent = 'Network error: ' + e;
+    msg.classList.remove('hidden');
+  }
+}
+loadScheduleTimes();
+
+// ── Platform Health ───────────────────────────────────────────────────────────
+const PLATFORM_ICONS = {telegram:'✈️', x:'𝕏', instagram:'📷', tiktok:'🎵', youtube:'▶️', facebook:'👍'};
+async function refreshHealth(force = false) {
+  try {
+    const r = await fetch(force ? '/api/health?force=true' : '/api/health');
+    const d = await r.json();
+    renderHealthRow(d);
+  } catch(e) {}
+}
+
+function renderHealthRow(d) {
+  const row = document.getElementById('healthRow');
+  if (!row) return;
+  const platforms = d.platforms || {};
+  const names = ['telegram','x','instagram','tiktok','youtube','facebook'];
+  row.innerHTML = '<span style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-right:4px;">Platforms</span>';
+  names.forEach(p => {
+    const res = platforms[p] || {status:'unknown'};
+    const colorMap = {ok:'var(--cyan)', warning:'var(--gold)', error:'#f87171', unknown:'var(--muted)'};
+    const dotCls = {ok:'edot-live', warning:'edot-gold', error:'edot-red', unknown:'edot-off'};
+    const c = colorMap[res.status] || colorMap.unknown;
+    const d2 = dotCls[res.status] || 'edot-off';
+    const el = document.createElement('div');
+    el.className = 'plat-health';
+    el.style.cssText = `color:${c};border-color:${c}22;background:${c}09;`;
+    el.innerHTML = `<span class="edot ${d2}" style="width:6px;height:6px;"></span>${(PLATFORM_ICONS[p]||'')} ${p.toUpperCase()}`;
+    row.appendChild(el);
+  });
+}
+refreshHealth();
+setInterval(() => refreshHealth(), 300000);
+
+// ── Emergency ─────────────────────────────────────────────────────────────────
+const _eStatus = document.getElementById('emergencyStatus');
+async function emergencyStop() {
+  if (!confirm(AP_T('bo.confirm_stop'))) return;
+  const btn = document.getElementById('btnStopAll');
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await fetch('/api/emergency-stop', {method:'POST'});
+    const d = await r.json();
+    _eStatus.textContent = d.message || AP_T('bo.sys_stopped');
+    _eStatus.style.cssText = 'background:rgba(239,68,68,.06);color:#f87171;';
+  } catch(e) { _eStatus.textContent = 'Error: ' + e; }
+  _eStatus.classList.remove('hidden');
+  setTimeout(() => { _eStatus.classList.add('hidden'); btn.disabled = false; btn.textContent = '🛑 Stop'; }, 3000);
+}
+
+async function emergencyResume() {
+  const btn = document.getElementById('btnStartAll');
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await fetch('/api/emergency-resume', {method:'POST'});
+    const d = await r.json();
+    _eStatus.textContent = d.message || AP_T('bo.sys_started');
+    _eStatus.style.cssText = 'background:rgba(0,212,170,.06);color:var(--cyan);';
+  } catch(e) { _eStatus.textContent = 'Error: ' + e; }
+  _eStatus.classList.remove('hidden');
+  setTimeout(() => { _eStatus.classList.add('hidden'); btn.disabled = false; btn.textContent = '▶ Start'; }, 3000);
+}
+
+async function sysRestart() {
+  if (!confirm(AP_T('bo.confirm_restart'))) return;
+  const btn = document.getElementById('btnSysRestart');
+  const btn2 = document.getElementById('btnSysRestart2');
+  [btn, btn2].forEach(b => { if(b) { b.textContent = '⏳'; b.disabled = true; } });
+  try { await fetch('/api/system-restart', {method:'POST'}); } catch(_) {}
+  const start = Date.now();
+  const poll = setInterval(async () => {
+    try {
+      const r = await fetch('/api/bot-status');
+      if (r.ok) { clearInterval(poll); window.location.reload(); }
+    } catch(_) {
+      if (Date.now() - start > 30000) {
+        clearInterval(poll);
+        [btn, btn2].forEach(b => { if(b) { b.textContent = '✗ Timeout'; b.disabled = false; } });
+      }
+    }
+  }, 1500);
+}
+
+// ── Agent Brains ──────────────────────────────────────────────────────────────
+const LEVEL_LABELS=['','Recruit','Scout','Initiate','Trainee','Apprentice','Cadet','Journeyman','Practitioner','Analyst','Specialist','Proficient','Skilled','Competent','Adept','Capable','Expert','Senior','Lead','Principal','Director','Executive','Master','Mentor','Advisor','Strategist','Champion','Elite','Superior','Exceptional','Premier','Virtuoso','Luminary','Authority','Titan','Legend','Prodigy','Phenomenon','Mastermind','Genius','Grand Master','Mythic','Cosmic','Ethereal','Divine','Arcane','Immortal','Transcendent','Omniscient','Eternal','Oracle','Prophet','Seer','Visionary','Enlightened','Celestial','Astral','Radiant','Stellar','Galactic','Quantum','Neural','Synaptic','Singularity','Emergent','Sentient','Apex','Pinnacle','Zenith','Supreme','Ultimate','Absolute','Infinite','Boundless','Limitless','Omnipotent','Hyperion','Atlas','Prometheus','Olympian','Titan Elite','Deus','Ascended','Exalted','Hallowed','Sacred','Blessed','Sanctified','Divine Master','Celestial God','Ethereal God','God I','God II','God III','God IV','God V','God VI','God VII','God VIII','God IX','OmniAgent ⚡'];
+const LEVEL_COLORS=['','#78716c','#92400e','#a16207','#b45309','#ca8a04','#d97706','#ea580c','#dc2626','#b91c1c','#991b1b','#6b7280','#4b5563','#9ca3af','#d1d5db','#e5e7eb','#3b82f6','#2563eb','#1d4ed8','#1e40af','#1e3a8a','#f59e0b','#d97706','#b45309','#fbbf24','#fcd34d','#eab308','#ca8a04','#a16207','#854d0e','#713f12','#8b5cf6','#7c3aed','#6d28d9','#5b21b6','#4c1d95','#a78bfa','#c4b5fd','#ddd6fe','#9333ea','#7e22ce','#06b6d4','#0891b2','#0e7490','#155e75','#164e63','#22d3ee','#67e8f9','#a5f3fc','#0284c7','#0369a1','#ec4899','#db2777','#be185d','#9d174d','#831843','#f472b6','#f9a8d4','#d946ef','#c026d3','#a21caf','#10b981','#059669','#047857','#065f46','#064e3b','#34d399','#6ee7b7','#16a34a','#15803d','#166534','#f97316','#ea580c','#ef4444','#dc2626','#b91c1c','#fb923c','#fdba74','#fca5a5','#f87171','#ff6b6b','#fbbf24','#fcd34d','#fde68a','#fef3c7','#fffbeb','#f0abfc','#e879f9','#d946ef','#c026d3','#a855f7','#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#f43f5e','#ffd700'];
+
+function levelBadge(lvl) {
+  const color = LEVEL_COLORS[Math.min(lvl,LEVEL_COLORS.length-1)];
+  const label = LEVEL_LABELS[Math.min(lvl,LEVEL_LABELS.length-1)];
+  return `<span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px;background:${color}22;color:${color};border:1px solid ${color}55;">Lv.${lvl} ${label}</span>`;
+}
+
+function brainCard(b) {
+  const lvl   = b.level || 1;
+  const pct   = b.level_pct || 0;
+  const color = b.color || '#6b7280';
+  const xp    = b.total_xp || 0;
+  const runs  = b.total_runs || 0;
+  const isLearning = b.status === 'learning';
+  const skills = b.skills || {};
+  const topSkills = Object.entries(skills).sort((a,b2) => (b2[1].level||0)-(a[1].level||0)).slice(0,3);
+  const skillsHtml = topSkills.map(([k,v]) => {
+    const c = LEVEL_COLORS[Math.min(v.level||1,LEVEL_COLORS.length-1)];
+    return `<div class="flex items-center justify-between">
+      <span style="font-size:10px;color:var(--muted);">${k.replace(/_/g,' ')}</span>
+      <span style="font-size:10px;font-weight:700;color:${c};">Lv.${v.level||1}</span>
+    </div>`;
+  }).join('');
+  const lastLearn = (b.learnings||[]).slice(-1)[0];
+  return `
+  <div class="brain-card">
+    <div class="flex items-center gap-2 mb-2">
+      <span style="font-size:18px;">${b.icon||'🤖'}</span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold" style="color:var(--text);">${b.name.replace(/_/g,' ')}</span>
+          ${isLearning ? `<span style="font-size:9px;color:var(--gold);">⚡ learning</span>` : ''}
+        </div>
+        <div class="flex items-center gap-2 mt-0.5">
+          ${levelBadge(lvl)}
+          <span style="font-size:9px;color:var(--muted);">${xp.toLocaleString()} XP · ${runs} runs</span>
+        </div>
+      </div>
+    </div>
+    <div style="height:3px;border-radius:99px;background:var(--dim);overflow:hidden;margin-bottom:6px;">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,${color}88,${color});border-radius:99px;transition:width .5s;"></div>
+    </div>
+    ${skillsHtml ? `<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:4px;">${skillsHtml}</div>` : ''}
+    ${lastLearn ? `<div style="font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:4px;margin-top:2px;line-height:1.4;">${lastLearn.text||''}</div>` : ''}
+  </div>`;
+}
+
+async function loadBrains() {
+  try {
+    const r = await fetch('/api/agent-brains');
+    const data = await r.json();
+    const brains = data.brains || [];
+    const grid = document.getElementById('brain-grid');
+    if (!brains.length) { grid.innerHTML = '<p class="text-sm col-span-3" style="color:var(--dim);">No brains loaded yet.</p>'; return; }
+    grid.innerHTML = brains.map(brainCard).join('');
+    const learning = brains.filter(b => b.status === 'learning').length;
+    const avgLvl   = (brains.reduce((s,b) => s+(b.level||1), 0)/brains.length).toFixed(1);
+    const totalXp  = brains.reduce((s,b) => s+(b.total_xp||0), 0);
+    const statusTxt = learning > 0 ? `⚡ ${learning} agent${learning>1?'s':''} learning…` : `✓ ${brains.length} agents · avg Lv.${avgLvl} · ${totalXp.toLocaleString()} XP`;
+    document.getElementById('brain-status').textContent = statusTxt;
+    document.getElementById('brain-status-short').textContent = `Lv.${avgLvl}`;
+  } catch(e) { document.getElementById('brain-status').textContent = 'Error'; }
+}
+
+async function triggerLearning() {
+  const btn = document.getElementById('learn-btn');
+  btn.textContent = '⏳'; btn.disabled = true;
+  try { await fetch('/api/agent-brains/run-cycle', {method:'POST'}); } catch(_) {}
+  setTimeout(() => { btn.textContent = '⚡ Run Cycle'; btn.disabled = false; loadBrains(); }, 3000);
+}
+async function triggerWebLearning() {
+  const btn = document.getElementById('weblearn-btn');
+  btn.textContent = '⏳'; btn.disabled = true;
+  try { await fetch('/api/web-learner/run-now', {method:'POST'}); } catch(_) {}
+  setTimeout(() => { btn.textContent = '🌐 Web Learn'; btn.disabled = false; }, 5000);
+}
+setInterval(() => { if(window._brainsLoaded) loadBrains(); }, 60000);
+
+// ── Intelligence widgets ──────────────────────────────────────────────────────
+async function refreshTrends() {
+  const el = document.getElementById('trendForecast');
+  el.innerHTML = '<div class="flex gap-2 items-center"><span class="spinner"></span><span class="text-xs" style="color:var(--muted);">Loading…</span></div>';
+  try {
+    const r = await fetch('/api/trend-forecast');
+    const d = await r.json();
+    renderTrends(d, el);
+  } catch(e) { el.innerHTML = '<p class="text-xs" style="color:#f87171;">Error</p>'; }
+}
+function renderTrends(d, el) {
+  if (!d || d.error) { el.innerHTML = '<p class="text-xs" style="color:var(--muted);">No data yet</p>'; return; }
+  const fg = d.fear_greed || {};
+  const fgVal = fg.value; const fgLabel = fg.label || '?';
+  const fgColor = fgVal >= 75 ? '#f87171' : fgVal >= 55 ? '#fbbf24' : fgVal >= 45 ? '#60a5fa' : fgVal >= 25 ? '#a78bfa' : '#f87171';
+  const coins = (d.top_coins || []).slice(0,4);
+  const coinsHtml = coins.map(c => {
+    const ch = c.change_1h || 0; const col = ch>0?'#34d399':ch<0?'#f87171':'var(--muted)';
+    return `<div class="flex items-center justify-between"><span class="text-xs font-bold" style="color:var(--text);">$${c.symbol}</span><span class="text-xs" style="color:${col};">${ch>0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}%</span></div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="flex items-center gap-2 mb-2">
+      <span class="text-sm font-bold" style="color:${fgColor};">F&G: ${fgLabel} (${fgVal})</span>
+    </div>
+    ${d.narrative ? `<p class="text-xs mb-2 italic" style="color:var(--muted);">${d.narrative.slice(0,120)}…</p>` : ''}
+    <div class="flex flex-col gap-1">${coinsHtml}</div>
+    <p class="text-xs mt-2" style="color:var(--dim);">Updated: ${d.generated_at ? new Date(d.generated_at).toLocaleTimeString() : '?'}</p>
+  `;
+}
+
+async function refreshEngagement() {
+  const el = document.getElementById('engagementInsights');
+  el.innerHTML = '<div class="flex gap-2 items-center"><span class="spinner"></span><span class="text-xs" style="color:var(--muted);">Loading…</span></div>';
+  try {
+    const r = await fetch('/api/engagement-insights');
+    const d = await r.json();
+    renderEngagement(d, el);
+  } catch(e) { el.innerHTML = '<p class="text-xs" style="color:#f87171;">Error</p>'; }
+}
+function renderEngagement(d, el) {
+  if (!d || d.error) { el.innerHTML = '<p class="text-xs" style="color:var(--muted);">No data yet</p>'; return; }
+  const recs = (d.recommendations || []).slice(0,3);
+  const recHtml = recs.map(r => `<div class="text-xs flex gap-1" style="color:var(--muted);"><span style="color:var(--neon);">→</span>${r}</div>`).join('');
+  const plats = Object.entries(d.platform_success||{}).filter(([p,v])=>v.ok+v.error>0).slice(0,4);
+  const platHtml = plats.map(([p,v]) => {
+    const rate = v.success_rate||0; const col = rate>=80?'var(--cyan)':rate>=50?'var(--gold)':'#f87171';
+    return `<div class="text-center"><div class="text-xs font-bold" style="color:var(--text);">${p.toUpperCase()}</div><div class="text-xs" style="color:${col};">${rate}%</div></div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="flex gap-3 mb-2 flex-wrap">
+      <div><div class="text-xs" style="color:var(--muted);">Best Time</div><div class="text-sm font-bold" style="color:var(--gold);">${d.best_slot_time?.recommended||'?'}</div></div>
+      <div><div class="text-xs" style="color:var(--muted);">Best Day</div><div class="text-sm font-bold" style="color:var(--neon);">${d.best_weekday?.best||'?'}</div></div>
+    </div>
+    ${platHtml ? `<div class="flex gap-4 mb-2">${platHtml}</div>` : ''}
+    <div class="flex flex-col gap-1">${recHtml}</div>
+  `;
+}
+
+async function refreshABTest() {
+  const el = document.getElementById('abTestWidget');
+  el.innerHTML = '<div class="flex gap-2 items-center"><span class="spinner"></span><span class="text-xs" style="color:var(--muted);">Loading…</span></div>';
+  try {
+    const r = await fetch('/api/ab-test');
+    const d = await r.json();
+    renderABTest(d, el);
+  } catch(e) { el.innerHTML = '<p class="text-xs" style="color:#f87171;">Error</p>'; }
+}
+function renderABTest(d, el) {
+  if (!d || d.error) { el.innerHTML = '<p class="text-xs" style="color:var(--muted);">No A/B data yet</p>'; return; }
+  const comp = d.comparison || {};
+  const winner = comp.score_winner;
+  const wCol = winner==='A'?'var(--cyan)':winner==='B'?'#f472b6':'var(--muted)';
+  const wLbl = winner==='tie'?'🤝 TIE':winner?`🏆 Variant ${winner}`:'-';
+  const recs = (d.recommendations||[]).slice(0,3);
+  const recHtml = recs.map(r => `<div class="text-xs flex gap-1" style="color:var(--muted);"><span style="color:#fb923c;">→</span>${r}</div>`).join('');
+  el.innerHTML = `
+    <div class="flex items-center gap-3 mb-3">
+      <span class="text-sm font-bold" style="color:${wCol};">${wLbl}</span>
+      <span class="text-xs" style="color:var(--muted);">A: ${comp.a_mean_score??'—'} vs B: ${comp.b_mean_score??'—'}</span>
+    </div>
+    <div class="flex gap-3 mb-2">
+      ${comp.best_hook_type?`<div><div class="text-xs" style="color:var(--muted);">Best Hook</div><div class="text-xs font-bold" style="color:#fb923c;">${comp.best_hook_type}</div></div>`:''}
+      ${comp.best_tone?`<div><div class="text-xs" style="color:var(--muted);">Best Tone</div><div class="text-xs font-bold" style="color:var(--purple);">${comp.best_tone}</div></div>`:''}
+    </div>
+    <div class="flex flex-col gap-1">${recHtml}</div>
+    <p class="text-xs mt-2" style="color:var(--dim);">${d.records_count||0} records</p>
+  `;
+}
+setInterval(refreshTrends,    120000);
+setInterval(refreshEngagement,300000);
+setInterval(refreshABTest,    300000);
+setInterval(refreshPlatformTiming, 600000);
+
+// ── Platform Timing ────────────────────────────────────────────────────────
+async function refreshPlatformTiming() {
+  const el = document.getElementById('platformTiming');
+  if (!el) return;
+  el.innerHTML = '<div class="flex gap-2 items-center"><span class="spinner"></span><span class="text-xs" style="color:var(--muted);">Loading…</span></div>';
+  try {
+    const r = await fetch('/api/platform-timing');
+    const d = await r.json();
+    renderPlatformTiming(d, el);
+  } catch(e) { el.innerHTML = '<p class="text-xs" style="color:#f87171;">Error loading timing data</p>'; }
+}
+
+const _PLATFORM_ICONS = {youtube:'▶', tiktok:'♪', instagram:'◈', x:'✕', telegram:'✈', facebook:'👍'};
+const _PLATFORM_COLORS = {youtube:'#f87171', tiktok:'#ec4899', instagram:'#fb923c', x:'#60a5fa', telegram:'#34d399', facebook:'#1877f2'};
+
+function renderPlatformTiming(d, el) {
+  if (!d || d.error) { el.innerHTML = '<p class="text-xs" style="color:var(--muted);">No timing data yet — agent hasn\'t run</p>'; return; }
+  const platforms = d.platforms || {};
+  const now_utc = new Date();
+  const tz_offset = now_utc.getTimezoneOffset(); // local offset in minutes
+
+  let html = '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">';
+
+  const _ALL_PLATS = ['telegram','x','instagram','tiktok','youtube','facebook'];
+  for (const plat of _ALL_PLATS) {
+    const info  = platforms[plat] || null;
+    const color = _PLATFORM_COLORS[plat] || 'var(--neon)';
+    const icon  = _PLATFORM_ICONS[plat] || '●';
+
+    if (!info) {
+      html += `<div class="ecard p-3 flex flex-col gap-2" style="opacity:.45;">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-bold" style="color:${color};">${icon} ${plat.toUpperCase()}</span>
+          <span class="text-xs" style="color:var(--muted);">no data</span>
+        </div>
+        <p class="text-xs" style="color:var(--dim);">Agent hasn't collected data yet.</p>
+      </div>`;
+      continue;
+    }
+    const hours = info.best_hours || [];
+    const days  = (info.best_days || []).slice(0,3).join(', ');
+    const conf  = Math.round((info.confidence || 0) * 100);
+
+    // 24h heatmap bars
+    const heatmap = info.heatmap_24h || Array(24).fill(0);
+    const maxH = Math.max(...heatmap, 1);
+    const barsHtml = heatmap.map((v, h) => {
+      const pct = Math.round(v / maxH * 100);
+      const isGood = hours.includes(h);
+      const barColor = isGood ? color : 'rgba(255,255,255,0.06)';
+      // Convert UTC hour to local
+      const localH = (h - Math.floor(tz_offset/60) + 24) % 24;
+      return `<div title="${localH}:00 local (${h}:00 UTC)" style="flex:1;height:28px;display:flex;flex-direction:column;justify-content:flex-end;cursor:default;">
+        <div style="width:100%;background:${barColor};height:${Math.max(pct,4)}%;min-height:2px;border-radius:1px;transition:height .2s;"></div>
+      </div>`;
+    }).join('');
+
+    // Next best slot
+    let nextSlot = '';
+    if (info.next_best_slot) {
+      const nb = new Date(info.next_best_slot);
+      const diffH = Math.round((nb - now_utc) / 3600000);
+      nextSlot = diffH <= 0 ? 'Now!' : diffH < 24 ? `in ${diffH}h` : nb.toLocaleDateString();
+    }
+
+    html += `
+    <div class="ecard p-3 flex flex-col gap-2">
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-bold" style="color:${color};">${icon} ${plat.toUpperCase()}</span>
+        <span class="text-xs" style="color:var(--muted);">conf: ${conf}%</span>
+      </div>
+      <div class="flex items-end gap-px" style="height:28px;">${barsHtml}</div>
+      <div class="text-xs" style="color:var(--muted);">
+        Best UTC: <span style="color:${color};font-weight:700;">${hours.map(h => h+':00').join(', ')}</span>
+      </div>
+      <div class="text-xs" style="color:var(--dim);">Days: ${days}</div>
+      ${nextSlot ? `<div class="text-xs" style="color:var(--cyan);">Next slot: <strong>${nextSlot}</strong></div>` : ''}
+    </div>`;
+  }
+  html += '</div>';
+  html += `<p class="text-xs mt-2" style="color:var(--dim);">Hours are UTC — convert to your local time. Updated: ${d.updated_at ? new Date(d.updated_at).toLocaleTimeString() : '?'}</p>`;
+  el.innerHTML = html;
+}
+
+// ── Security Log ──────────────────────────────────────────────────────────
+async function refreshSecurityLog() {
+  const el = document.getElementById('securityLog');
+  if (!el) return;
+  el.innerHTML = '<div class="flex gap-2 items-center"><span class="spinner"></span><span class="text-xs" style="color:var(--muted);">Loading…</span></div>';
+  try {
+    const r = await fetch('/api/security-log');
+    const d = await r.json();
+    if (d.error) { el.innerHTML = `<p class="text-xs" style="color:#f87171;">${d.error}</p>`; return; }
+
+    // Summary row
+    const failedCount = d.failed_attempts || 0;
+    const suspIPs = (d.suspicious_ips || []).join(', ') || 'none';
+    const countries = Object.entries(d.country_summary || {}).slice(0,6)
+      .map(([cc, n]) => `<span class="epill epill-muted" style="font-size:9px;">${cc} (${n})</span>`).join(' ');
+
+    let rows = (d.events || []).slice(0, 20).map(e => {
+      const statusColor = e.success ? 'var(--cyan)' : '#f87171';
+      const statusIcon  = e.success ? '✓' : '✕';
+      const susp = e.suspicious ? '<span style="color:#f87171;margin-left:4px;">⚠</span>' : '';
+      const loc = [e.city, e.country_code].filter(Boolean).join(', ') || '—';
+      return `<div class="flex items-center gap-2 py-1" style="border-bottom:1px solid var(--border);font-size:10px;">
+        <span style="color:${statusColor};font-weight:700;width:10px;">${statusIcon}</span>
+        <span style="color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;">${e.user_email}</span>
+        <span style="color:var(--text);">${loc}${susp}</span>
+        <span style="color:var(--dim);font-family:monospace;">${e.ip}</span>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="flex items-center gap-2 mb-2 flex-wrap">
+        ${failedCount > 0 ? `<span class="epill" style="background:rgba(248,113,113,.15);color:#f87171;font-size:9px;">⚠ ${failedCount} failed attempts</span>` : '<span class="epill epill-cyan" style="font-size:9px;">✓ No attacks detected</span>'}
+        ${suspIPs !== 'none' ? `<span class="text-xs" style="color:#f87171;">Suspicious IPs: ${suspIPs}</span>` : ''}
+      </div>
+      <div class="flex flex-wrap gap-1 mb-2">${countries}</div>
+      <div>${rows || '<p class="text-xs" style="color:var(--dim);">No login events yet</p>'}</div>
+    `;
+  } catch(e) { el.innerHTML = '<p class="text-xs" style="color:#f87171;">Error loading security log</p>'; }
+}
+
+// Also enrich Trends with Market Pulse data
+async function refreshTrendsFull() {
+  await refreshTrends();
+  // Overlay market pulse on top
+  try {
+    const r = await fetch('/api/market-pulse');
+    const d = await r.json();
+    if (!d || d.error) return;
+    const el = document.getElementById('trendForecast');
+    const cs = d.content_signals || {};
+    const kw = (d.trending_keywords || []).slice(0, 8).join(', ');
+    const coins = (d.trending_coins || []).slice(0, 4).map(c => `<span class="epill epill-neon" style="font-size:9px;">${c.symbol}</span>`).join('');
+    const extra = `
+      <div class="mt-2 pt-2" style="border-top:1px solid var(--border);">
+        <div class="text-xs mb-1" style="color:var(--muted);">🔥 Trending coins: ${coins || 'none'}</div>
+        <div class="text-xs mb-1" style="color:var(--muted);">Best hook: <span style="color:var(--gold);">${cs.best_hook_type||'?'}</span></div>
+        <div class="text-xs mb-1" style="color:var(--muted);">Tone: <span style="color:var(--cyan);">${cs.recommended_tone||'?'}</span></div>
+        <div class="text-xs" style="color:var(--dim);">Keywords: ${kw}</div>
+      </div>`;
+    el.innerHTML += extra;
+  } catch(e) {}
+}
 </script>
+<script src="/static/i18n.js"></script>
+</div><!-- /main-wrap -->
 </body>
 </html>

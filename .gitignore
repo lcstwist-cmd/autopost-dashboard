@@ -34,6 +34,34 @@ env/
 analytics/
 backtest_report.json
 
+# Debug artifacts from browser automation
+src/agents/debug_*.png
+src/agents/*_cookies.json
+
+# D-ID presenter cache & diagnostic artifacts
+.did_presenter_cache.json
+.did_presenter_urls.json
+.did_presenter_urls_preview.json
+.image_cache/
+.presenter_photo_cache/
+test_did_log.txt
+test_did_console.txt
+test_did_output.mp4
+recovery_log.txt
+
+# Runtime state
+scheduler_heartbeat.txt
+scheduler_state.json
+watchdog.pid
+watchdog.log
+output/
+data/
+
+# Large binaries
+*.mp3
+*.mp4
+*.mov
+
 # OS
 .DS_Store
 Thumbs.db

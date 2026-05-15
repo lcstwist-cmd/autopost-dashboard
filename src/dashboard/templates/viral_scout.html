@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Viral Scout — AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/elite.css">
+<style>
+:root {
+  --bg:#020806; --surface:rgba(4,13,7,.95);
+  --border:rgba(0,255,120,.1); --border-h:rgba(0,255,120,.3);
+  --neon:#00ff7a; --cyan:#06d6a0; --purple:#a78bfa;
+  --text:#dff7e8; --muted:#3d7a55; --dim:#1a3d26;
+}
+*{box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:radial-gradient(circle,rgba(0,255,120,.18) 1px,transparent 1px);
+  background-size:28px 28px;}
+body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 80% 60% at 15% 85%,rgba(0,255,120,.07) 0%,transparent 55%),
+             radial-gradient(ellipse 65% 75% at 85% 15%,rgba(6,214,160,.05) 0%,transparent 55%);}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(12px);}
+.card:hover{border-color:var(--border-h);}
+.btn-primary{background:linear-gradient(135deg,#065c28,#16a34a);color:#fff;border:none;border-radius:10px;padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 0 18px rgba(22,163,74,.25);transition:opacity .15s;}
+.btn-primary:hover{opacity:.85;}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed;}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:8px 16px;font-size:12px;cursor:pointer;transition:border-color .15s,color .15s;}
+.btn-ghost:hover{border-color:var(--neon);color:var(--text);}
+.topic-btn{background:rgba(0,255,120,.04);border:1px solid rgba(0,255,120,.12);border-radius:999px;color:var(--muted);padding:5px 16px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.topic-btn.active,.topic-btn:hover{background:rgba(0,255,120,.1);border-color:var(--neon);color:var(--neon);}
+.platform-icon{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font-size:13px;flex-shrink:0;}
+.plat-yt {background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);}
+.plat-tt {background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.1);}
+.plat-ig {background:rgba(236,72,153,.1);border:1px solid rgba(236,72,153,.2);}
+.plat-x  {background:rgba(148,163,184,.08);border:1px solid rgba(148,163,184,.15);}
+.tag{display:inline-block;background:rgba(0,255,120,.06);border:1px solid rgba(0,255,120,.15);color:var(--neon);border-radius:999px;padding:3px 11px;font-size:11px;font-weight:600;margin:2px;}
+.stat-val{font-size:22px;font-weight:800;color:var(--neon);}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:1px;}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(0,255,120,.2);border-top-color:var(--neon);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hook-card{background:rgba(0,0,0,.25);border:1px solid rgba(0,255,120,.07);border-radius:10px;padding:12px 16px;margin-bottom:8px;font-size:13px;color:var(--text);line-height:1.5;}
+.hook-card:hover{border-color:rgba(0,255,120,.2);}
+.example-card{background:rgba(0,0,0,.2);border:1px solid rgba(0,255,120,.06);border-radius:12px;padding:14px;transition:border-color .15s;}
+.example-card:hover{border-color:rgba(0,255,120,.2);}
+.views-badge{font-size:10px;font-weight:700;background:rgba(0,255,120,.07);color:var(--neon);border:1px solid rgba(0,255,120,.15);border-radius:6px;padding:2px 8px;}
+</style>
+</head>
+<body style="display:flex;min-height:100vh;">
+{% include '_sidebar.html' %}
+<div class="main-wrap">
+<header style="position:sticky;top:0;z-index:100;background:rgba(2,8,4,.96);border-bottom:1px solid rgba(0,255,120,.08);backdrop-filter:blur(20px);">
+  <div class="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <a href="/" style="color:var(--muted);font-size:13px;font-weight:600;text-decoration:none;" class="hover:text-white">← Dashboard</a>
+      <span style="color:var(--dim);">/</span>
+      <span style="font-weight:800;color:var(--text);font-size:14px;">🔥 Viral Scout</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="last-scan-label" style="font-size:11px;color:var(--muted);"></span>
+      <button id="btn-scan" class="btn-primary" onclick="runScan()" data-i18n="viral.scan_btn">
+        ⚡ Scan acum
+      </button>
+      <div style="display:flex;gap:4px;border-left:1px solid rgba(0,255,120,.12);padding-left:8px;">
+        <button class="lang-btn btn-ghost" data-lang="en" onclick="setLang('en')" style="padding:4px 8px;font-size:11px;">EN</button>
+        <button class="lang-btn btn-ghost" data-lang="ro" onclick="setLang('ro')" style="padding:4px 8px;font-size:11px;">RO</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-6xl mx-auto px-6 py-8" style="position:relative;z-index:1;">
+
+  <!-- Topic selector -->
+  <div class="mb-6 flex flex-wrap items-center gap-2">
+    <span style="font-size:11px;color:var(--muted);font-weight:600;margin-right:4px;">TOPIC:</span>
+    {% for t in topics %}
+    <button class="topic-btn {% if loop.first %}active{% endif %}"
+            onclick="selectTopic('{{ t }}')" id="topic-{{ t|replace(' ','_') }}">
+      {{ t }}
+    </button>
+    {% endfor %}
+  </div>
+
+  <!-- Loading state -->
+  <div id="loading" style="display:none;" class="card px-6 py-10 text-center mb-6">
+    <div class="spinner mx-auto mb-3"></div>
+    <p style="color:var(--muted);font-size:13px;" data-i18n="viral.scanning">Se scanează platformele… YouTube, TikTok, Instagram, X, Facebook</p>
+  </div>
+
+  <!-- No data state -->
+  <div id="no-data" style="display:none;" class="card px-6 py-12 text-center mb-6">
+    <p style="font-size:32px;margin-bottom:12px;">🔍</p>
+    <p style="color:var(--text);font-weight:700;margin-bottom:6px;" data-i18n="viral.no_scan_title">Nicio scanare pentru acest topic</p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;" data-i18n="viral.no_scan_desc">Click pe "Scan acum" pentru a colecta date virale de pe YouTube, TikTok, Instagram și X.</p>
+    <button class="btn-primary" onclick="runScan()" data-i18n="viral.scan_btn">⚡ Scan acum</button>
+  </div>
+
+  <!-- Main content -->
+  <div id="content" style="display:none;">
+
+    <!-- Stats bar -->
+    <div class="grid gap-4 mb-6" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));">
+      <div class="card px-4 py-3 text-center">
+        <div class="stat-val" id="s-sample">—</div>
+        <div class="stat-lbl">Sample total</div>
+      </div>
+      <div class="card px-4 py-3 text-center">
+        <div class="stat-val" id="s-hooks" style="color:var(--cyan);">—</div>
+        <div class="stat-lbl">Hook patterns</div>
+      </div>
+      <div class="card px-4 py-3 text-center">
+        <div class="stat-val" id="s-hashtags" style="color:var(--purple);">—</div>
+        <div class="stat-lbl" data-i18n="viral.hashtags_lbl">Hashtag-uri</div>
+      </div>
+      <div class="card px-4 py-3 text-center">
+        <div class="stat-val" id="s-duration" style="color:#fb923c;">—</div>
+        <div class="stat-lbl" data-i18n="viral.duration_lbl">Durata medie (s)</div>
+      </div>
+    </div>
+
+    <!-- Platform breakdown -->
+    <div class="grid gap-4 mb-6" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
+      <div class="card px-5 py-4" id="plat-youtube" style="display:none;">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="platform-icon plat-yt">▶</span>
+          <span style="font-weight:700;font-size:13px;">YouTube Shorts</span>
+        </div>
+        <div class="flex justify-between text-xs" style="color:var(--muted);">
+          <span>Videos</span><span id="yt-count" style="color:var(--text);font-weight:700;">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);">
+          <span>Avg views</span><span id="yt-views" style="color:var(--neon);font-weight:700;">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);">
+          <span>Top hashtag</span><span id="yt-tag" style="color:var(--cyan);">—</span>
+        </div>
+      </div>
+      <div class="card px-5 py-4" id="plat-tiktok" style="display:none;">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="platform-icon plat-tt">♪</span>
+          <span style="font-weight:700;font-size:13px;">TikTok</span>
+        </div>
+        <div class="flex justify-between text-xs" style="color:var(--muted);">
+          <span>Videos</span><span id="tt-count" style="color:var(--text);font-weight:700;">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);">
+          <span>Avg views</span><span id="tt-views" style="color:var(--neon);font-weight:700;">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);">
+          <span>Top hashtag</span><span id="tt-tag" style="color:var(--cyan);">—</span>
+        </div>
+      </div>
+      <div class="card px-5 py-4" id="plat-instagram" style="display:none;">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="platform-icon plat-ig">◈</span>
+          <span style="font-weight:700;font-size:13px;">Instagram Reels</span>
+        </div>
+        <div class="flex justify-between text-xs" style="color:var(--muted);">
+          <span>Reels</span><span id="ig-count" style="color:var(--text);font-weight:700;">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);">
+          <span>Avg views</span><span id="ig-views" style="color:var(--neon);font-weight:700;">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);">
+          <span>Top hashtag</span><span id="ig-tag" style="color:var(--cyan);">—</span>
+        </div>
+      </div>
+      <div class="card px-5 py-4" id="plat-x" style="display:none;">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="platform-icon plat-x" style="font-weight:900;font-size:11px;">✕</span>
+          <span style="font-weight:700;font-size:13px;">X (Twitter)</span>
+        </div>
+        <div class="flex justify-between text-xs" style="color:var(--muted);">
+          <span>Tweets</span><span id="x-count" style="color:var(--text);font-weight:700;">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);">
+          <span>Avg views</span><span id="x-views" style="color:var(--neon);font-weight:700;">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);">
+          <span>Top hashtag</span><span id="x-tag" style="color:var(--cyan);">—</span>
+        </div>
+      </div>
+      <div class="card px-5 py-4" id="plat-facebook" style="display:none;">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="platform-icon" style="color:#1877f2;font-size:14px;">👍</span>
+          <span style="font-weight:700;font-size:13px;">Facebook Reels</span>
+        </div>
+        <div class="flex justify-between text-xs" style="color:var(--muted);">
+          <span>Reels</span><span id="fb-count" style="color:var(--text);font-weight:700;">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);">
+          <span>Avg views</span><span id="fb-views" style="color:var(--neon);font-weight:700;">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--muted);">
+          <span>Top hashtag</span><span id="fb-tag" style="color:var(--cyan);">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid gap-6" style="grid-template-columns:1fr 1fr;">
+
+      <!-- Hook patterns -->
+      <div class="card px-5 py-5">
+        <h2 style="font-weight:800;font-size:14px;color:var(--text);margin-bottom:4px;" data-i18n="viral.hooks_title">🎣 Hook Patterns</h2>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:14px;" data-i18n="viral.hooks_desc">Primele cuvinte din conținuturile cu cel mai mare engagement — imitați de copywriter.</p>
+        <div id="hooks-list"></div>
+      </div>
+
+      <!-- Top hashtags -->
+      <div class="card px-5 py-5">
+        <h2 style="font-weight:800;font-size:14px;color:var(--text);margin-bottom:4px;" data-i18n="viral.hashtags_title">🏷 Top Hashtag-uri</h2>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:14px;" data-i18n="viral.hashtags_desc">Cele mai frecvente hashtag-uri din conținuturile analizate, ordonate după frecvență.</p>
+        <div id="hashtags-list"></div>
+      </div>
+
+    </div>
+
+    <!-- Top examples -->
+    <div class="card px-5 py-5 mt-6">
+      <h2 style="font-weight:800;font-size:14px;color:var(--text);margin-bottom:4px;" data-i18n="viral.examples_title">🏆 Top Exemple Virale</h2>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:16px;" data-i18n="viral.examples_desc">Conținuturile cu cel mai mare engagement din scanare — sursele de inspirație pentru avatarul nostru.</p>
+      <div id="examples-grid" class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));"></div>
+    </div>
+
+    <!-- CTA patterns -->
+    <div id="cta-section" class="card px-5 py-5 mt-6" style="display:none;">
+      <h2 style="font-weight:800;font-size:14px;color:var(--text);margin-bottom:4px;">📣 CTA Patterns</h2>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:14px;">Call-to-action phrases found in viral content.</p>
+      <div id="cta-list" class="flex flex-wrap gap-2"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+const BLUEPRINTS = {{ blueprints_json | safe }};
+const TOPICS = {{ topics_json | safe }};
+let currentTopic = TOPICS[0] || 'crypto';
+
+function fmt(n) {
+  if (!n && n !== 0) return '—';
+  n = parseInt(n);
+  if (n >= 1_000_000) return (n/1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n/1_000).toFixed(0) + 'K';
+  return n.toString();
+}
+
+function platIcon(p) {
+  return {youtube:'▶', tiktok:'♪', instagram:'◈', x:'✕', facebook:'👍'}[p] || '●';
+}
+function platColor(p) {
+  return {youtube:'#ef4444', tiktok:'#ffffff', instagram:'#ec4899', x:'#94a3b8', facebook:'#1877f2'}[p] || '#00ff7a';
+}
+
+function renderBlueprint(bp) {
+  if (!bp) { showNoData(); return; }
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('no-data').style.display = 'none';
+  document.getElementById('content').style.display = '';
+
+  // Stats
+  document.getElementById('s-sample').textContent = bp.sample_size || 0;
+  document.getElementById('s-hooks').textContent = (bp.hook_patterns||[]).length;
+  document.getElementById('s-hashtags').textContent = (bp.top_hashtags||[]).length;
+  document.getElementById('s-duration').textContent = bp.avg_duration ? Math.round(bp.avg_duration) : '—';
+
+  if (bp.generated_at) {
+    const d = new Date(bp.generated_at);
+    document.getElementById('last-scan-label').textContent =
+      AP_T('viral.last_scan') + ': ' + d.toLocaleString(document.documentElement.lang === 'ro' ? 'ro-RO' : 'en-GB', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  }
+
+  // Platform cards
+  const platMap = {youtube:['yt','plat-youtube'], tiktok:['tt','plat-tiktok'], instagram:['ig','plat-instagram'], x:['x','plat-x'], facebook:['fb','plat-facebook']};
+  Object.entries(platMap).forEach(([plat, [pfx, cardId]]) => {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    card.style.display = '';
+    const stats = (bp.by_platform||{})[plat];
+    if (stats) {
+      document.getElementById(pfx+'-count').textContent = stats.count || 0;
+      document.getElementById(pfx+'-views').textContent = fmt(Math.round(stats.avg_views||0));
+      const topTag = (stats.top_hashtag||[])[0];
+      document.getElementById(pfx+'-tag').textContent = topTag ? topTag[0] : '—';
+    }
+  });
+
+  // Hooks
+  const hooksList = document.getElementById('hooks-list');
+  hooksList.innerHTML = '';
+  (bp.hook_patterns||[]).forEach((h,i) => {
+    const div = document.createElement('div');
+    div.className = 'hook-card';
+    div.innerHTML = `<span style="color:var(--muted);font-size:10px;font-weight:700;margin-right:8px;">#${i+1}</span>${escHtml(h)}`;
+    hooksList.appendChild(div);
+  });
+  if (!(bp.hook_patterns||[]).length) {
+    hooksList.innerHTML = '<p style="color:var(--muted);font-size:12px;">' + AP_T('viral.no_scan_js') + '</p>';
+  }
+
+  // Hashtags
+  const tagsList = document.getElementById('hashtags-list');
+  tagsList.innerHTML = '';
+  const maxCount = Math.max(...(bp.top_hashtags||[]).map(t=>t[1]||1), 1);
+  (bp.top_hashtags||[]).slice(0,20).forEach(([tag,count]) => {
+    const opacity = 0.4 + 0.6*(count/maxCount);
+    tagsList.innerHTML += `<span class="tag" style="opacity:${opacity.toFixed(2)};font-size:${10+Math.round(3*count/maxCount)}px;">${escHtml(tag)} <span style="opacity:.6">${count}</span></span>`;
+  });
+
+  // Examples
+  const grid = document.getElementById('examples-grid');
+  grid.innerHTML = '';
+  (bp.top_examples||[]).forEach(ex => {
+    const icon = platIcon(ex.platform);
+    const color = platColor(ex.platform);
+    const card = document.createElement('div');
+    card.className = 'example-card';
+    card.innerHTML = `
+      <div class="flex items-center gap-2 mb-2">
+        <span style="color:${color};font-size:12px;font-weight:800;">${icon}</span>
+        <span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">${ex.platform}</span>
+        <span class="views-badge ml-auto">${fmt(ex.views)} views</span>
+      </div>
+      <p style="font-size:12px;color:var(--text);line-height:1.5;margin-bottom:8px;">${escHtml((ex.title||'').slice(0,120))}${(ex.title||'').length>120?'…':''}</p>
+      <div class="flex gap-3 text-xs" style="color:var(--muted);">
+        <span>❤ ${fmt(ex.likes)}</span>
+        <span>💬 ${fmt(ex.comments)}</span>
+        ${ex.url ? `<a href="${ex.url}" target="_blank" style="color:var(--cyan);text-decoration:none;margin-left:auto;">↗ Vezi</a>` : ''}
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  // CTA patterns
+  const ctaSection = document.getElementById('cta-section');
+  const ctaList = document.getElementById('cta-list');
+  const ctas = bp.top_cta_patterns||[];
+  if (ctas.length) {
+    ctaSection.style.display = '';
+    ctaList.innerHTML = ctas.map(([pat,cnt]) =>
+      `<span class="tag">${escHtml(pat)} <span style="opacity:.6">${cnt}</span></span>`
+    ).join('');
+  } else {
+    ctaSection.style.display = 'none';
+  }
+}
+
+function showNoData() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = 'none';
+  document.getElementById('no-data').style.display = '';
+}
+
+function selectTopic(t) {
+  currentTopic = t;
+  document.querySelectorAll('.topic-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('topic-' + t.replace(' ','_'));
+  if (btn) btn.classList.add('active');
+  const bp = BLUEPRINTS[t];
+  if (bp) renderBlueprint(bp);
+  else showNoData();
+}
+
+async function runScan() {
+  const btn = document.getElementById('btn-scan');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> ' + AP_T('viral.btn_scanning');
+  document.getElementById('loading').style.display = '';
+  document.getElementById('content').style.display = 'none';
+  document.getElementById('no-data').style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('topic', currentTopic);
+    fd.append('refresh', 'true');
+    const r = await fetch('/api/viral-scan', {method:'POST', body: fd});
+    const data = await r.json();
+    if (data.ok && data.blueprint) {
+      BLUEPRINTS[currentTopic] = data.blueprint;
+      renderBlueprint(data.blueprint);
+    } else {
+      alert(AP_T('common.error') + ' ' + (data.error || AP_T('common.unknown_error')));
+      showNoData();
+    }
+  } catch(e) {
+    alert(AP_T('common.net_error') + ': ' + e.message);
+    showNoData();
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = AP_T('viral.scan_btn');
+  }
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Init
+selectTopic(currentTopic);
+</script>
+<script src="/static/i18n.js"></script>
+</div><!-- /main-wrap -->
+</body>
+</html>

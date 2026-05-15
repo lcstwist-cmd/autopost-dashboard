@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Competitor Tracker — AutoPost</title>
+<script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/elite.css">
+<style>
+  :root {
+    --bg:      #020806;
+    --surface: rgba(4,13,7,.95);
+    --border:  rgba(0,255,120,.1);
+    --border-h:rgba(0,255,120,.38);
+    --neon:    #00ff7a;
+    --green:   #22c55e;
+    --cyan:    #06d6a0;
+    --text:    #dff7e8;
+    --muted:   #3d7a55;
+    --dim:     #1a3d26;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    position: relative;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,255,120,.04) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    backdrop-filter: blur(12px);
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .card:hover {
+    border-color: rgba(0,255,120,.22);
+    box-shadow: 0 0 24px rgba(0,255,120,.06);
+  }
+
+  .comp-card {
+    background: rgba(3,10,5,.97);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .comp-card:hover {
+    border-color: rgba(0,255,120,.22);
+    box-shadow: 0 0 20px rgba(0,255,120,.05);
+  }
+
+  .post-row         { border-bottom: 1px solid rgba(0,255,120,.06); }
+  .post-row:last-child { border-bottom: none; }
+
+  .badge-x    { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); color:rgba(255,255,255,.5); }
+  .badge-rss  { background:rgba(251,191,36,.08);  border:1px solid rgba(251,191,36,.2);   color:#fbbf24; }
+  .badge-yt   { background:rgba(239,68,68,.08);   border:1px solid rgba(239,68,68,.18);   color:#f87171; }
+  .badge-site { background:rgba(96,165,250,.08);  border:1px solid rgba(96,165,250,.18);  color:#60a5fa; }
+
+  .stat-mini {
+    background: rgba(2,8,4,.98);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(0,255,120,.15);
+    border-top-color: var(--neon);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle;
+  }
+
+  input, select {
+    background: rgba(2,8,4,.95);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 13px;
+    width: 100%;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input::placeholder { color: var(--muted); opacity: .7; }
+  input:focus, select:focus { border-color: var(--border-h); }
+  select option { background: #020c05; color: var(--text); }
+
+  .btn-green {
+    background: linear-gradient(135deg, #065c28, #16a34a);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-weight: 700;
+    box-shadow: 0 0 16px rgba(22,163,74,.2);
+    cursor: pointer;
+    transition: box-shadow .15s, filter .15s;
+  }
+  .btn-green:hover {
+    box-shadow: 0 0 28px rgba(22,163,74,.4);
+    filter: brightness(1.1);
+  }
+
+  .btn-scan {
+    background: rgba(96,165,250,.1);
+    color: #60a5fa;
+    border: 1px solid rgba(96,165,250,.2);
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+  }
+  .btn-scan:hover {
+    background: rgba(96,165,250,.18);
+    box-shadow: 0 0 18px rgba(96,165,250,.18);
+  }
+
+  .btn-del {
+    background: rgba(239,68,68,.07);
+    border: 1px solid rgba(239,68,68,.18);
+    color: #f87171;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .btn-del:hover { background: rgba(239,68,68,.15); }
+
+  .tag {
+    background: rgba(0,255,120,.07);
+    border: 1px solid rgba(0,255,120,.18);
+    color: var(--neon);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+
+  .lang-btn { transition: background .15s, color .15s; }
+  .lang-btn:hover { background: rgba(0,255,120,.1) !important; color: var(--neon) !important; }
+/* __BG_REPLACED__ */
+body::before {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image: radial-gradient(circle, rgba(0,255,120,.22) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+body::after {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 85%, rgba(0,255,120,.09) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 75% at 85% 15%, rgba(6,214,160,.07) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 45% at 50% 50%, rgba(0,70,35,.06) 0%, transparent 65%);
+  animation: aurora 18s ease-in-out infinite alternate;
+}
+@keyframes aurora { 0%{opacity:.7;} 50%{opacity:1;} 100%{opacity:.75;} }
+.grid-floor {
+  position:fixed; bottom:-10%; left:50%;
+  transform:translateX(-50%) perspective(600px) rotateX(70deg);
+  transform-origin:center bottom; width:250%; height:75%; z-index:0; pointer-events:none;
+  mask-image:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 55%);
+  -webkit-mask-image:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 55%);
+}
+
+</style>
+</head>
+<body style="display:flex;min-height:100vh;">
+<div class="grid-floor" aria-hidden="true"></div>
+{% include '_sidebar.html' %}
+<div class="main-wrap">
+
+<!-- ── Header ── -->
+<header style="position:sticky;top:0;z-index:100;background:rgba(2,8,4,.95);border-bottom:1px solid rgba(0,255,120,.08);backdrop-filter:blur(20px);">
+  <div class="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <a href="/" style="color:var(--muted);font-size:13px;font-weight:600;text-decoration:none;">← Dashboard</a>
+      <span style="color:var(--dim);">/</span>
+      <span style="font-weight:800;color:var(--text);font-size:14px;">🕵️ Competitor Tracker</span>
+    </div>
+    <div class="flex items-center gap-3">
+      {% if is_admin %}
+      <button onclick="scanAll()" id="scan-btn" class="btn-scan text-sm" data-i18n="comp.scan_btn">🔍 Scan All Now</button>
+      {% endif %}
+      <a href="/settings" style="font-size:12px;color:var(--muted);text-decoration:none;font-weight:600;" class="hover:text-white">⚙ Settings</a>
+      <form method="post" action="/logout" style="margin:0;">
+        <button type="submit" style="font-size:12px;padding:3px 10px;border-radius:6px;border:1px solid var(--dim);background:transparent;color:var(--muted);cursor:pointer;" class="hover:text-red-400">Logout</button>
+      </form>
+      <div class="flex gap-1" style="border-left:1px solid var(--dim);padding-left:8px;">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')" style="font-size:10px;padding:3px 7px;border-radius:6px;border:1px solid var(--dim);background:rgba(0,255,120,.04);color:var(--muted);cursor:pointer;">EN</button>
+        <button class="lang-btn" data-lang="ro" onclick="setLang('ro')" style="font-size:10px;padding:3px 7px;border-radius:6px;border:1px solid var(--dim);background:rgba(0,255,120,.04);color:var(--muted);cursor:pointer;">RO</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-6xl mx-auto px-6 py-8 space-y-8" style="position:relative;z-index:1;">
+
+  <!-- ── Add Competitor ── -->
+  <div class="card p-6">
+    <h2 class="text-base font-bold mb-4" style="color:var(--neon);" data-i18n="comp.add_title">+ Add Competitor Account</h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div>
+        <label class="text-xs mb-1 block" style="color:var(--muted);" data-i18n="comp.platform_lbl">Platform</label>
+        <select id="add-platform">
+          <option value="x">𝕏 X / Twitter</option>
+          <option value="instagram">📸 Instagram</option>
+          <option value="tiktok">🎵 TikTok</option>
+          <option value="youtube">▶ YouTube</option>
+          <option value="facebook">👍 Facebook</option>
+          <option value="website">🌐 Website / RSS</option>
+        </select>
+      </div>
+      <div class="md:col-span-2">
+        <label class="text-xs mb-1 block" style="color:var(--muted);" id="handle-label" data-i18n="comp.handle_lbl">Handle (e.g. @CoinDesk)</label>
+        <input id="add-handle" type="text" placeholder="@handle or https://site.com">
+      </div>
+      <div>
+        <label class="text-xs mb-1 block" style="color:var(--muted);" data-i18n="comp.label_lbl">Label (optional)</label>
+        <input id="add-label" type="text" data-i18n-ph="comp.label_ph" placeholder="e.g. Top crypto news">
+      </div>
+    </div>
+    <div class="mt-4 flex items-center gap-3">
+      <button onclick="addCompetitor()" class="btn-green" data-i18n="comp.add_btn">+ Add</button>
+      <span id="add-msg" class="text-sm" style="color:var(--muted);"></span>
+    </div>
+  </div>
+
+  <!-- ── Competitor Cards ── -->
+  <div id="competitors-wrap">
+    {% if not report %}
+    <div class="card p-10 text-center" style="color:var(--muted);">
+      <div class="text-4xl mb-3">🕵️</div>
+      <p class="text-sm" data-i18n="comp.no_comps">No competitors tracked yet. Add your first one above.</p>
+    </div>
+    {% else %}
+    <div class="space-y-6">
+    {% for item in report %}
+    {% set acc = item.account %}
+    {% set ins = item.insights %}
+    <div class="comp-card p-5" id="comp-{{ acc.id }}">
+      <!-- Card header -->
+      <div class="flex items-start justify-between mb-4">
+        <div class="flex items-center gap-3">
+          {% if acc.platform == 'x' %}
+          <span class="badge-x text-xs font-bold px-2 py-0.5 rounded">𝕏 X</span>
+          {% elif acc.platform == 'instagram' %}
+          <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:#e1306c22;color:#e1306c;">📸 IG</span>
+          {% elif acc.platform == 'tiktok' %}
+          <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:#69c9d022;color:#69c9d0;">🎵 TT</span>
+          {% elif acc.platform == 'youtube' %}
+          <span class="badge-yt text-xs font-bold px-2 py-0.5 rounded">▶ YT</span>
+          {% elif acc.platform == 'facebook' %}
+          <span class="text-xs font-bold px-2 py-0.5 rounded" style="background:#1877f222;color:#1877f2;">👍 FB</span>
+          {% else %}
+          <span class="badge-site text-xs font-bold px-2 py-0.5 rounded">🌐 RSS</span>
+          {% endif %}
+          <div>
+            <div class="font-bold" style="color:var(--text);">{{ acc.label or acc.handle }}</div>
+            <div class="text-xs" style="color:var(--muted);">{{ acc.handle }}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          {% if acc.last_scanned_at %}
+          <span class="text-xs" style="color:var(--muted);"><span data-i18n="comp.scanned_lbl">Scanned</span> {{ acc.last_scanned_at[:16].replace('T',' ') }} UTC</span>
+          {% endif %}
+          <button class="btn-del" onclick="removeComp({{ acc.id }})" data-i18n="comp.remove_btn">✕ Remove</button>
+        </div>
+      </div>
+
+      <!-- Insight stats -->
+      {% if ins %}
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <div class="stat-mini text-center">
+          <div class="text-lg font-bold" style="color:var(--neon);">{{ ins.posts_per_week or '—' }}</div>
+          <div class="text-xs" style="color:var(--muted);" data-i18n="comp.posts_week">posts/week</div>
+        </div>
+        <div class="stat-mini text-center">
+          <div class="text-lg font-bold" style="color:var(--neon);">{{ ins.avg_likes or 0 }}</div>
+          <div class="text-xs" style="color:var(--muted);" data-i18n="comp.avg_likes">avg likes</div>
+        </div>
+        <div class="stat-mini text-center">
+          <div class="text-lg font-bold" style="color:var(--neon);">{{ ins.avg_shares or 0 }}</div>
+          <div class="text-xs" style="color:var(--muted);" data-i18n="comp.avg_shares">avg shares</div>
+        </div>
+        <div class="stat-mini text-center">
+          <div class="text-lg font-bold" style="color:var(--neon);">{{ ins.avg_views or 0 }}</div>
+          <div class="text-xs" style="color:var(--muted);" data-i18n="comp.avg_views">avg views</div>
+        </div>
+        <div class="stat-mini text-center">
+          <div class="text-lg font-bold" style="color:var(--neon);">{{ ins.best_day or '—' }}</div>
+          <div class="text-xs" style="color:var(--muted);" data-i18n="comp.best_day">best day</div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Top hashtags -->
+      {% if ins and ins.top_hashtags %}
+      <div class="mb-4">
+        <div class="text-xs mb-2" style="color:var(--muted);" data-i18n="comp.top_hashtags">Top hashtags</div>
+        <div class="flex flex-wrap gap-2">
+          {% for tag in ins.top_hashtags %}
+          <span class="tag">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Recent posts toggle -->
+      {% if item.posts %}
+      <div>
+        <button onclick="togglePosts('posts-{{ acc.id }}')"
+                class="text-xs font-semibold mb-2 hover:text-white"
+                style="color:var(--neon);background:none;border:none;cursor:pointer;">▸ <span data-i18n="comp.recent_posts">Recent Posts</span> ({{ item.posts|length }})</button>
+        <div id="posts-{{ acc.id }}" class="hidden mt-2 space-y-0 rounded-lg overflow-hidden"
+             style="border:1px solid rgba(0,255,120,.12);">
+          {% for post in item.posts %}
+          <div class="post-row px-4 py-3">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <p class="text-sm leading-snug" style="color:rgba(223,247,232,.75);">
+                  {{ post.content[:180] }}{% if post.content|length > 180 %}…{% endif %}
+                </p>
+                <div class="flex items-center gap-3 mt-1">
+                  <span class="text-xs" style="color:var(--muted);">{{ post.posted_at[:10] if post.posted_at else '' }}</span>
+                  {% if post.likes %}<span class="text-xs" style="color:var(--muted);">❤ {{ post.likes }}</span>{% endif %}
+                  {% if post.shares %}<span class="text-xs" style="color:var(--muted);">🔁 {{ post.shares }}</span>{% endif %}
+                  {% if post.views %}<span class="text-xs" style="color:var(--muted);">👁 {{ post.views }}</span>{% endif %}
+                </div>
+              </div>
+              {% if post.url %}
+              <a href="{{ post.url }}" target="_blank" rel="noopener"
+                 class="text-xs shrink-0 hover:text-white" style="color:var(--neon);text-decoration:none;">↗</a>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <p class="text-xs" style="color:var(--muted);" data-i18n="comp.no_posts">No posts yet — click Scan All Now to fetch data.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+</div><!-- /max-w -->
+
+<script src="/static/i18n.js"></script>
+<script>
+const CSRF = "{{ csrf_token }}";
+
+document.getElementById("add-platform").addEventListener("change", function() {
+  const lbl = document.getElementById("handle-label");
+  const inp = document.getElementById("add-handle");
+  if (this.value === "x") {
+    lbl.textContent = AP_T("comp.handle_x");
+    inp.placeholder = AP_T("comp.handle_ph_x");
+  } else if (this.value === "instagram") {
+    lbl.textContent = AP_T("comp.handle_ig");
+    inp.placeholder = AP_T("comp.handle_ph_ig");
+  } else if (this.value === "tiktok") {
+    lbl.textContent = AP_T("comp.handle_tt");
+    inp.placeholder = AP_T("comp.handle_ph_ig");
+  } else if (this.value === "youtube") {
+    lbl.textContent = AP_T("comp.handle_yt");
+    inp.placeholder = AP_T("comp.handle_ph_yt");
+  } else if (this.value === "facebook") {
+    lbl.textContent = AP_T("comp.handle_fb");
+    inp.placeholder = AP_T("comp.handle_ph_fb");
+  } else {
+    lbl.textContent = AP_T("comp.handle_site");
+    inp.placeholder = AP_T("comp.handle_ph_site");
+  }
+});
+
+function addCompetitor() {
+  const platform = document.getElementById("add-platform").value;
+  const handle   = document.getElementById("add-handle").value.trim();
+  const label    = document.getElementById("add-label").value.trim();
+  const msg      = document.getElementById("add-msg");
+  if (!handle) { msg.textContent = AP_T("comp.required_msg"); msg.style.color="#f87171"; return; }
+  msg.textContent = AP_T("comp.adding"); msg.style.color="var(--muted)";
+  const fd = new FormData();
+  fd.append("platform", platform);
+  fd.append("handle",   handle);
+  fd.append("label",    label);
+  fd.append("_csrf",    CSRF);
+  fetch("/api/competitor/add", { method: "POST", body: fd })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { msg.textContent = d.error; msg.style.color="#f87171"; }
+      else { msg.textContent = AP_T("comp.added"); msg.style.color="var(--neon)"; setTimeout(() => location.reload(), 800); }
+    })
+    .catch(() => { msg.textContent = AP_T("common.net_error"); msg.style.color="#f87171"; });
+}
+
+function removeComp(id) {
+  if (!confirm(AP_T("comp.confirm_remove"))) return;
+  const fd = new FormData();
+  fd.append("comp_id", id);
+  fd.append("_csrf",   CSRF);
+  fetch("/api/competitor/remove", { method: "POST", body: fd })
+    .then(r => r.json())
+    .then(() => {
+      const el = document.getElementById("comp-" + id);
+      if (el) el.remove();
+    });
+}
+
+function scanAll() {
+  const btn = document.getElementById("scan-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> ' + AP_T('comp.scanning_btn');
+  const fd = new FormData();
+  fd.append("_csrf", CSRF);
+  fetch("/api/competitor/scan", { method: "POST", body: fd })
+    .then(r => r.json())
+    .then(d => {
+      btn.disabled = false;
+      btn.textContent = AP_T("comp.scan_btn");
+      const n = d.total_scanned || 0;
+      alert(AP_T("comp.scan_done") + " " + n + " " + AP_T("comp.refreshed"));
+      location.reload();
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = AP_T("comp.scan_btn");
+    });
+}
+
+function togglePosts(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle("hidden");
+  const btn = el.previousElementSibling;
+  if (btn) btn.textContent = el.classList.contains("hidden")
+    ? btn.textContent.replace("▾","▸")
+    : btn.textContent.replace("▸","▾");
+}
+</script>
+</div><!-- /main-wrap -->
+</body>
+</html>

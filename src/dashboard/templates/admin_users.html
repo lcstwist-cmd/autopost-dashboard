@@ -5,113 +5,176 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin — Users — AutoPost</title>
 <script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/elite.css">
 <style>
-  body { background: #0a0f1a; }
-  .card { background: #111827; border: 1px solid #1f2937; }
+  :root {
+    --bg:#020806; --surface:rgba(4,13,7,.95);
+    --border:rgba(0,255,120,.1); --border-h:rgba(0,255,120,.38);
+    --neon:#00ff7a; --green:#22c55e; --cyan:#06d6a0;
+    --text:#dff7e8; --muted:#3d7a55; --dim:#1a3d26;
+  }
+  *{box-sizing:border-box;}
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  .card {
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    backdrop-filter:blur(12px); position:relative; transition:border-color .2s;
+  }
+  .card:hover { border-color:rgba(0,255,120,.2); }
+  .row-item { transition: background .15s; }
+  .row-item:hover { background: rgba(0,255,120,.02); }
+  .badge-admin { background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid rgba(251,191,36,.2);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700; }
+  .badge-active { background:rgba(0,255,120,.09);color:var(--neon);border:1px solid rgba(0,255,120,.18);padding:2px 10px;border-radius:999px;font-size:10px;font-weight:700; }
+  .badge-pending { background:rgba(251,191,36,.09);color:#fbbf24;border:1px solid rgba(251,191,36,.2);padding:2px 10px;border-radius:999px;font-size:10px;font-weight:700; }
+  .btn-approve { background:linear-gradient(135deg,#065c28,#16a34a);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:700;font-size:12px;cursor:pointer;box-shadow:0 0 14px rgba(22,163,74,.2); }
+  .btn-reject  { background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:6px 14px;font-weight:700;font-size:12px;cursor:pointer; }
+  .btn-delete  { background:rgba(239,68,68,.08);color:#f87171;border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:5px 12px;font-weight:600;font-size:11px;cursor:pointer; }
+  .btn-edit    { background:rgba(0,255,120,.06);color:var(--neon);border:1px solid rgba(0,255,120,.2);border-radius:8px;padding:5px 12px;font-weight:600;font-size:11px;cursor:pointer; }
+  .btn-ghost   { background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;cursor:pointer; }
+  /* Modal */
+  .modal-backdrop { position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center; }
+  .modal-box { background:rgba(4,16,9,.98);border:1px solid rgba(0,255,120,.2);border-radius:18px;padding:28px;width:100%;max-width:420px; }
+  input[type=text],input[type=email],select { background:rgba(0,0,0,.3);border:1px solid rgba(0,255,120,.15);border-radius:8px;color:var(--text);padding:8px 12px;width:100%;font-size:13px; }
+  input:focus,select:focus { outline:none;border-color:var(--neon); }
+  label { font-size:11px;color:var(--muted);font-weight:600;display:block;margin-bottom:4px; }
+body::before {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image: radial-gradient(circle, rgba(0,255,120,.22) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+body::after {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 85%, rgba(0,255,120,.09) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 75% at 85% 15%, rgba(6,214,160,.07) 0%, transparent 55%);
+}
 </style>
 </head>
-<body class="text-gray-100 min-h-screen">
-
-<header class="sticky top-0 z-10 border-b border-gray-800" style="background:#0d1423;">
-  <div class="max-w-4xl mx-auto px-6 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <a href="/" class="text-gray-400 hover:text-white text-sm">← Dashboard</a>
-      <span class="text-gray-700">/</span>
-      <span class="font-bold text-white">Admin — Users</span>
+<body style="display:flex;min-height:100vh;">
+{% include '_sidebar.html' %}
+<div class="main-wrap">
+<header style="position:sticky;top:0;z-index:100;background:rgba(2,8,4,.95);border-bottom:1px solid rgba(0,255,120,.08);backdrop-filter:blur(20px);">
+  <div class="max-w-5xl mx-auto px-5 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <a href="/" style="color:var(--muted);font-size:13px;font-weight:600;text-decoration:none;" class="hover:text-white">← Dashboard</a>
+      <span style="color:var(--dim);">/</span>
+      <span style="font-weight:800;color:var(--text);font-size:14px;">Admin — Users</span>
     </div>
     <div class="flex items-center gap-3">
-      <a href="/admin/backoffice" class="text-xs text-gray-500 hover:text-gray-300">⚙ Backoffice</a>
-      <span class="text-xs text-yellow-400 font-bold px-2 py-1 rounded" style="background:#1a1400;border:1px solid #713f12;">ADMIN</span>
-      <form method="post" action="/logout">
-        <button type="submit" class="text-xs text-gray-500 hover:text-red-400 px-3 py-1 rounded border border-gray-700">Logout</button>
+      <a href="/admin/login-logs" style="font-size:12px;color:var(--cyan);text-decoration:none;font-weight:600;" class="hover:text-white">🔍 IP Logs</a>
+      <a href="/admin/backoffice" style="font-size:12px;color:var(--muted);text-decoration:none;font-weight:600;" class="hover:text-white">⚙ Backoffice</a>
+      <span class="badge-admin">ADMIN</span>
+      <form method="post" action="/logout" style="margin:0;">
+        <button type="submit" class="btn-reject" style="font-size:11px;padding:5px 12px;">Logout</button>
       </form>
     </div>
   </div>
 </header>
 
-<div class="max-w-4xl mx-auto px-6 py-8">
+<div class="max-w-5xl mx-auto px-6 py-8" style="position:relative;z-index:1;">
 
   {% if msg %}
-  <div class="mb-6 px-4 py-3 rounded-lg text-sm text-green-400" style="background:#0a1a0a;border:1px solid #166534;">
+  <div class="mb-6 px-4 py-3 rounded-lg text-sm" style="color:var(--neon);background:rgba(3,10,5,.97);border:1px solid rgba(0,255,120,.18);">
     {{ msg }}
   </div>
   {% endif %}
 
   <!-- Pending approvals -->
   <div class="mb-8">
-    <h2 class="text-lg font-bold text-white mb-1">Pending Approvals</h2>
-    <p class="text-gray-500 text-sm mb-4">These users registered and are waiting for your approval.</p>
+    <h2 class="text-lg font-bold mb-1" style="color:var(--text);" data-i18n="users.pending">Conturi în Așteptare</h2>
+    <p class="text-sm mb-4" style="color:var(--muted);" data-i18n="users.pending_desc">Acești utilizatori s-au înregistrat și așteaptă aprobarea ta.</p>
 
     {% if pending %}
-    <div class="card rounded-2xl overflow-hidden">
+    <div class="card overflow-hidden">
       {% for u in pending %}
-      <div class="flex items-center justify-between px-5 py-4 {% if not loop.first %}border-t border-gray-800{% endif %}">
+      <div class="row-item flex items-center justify-between px-5 py-4" style="{% if not loop.first %}border-top:1px solid rgba(0,255,120,.06);{% endif %}">
         <div>
-          <p class="text-white font-medium text-sm">{{ u.display_name or u.email }}</p>
-          <p class="text-gray-500 text-xs">{{ u.email }}</p>
-          <p class="text-gray-600 text-xs">Registered: {{ u.created_at[:16].replace('T',' ') }}</p>
+          <p class="font-medium text-sm" style="color:var(--text);">{{ u.display_name or u.email }}</p>
+          <p class="text-xs" style="color:var(--muted);">{{ u.email }}</p>
+          <p class="text-xs" style="color:var(--dim);"><span data-i18n="users.registered">Înregistrat:</span> {{ u.created_at[:16].replace('T',' ') }}</p>
         </div>
         <div class="flex gap-2">
           <form method="post" action="/admin/users/{{ u.id }}/approve">
-            <button type="submit"
-              class="px-4 py-2 rounded-lg text-sm font-semibold"
-              style="background:#065f46;color:#34d399;border:1px solid #059669;cursor:pointer;">
-              ✅ Approve
-            </button>
+            <button type="submit" class="btn-approve" data-i18n="users.approve">✅ Aprobă</button>
           </form>
           <form method="post" action="/admin/users/{{ u.id }}/reject"
-            onsubmit="return confirm('Delete this user permanently?')">
-            <button type="submit"
-              class="px-4 py-2 rounded-lg text-sm font-semibold"
-              style="background:#1c0a0a;color:#f87171;border:1px solid #7f1d1d;cursor:pointer;">
-              ✕ Reject
-            </button>
+            onsubmit="return confirm(AP_T('users.confirm_reject'))">
+            <button type="submit" class="btn-reject" data-i18n="users.reject">✕ Respinge</button>
           </form>
         </div>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <div class="card rounded-2xl px-5 py-8 text-center text-gray-500 text-sm">
-      No pending registrations.
+    <div class="card px-5 py-8 text-center text-sm" style="color:var(--muted);" data-i18n="users.no_pending">
+      Nicio aprobare în așteptare.
     </div>
     {% endif %}
   </div>
 
   <!-- All users -->
   <div>
-    <h2 class="text-lg font-bold text-white mb-1">All Users</h2>
-    <p class="text-gray-500 text-sm mb-4">{{ all_users | length }} total users.</p>
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-lg font-bold" style="color:var(--text);" data-i18n="users.all">Toți Utilizatorii</h2>
+        <p class="text-sm" style="color:var(--muted);">{{ all_users | length }} useri total</p>
+      </div>
+      <a href="/admin/login-logs" style="font-size:12px;color:var(--cyan);text-decoration:none;font-weight:600;border:1px solid rgba(6,214,160,.2);padding:6px 14px;border-radius:8px;background:rgba(6,214,160,.06);">
+        🔍 Vezi toate IP-urile
+      </a>
+    </div>
 
-    <div class="card rounded-2xl overflow-hidden">
+    <div class="card overflow-hidden">
       {% for u in all_users %}
-      <div class="flex items-center justify-between px-5 py-4 {% if not loop.first %}border-t border-gray-800{% endif %}">
-        <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-            style="background:#1e3a5f;color:#60a5fa;">
-            {{ (u.display_name or u.email)[0].upper() }}
+      <div class="row-item px-5 py-4" style="{% if not loop.first %}border-top:1px solid rgba(0,255,120,.06);{% endif %}">
+        <div class="flex items-center justify-between">
+          <!-- Left: avatar + info -->
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+              style="background:rgba(0,255,120,.07);color:var(--neon);border:1px solid rgba(0,255,120,.15);">
+              {{ (u.display_name or u.email)[0].upper() }}
+            </div>
+            <div>
+              <p class="font-medium text-sm flex items-center gap-2 flex-wrap" style="color:var(--text);">
+                {{ u.display_name or "(fara nume)" }}
+                {% if u.is_admin %}<span class="badge-admin">ADMIN</span>{% endif %}
+                {% if u.is_approved %}
+                  <span class="badge-active" data-i18n="users.active">✓ Activ</span>
+                {% else %}
+                  <span class="badge-pending" data-i18n="users.status_pending">⏳ În Așteptare</span>
+                {% endif %}
+              </p>
+              <p class="text-xs mt-0.5" style="color:var(--muted);">{{ u.email }}</p>
+              <p class="text-xs mt-0.5" style="color:var(--dim);">
+                <span data-i18n="users.registered">Înregistrat:</span> {{ u.created_at[:10] }}
+                {% if u.last_login_at %}
+                  &nbsp;|&nbsp; <span data-i18n="users.last_login">Ultim login:</span> <span style="color:var(--cyan);">{{ u.last_login_at[:16].replace('T',' ') }}</span>
+                  &nbsp;IP: <code style="background:rgba(0,0,0,.4);padding:1px 5px;border-radius:4px;font-size:10px;color:#86efac;">{{ u.last_login_ip or '—' }}</code>
+                {% endif %}
+              </p>
+            </div>
           </div>
-          <div>
-            <p class="text-white font-medium text-sm flex items-center gap-2">
-              {{ u.display_name or u.email }}
-              {% if u.is_admin %}<span class="text-xs text-yellow-400 font-bold px-2 py-0.5 rounded" style="background:#1a1400;border:1px solid #713f12;">ADMIN</span>{% endif %}
-            </p>
-            <p class="text-gray-500 text-xs">{{ u.email }}</p>
+
+          <!-- Right: actions -->
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <!-- Edit button -->
+            <button class="btn-edit"
+              onclick="openEdit({{ u.id }}, '{{ u.display_name|replace("'","\\'")|e }}', '{{ u.email|e }}', {{ 1 if u.is_admin else 0 }}, {{ 1 if u.is_approved else 0 }})"
+              data-i18n="users.edit_btn">
+              ✎ Edit
+            </button>
+            <!-- Delete (for everyone except current admin editing themselves) -->
+            {% if u.id != user.id %}
+            <form method="post" action="/admin/users/{{ u.id }}/delete"
+              onsubmit="return confirm(AP_T('users.confirm_delete').replace('{email}', '{{ u.email }}'))">
+              <button type="submit" class="btn-delete" data-i18n="users.delete">✕ Șterge</button>
+            </form>
+            {% else %}
+            <span style="font-size:10px;color:var(--dim);padding:5px 8px;" data-i18n="users.you_lbl">(tu)</span>
+            {% endif %}
           </div>
-        </div>
-        <div class="flex items-center gap-3">
-          {% if u.is_approved %}
-          <span class="text-xs text-green-400 font-semibold">✓ Active</span>
-          {% else %}
-          <span class="text-xs text-yellow-400 font-semibold">⏳ Pending</span>
-          {% endif %}
-          <span class="text-xs text-gray-600">{{ u.created_at[:10] }}</span>
-          {% if not u.is_admin %}
-          <form method="post" action="/admin/users/{{ u.id }}/reject"
-            onsubmit="return confirm('Delete user {{ u.email }}?')">
-            <button type="submit" class="text-xs text-gray-600 hover:text-red-400">✕ Delete</button>
-          </form>
-          {% endif %}
         </div>
       </div>
       {% endfor %}
@@ -119,5 +182,96 @@
   </div>
 
 </div>
+
+<!-- Edit User Modal -->
+<div id="editModal" class="modal-backdrop" style="display:none;" onclick="if(event.target===this)closeEdit()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <h3 class="font-bold text-base mb-5" style="color:var(--text);" data-i18n="users.edit_title">Editează User</h3>
+    <form id="editForm" method="post" action="">
+      <div class="mb-4">
+        <label data-i18n="users.display_name_lbl">Nume afișat</label>
+        <input type="text" name="display_name" id="editName" placeholder="Nume">
+      </div>
+      <div class="mb-4">
+        <label>Email</label>
+        <input type="email" name="email" id="editEmail" placeholder="email@example.com">
+      </div>
+      <div class="mb-4">
+        <label data-i18n="users.role_lbl">Rol</label>
+        <select name="is_admin" id="editAdmin">
+          <option value="0" data-i18n="users.user_regular">User obișnuit</option>
+          <option value="1">ADMIN</option>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label data-i18n="users.status_lbl">Status</label>
+        <select name="is_approved" id="editApproved">
+          <option value="1" data-i18n="users.active_appr">Activ (aprobat)</option>
+          <option value="0" data-i18n="users.suspended">Suspendat (neaprobat)</option>
+        </select>
+      </div>
+      <div class="mb-5">
+        <label data-i18n="users.plan_lbl">Plan (manual, fără Stripe)</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="setPlanSelect" style="flex:1;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:13px;">
+            <option value="trial" data-i18n="users.trial_14">Trial (14 zile)</option>
+            <option value="free">Free</option>
+            <option value="starter">Starter</option>
+            <option value="pro">Pro</option>
+            <option value="elite">Elite</option>
+          </select>
+          <input type="number" id="setPlanDays" value="30" min="1" max="365" style="width:70px;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-size:13px;">
+          <span style="font-size:11px;color:var(--dim);" data-i18n="users.days">zile</span>
+          <button type="button" onclick="setPlan()" style="padding:6px 12px;background:rgba(0,255,120,.1);color:var(--neon);border:1px solid rgba(0,255,120,.25);border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Set</button>
+        </div>
+      </div>
+      <div class="flex gap-3 justify-end">
+        <button type="button" class="btn-ghost" onclick="closeEdit()" data-i18n="common.cancel">Anulează</button>
+        <button type="submit" class="btn-approve" style="border-radius:8px;" data-i18n="users.save_btn">Salvează</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+let _editUserId = null;
+function openEdit(id, name, email, isAdmin, isApproved) {
+  _editUserId = id;
+  document.getElementById('editForm').action = '/admin/users/' + id + '/edit';
+  document.getElementById('editName').value = name;
+  document.getElementById('editEmail').value = email;
+  document.getElementById('editAdmin').value = isAdmin ? '1' : '0';
+  document.getElementById('editApproved').value = isApproved ? '1' : '0';
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function setPlan() {
+  const plan = document.getElementById('setPlanSelect').value;
+  const days = document.getElementById('setPlanDays').value;
+  if (!_editUserId) return;
+  const fd = new FormData();
+  fd.append('user_id', _editUserId);
+  fd.append('plan', plan);
+  fd.append('days', days);
+  fetch('/api/admin/set-plan', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+      if (d.status === 'ok') {
+        alert(AP_T('users.set_plan_ok') + ' ' + plan + ' ' + AP_T('users.for_days') + ' ' + days + ' ' + AP_T('users.days') + '.');
+        closeEdit();
+        location.reload();
+      } else {
+        alert(AP_T('common.error') + ' ' + JSON.stringify(d));
+      }
+    })
+    .catch(e => alert(AP_T('common.error') + ' ' + e));
+}
+function closeEdit() {
+  document.getElementById('editModal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeEdit(); });
+</script>
+<script src="/static/i18n.js"></script>
+</div><!-- /main-wrap -->
 </body>
 </html>

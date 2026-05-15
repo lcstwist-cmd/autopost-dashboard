@@ -5,96 +5,176 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ name }} — AutoPost</title>
 <script src="/static/tailwind.js"></script>
+<link rel="stylesheet" href="/static/elite.css">
 <style>
-  body { background: #0a0f1a; }
-  .card { background: #111827; border: 1px solid #1f2937; }
-  .panel { background: #0d1423; border: 1px solid #1f2937; }
-  textarea { background: #0a0f1a; border: 1px solid #374151; color: #e5e7eb;
-             resize: vertical; font-family: ui-monospace, monospace; font-size: 13px;
-             line-height: 1.6; border-radius: 8px; padding: 12px; width: 100%; }
-  textarea:focus { outline: none; border-color: #3b82f6; }
-  .btn-primary   { background:#1d4ed8; color:#fff; padding:8px 18px; border-radius:8px;
-                   font-weight:600; font-size:14px; cursor:pointer; border:none;
-                   transition:background .15s; }
-  .btn-primary:hover { background:#2563eb; }
-  .btn-secondary { background:#1f2937; color:#d1d5db; padding:8px 18px; border-radius:8px;
-                   font-weight:600; font-size:14px; cursor:pointer; border:none;
-                   transition:background .15s; }
-  .btn-secondary:hover { background:#374151; }
-  .btn-ai        { background:#1a2e1a; color:#4ade80; padding:8px 18px; border-radius:8px;
-                   font-weight:600; font-size:14px; cursor:pointer; border:1px solid #166534;
-                   transition:all .15s; }
-  .btn-ai:hover  { background:#14532d; border-color:#22c55e; }
-  .btn-danger    { background:#1c0a0a; color:#f87171; padding:8px 18px; border-radius:8px;
-                   font-weight:600; font-size:14px; cursor:pointer; border:1px solid #7f1d1d;
-                   transition:all .15s; }
-  .btn-danger:hover { background:#7f1d1d; color:#fff; }
-  .btn-publish   { background:#064e3b; color:#34d399; padding:8px 18px; border-radius:8px;
-                   font-weight:600; font-size:14px; cursor:pointer; border:1px solid #065f46;
-                   transition:all .15s; }
-  .btn-publish:hover { background:#065f46; }
-  .char-count    { font-size: 12px; color: #6b7280; text-align: right; margin-top: 4px; }
-  .alert-ok      { background:rgba(52,211,153,.12); border:1px solid rgba(52,211,153,.3);
-                   color:#34d399; border-radius:8px; padding:10px 16px; font-size:14px; }
-  .alert-ai      { background:#0a1a0a; border:1px solid #166534; border-radius:8px;
-                   padding:12px 14px; margin-top:10px; }
-  .ai-spinner    { display:inline-block; width:14px; height:14px; border:2px solid #4ade80;
-                   border-top-color:transparent; border-radius:50%; animation:spin .7s linear infinite; }
+  /* ── Futurist Theme ── */
+  :root {
+    --bg:#020806; --surface:rgba(4,13,7,.95);
+    --border:rgba(0,255,120,.1); --border-h:rgba(0,255,120,.38);
+    --neon:#00ff7a; --green:#22c55e; --cyan:#06d6a0;
+    --text:#dff7e8; --muted:#3d7a55; --dim:#1a3d26;
+  }
+  *{box-sizing:border-box;}
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  .card {
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    backdrop-filter:blur(12px); position:relative; transition:border-color .2s;
+  }
+  .card::before {
+    content:''; position:absolute; top:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(0,255,120,.25),transparent);
+    opacity:0; transition:opacity .25s;
+  }
+  .card:hover::before { opacity:1; }
+  .panel { background:rgba(3,10,5,.97); border:1px solid var(--border); border-radius:12px; }
+  textarea {
+    background:rgba(2,8,4,.95); border:1px solid rgba(0,255,120,.1); color:var(--text);
+    resize:vertical; font-family:'JetBrains Mono','Fira Code',ui-monospace,monospace;
+    font-size:13px; line-height:1.6; border-radius:10px; padding:14px;
+    width:100%; outline:none; transition:border-color .18s;
+  }
+  textarea:focus { border-color:rgba(0,255,120,.38); box-shadow:0 0 0 3px rgba(0,255,120,.05); }
+  .btn-primary   { background:linear-gradient(135deg,#065c28,#16a34a);color:#fff;padding:9px 20px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;border:none;box-shadow:0 0 18px rgba(22,163,74,.2);transition:all .2s; }
+  .btn-primary:hover { opacity:.88; box-shadow:0 0 28px rgba(22,163,74,.35); }
+  .btn-secondary { background:rgba(255,255,255,.03);color:var(--muted);padding:9px 20px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;border:1px solid var(--border);transition:all .15s; }
+  .btn-secondary:hover { border-color:var(--border-h); color:var(--text); }
+  .btn-ai        { background:rgba(0,255,120,.08);color:var(--neon);padding:9px 20px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid rgba(0,255,120,.2);transition:all .15s; }
+  .btn-ai:hover  { background:rgba(0,255,120,.14); border-color:rgba(0,255,120,.4); }
+  .btn-danger    { background:rgba(239,68,68,.08);color:#f87171;padding:9px 20px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid rgba(239,68,68,.2);transition:all .15s; }
+  .btn-danger:hover { background:rgba(239,68,68,.18); color:#fff; }
+  .btn-publish   { background:rgba(6,214,160,.1);color:var(--cyan);padding:9px 20px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid rgba(6,214,160,.25);transition:all .15s; }
+  .btn-publish:hover { background:rgba(6,214,160,.2); }
+  .char-count    { color:var(--muted); font-size:11px; text-align:right; margin-top:4px; }
+  .alert-ok      { background:rgba(0,255,120,.07);border:1px solid rgba(0,255,120,.2);color:var(--neon);border-radius:10px;padding:12px 16px; }
+  .alert-ai      { background:rgba(4,13,7,.97);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:10px; }
+  .ai-spinner    { display:inline-block; width:14px; height:14px; border:2px solid rgba(0,255,120,.15); border-top-color:var(--neon); border-radius:50%; animation:spin .7s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
-  .story-score   { font-size:11px; color:#6b7280; }
-  .score-bar     { height:4px; border-radius:2px; background:#1f2937; }
-  .score-fill    { height:4px; border-radius:2px; background:#3b82f6; }
+  .story-score   { font-size:11px; color:var(--muted); }
+  .score-bar     { height:4px; border-radius:2px; background:var(--border); }
+  .score-fill    { height:4px; border-radius:2px; background:var(--neon); }
   ::-webkit-scrollbar { width:6px; }
-  ::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
-  .tab-active    { border-bottom:2px solid #3b82f6; color:#60a5fa; }
-  .tab-inactive  { border-bottom:2px solid transparent; color:#6b7280; }
-  .tab-inactive:hover { color:#9ca3af; }
+  ::-webkit-scrollbar-thumb { background:var(--dim); border-radius:3px; }
+  .tab-active    { border-bottom:2px solid var(--neon); color:var(--neon); }
+  .tab-inactive  { border-bottom:2px solid transparent; color:var(--muted); }
+  .tab-inactive:hover { color:var(--text); }
+  select, input[type="number"], input[type="text"] {
+    background:var(--surface); border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:8px 12px; font-size:13px; outline:none; transition:border-color .18s;
+  }
+  select:focus, input[type="number"]:focus, input[type="text"]:focus {
+    border-color:var(--border-h); box-shadow:0 0 0 3px rgba(0,255,120,.05);
+  }
+  details { background:var(--surface); border:1px solid var(--border); border-radius:10px; }
+  summary { color:var(--text); }
+/* __BG_REPLACED__ */
+body::before {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image: radial-gradient(circle, rgba(0,255,120,.22) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+body::after {
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 85%, rgba(0,255,120,.09) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 75% at 85% 15%, rgba(6,214,160,.07) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 45% at 50% 50%, rgba(0,70,35,.06) 0%, transparent 65%);
+  animation: aurora 18s ease-in-out infinite alternate;
+}
+@keyframes aurora { 0%{opacity:.7;} 50%{opacity:1;} 100%{opacity:.75;} }
+.grid-floor {
+  position:fixed; bottom:-10%; left:50%;
+  transform:translateX(-50%) perspective(600px) rotateX(70deg);
+  transform-origin:center bottom; width:250%; height:75%; z-index:0; pointer-events:none;
+  mask-image:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 55%);
+  -webkit-mask-image:linear-gradient(to top,rgba(0,0,0,.7) 0%,transparent 55%);
+}
+
 </style>
 </head>
-<body class="text-gray-100 min-h-screen">
-
+<body style="display:flex;min-height:100vh;">
+<div class="grid-floor" aria-hidden="true"></div>
+{% include '_sidebar.html' %}
+<div class="main-wrap">
 <!-- HEADER -->
-<header class="sticky top-0 z-10 border-b border-gray-800" style="background:#0d1423;">
-  <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <a href="/" class="text-gray-400 hover:text-white text-sm">← Dashboard</a>
-      <span class="text-gray-700">/</span>
-      <span class="font-bold text-white">{{ name }}</span>
+<header style="position:sticky;top:0;z-index:100;background:rgba(2,8,4,.95);border-bottom:1px solid rgba(0,255,120,.08);backdrop-filter:blur(20px);">
+  <div class="max-w-5xl mx-auto px-5 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <a href="/" style="color:var(--muted);font-size:13px;font-weight:600;text-decoration:none;" class="hover:text-white" data-i18n="nav.back">← Dashboard</a>
+      <span style="color:var(--dim);">/</span>
+      <span style="font-weight:800;color:var(--text);font-size:14px;" class="truncate max-w-xs">{{ name }}</span>
     </div>
     <div class="flex items-center gap-2">
-      <a href="/settings" class="text-xs text-gray-500 hover:text-gray-300">⚙ Settings</a>
+      <a href="/settings" class="text-xs hover:text-white" style="color:var(--muted);" data-i18n="nav.settings">⚙ Settings</a>
       <form method="post" action="/logout">
-        <button type="submit" class="text-xs text-gray-600 hover:text-red-400 px-2 py-1 rounded border border-gray-800">Logout</button>
+        <button type="submit" class="text-xs px-2 py-1 rounded hover:text-red-400" style="color:var(--dim);border:1px solid var(--border);" data-i18n="nav.logout">Logout</button>
       </form>
       <form method="post" action="/slot/{{ name }}/delete">
-        <button type="submit" class="btn-danger" onclick="return confirm('Delete this slot permanently?')">
+        <button type="submit" class="btn-danger" style="padding:6px 14px;font-size:12px;" onclick="return confirm('Delete this slot permanently?')" data-i18n="slot.delete">
           🗑 Delete
         </button>
       </form>
+      <div class="flex gap-1" style="border-left:1px solid var(--dim);padding-left:8px;">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')" style="font-size:10px;padding:3px 7px;border-radius:6px;border:1px solid var(--dim);background:rgba(0,255,120,.04);color:var(--muted);cursor:pointer;">EN</button>
+        <button class="lang-btn" data-lang="ro" onclick="setLang('ro')" style="font-size:10px;padding:3px 7px;border-radius:6px;border:1px solid var(--dim);background:rgba(0,255,120,.04);color:var(--muted);cursor:pointer;">RO</button>
+      </div>
     </div>
   </div>
 </header>
 
-<div class="max-w-5xl mx-auto px-6 py-6">
+<div class="max-w-5xl mx-auto px-6 py-6" style="position:relative;z-index:1;">
 
   <!-- FLASH MESSAGES -->
   {% if saved %}
-  <div class="alert-ok mb-4">✅ Saved successfully.</div>
+  <div class="alert-ok mb-4" data-i18n="slot.saved_ok">✅ Saved successfully.</div>
   {% endif %}
   {% if regenerated %}
-  <div class="alert-ok mb-4">✅ Posts regenerated from template.</div>
+  <div class="alert-ok mb-4" data-i18n="slot.regenerated_ok">✅ Posts regenerated from template.</div>
   {% endif %}
   {% if published %}
-  <div class="alert-ok mb-4">✅ Published!</div>
+  <div class="alert-ok mb-4" data-i18n="slot.published_ok">✅ Published!</div>
+  {% endif %}
+
+  {% if not has_image_x or not has_image_tg %}
+  <div id="img-pending-banner" class="mb-4 p-3 rounded-lg" style="background:rgba(3,10,5,.97);border:1px solid var(--border);color:var(--muted);">
+    ⏳ <strong data-i18n="slot.img_generating">Generating images…</strong>
+    <span id="img-pending-timer" data-i18n="slot.img_wait">(~30-60s, page auto-refreshes)</span>
+  </div>
+  <script>
+    // Auto-poll until both images land, then reload to show them.
+    (function(){
+      let seconds = 0;
+      const startedAt = Date.now();
+      const timerEl = document.getElementById('img-pending-timer');
+      async function check() {
+        try {
+          const r = await fetch(`/api/slot/{{ name }}/status`, { cache: 'no-store' });
+          if (r.ok) {
+            const d = await r.json();
+            if (d.has_image_x && d.has_image_tg) {
+              location.reload();
+              return;
+            }
+          }
+        } catch(e) {}
+        seconds = Math.floor((Date.now() - startedAt) / 1000);
+        if (timerEl) timerEl.textContent = `(${seconds}s — ` + AP_T('slot.img_gen_bg') + `)`;
+        setTimeout(check, 3000);
+      }
+      setTimeout(check, 3000);
+    })();
+  </script>
   {% endif %}
 
   <!-- PUBLISH STATUS -->
   {% if publish_log %}
-  <div class="card rounded-xl p-4 mb-6 text-sm">
-    <p class="text-gray-400 text-xs uppercase tracking-wider mb-2">Last Publish</p>
+  <div class="card p-4 mb-6 text-sm">
+    <p class="text-xs uppercase tracking-wider mb-2" style="color:var(--muted);">Last Publish</p>
     <div class="flex flex-wrap gap-3">
-      <span class="text-gray-500">{{ publish_log.timestamp[:19].replace('T',' ') if publish_log.timestamp else '' }}</span>
-      <span class="{{ 'text-green-400' if not publish_log.dry_run else 'text-gray-400' }}">
+      <span style="color:var(--muted);">{{ publish_log.timestamp[:19].replace('T',' ') if publish_log.timestamp else '' }}</span>
+      <span style="color:{{ 'var(--neon)' if not publish_log.dry_run else 'var(--muted)' }}">
         {{ '🔴 LIVE' if not publish_log.dry_run else '🔵 Dry-run' }}
       </span>
       {% for plat, res in (publish_log.results or {}).items() %}
@@ -112,40 +192,40 @@
     <div class="lg:col-span-1 space-y-4">
 
       <!-- Stories -->
-      <div class="card rounded-xl p-4">
-        <p class="text-xs text-gray-400 uppercase tracking-wider mb-3">
-          Top Stories
+      <div class="card p-4">
+        <p class="text-xs uppercase tracking-wider mb-3" style="color:var(--muted);">
+          <span data-i18n="slot.top_stories">Top Stories</span>
           {% if total_candidates %}
-          <span class="text-gray-600 normal-case ml-1">({{ total_candidates }} analyzed)</span>
+          <span class="normal-case ml-1" style="color:var(--dim);">({{ total_candidates }} <span data-i18n="slot.analyzed">analyzed</span>)</span>
           {% endif %}
         </p>
         {% if stories %}
           {% for s in stories %}
-          <div class="{% if not loop.first %}border-t border-gray-800 pt-3 mt-3{% endif %}">
-            <p class="text-sm text-gray-200 leading-snug mb-1">{{ s.title }}</p>
-            <div class="flex flex-wrap gap-2 text-xs text-gray-500">
+          <div class="{% if not loop.first %}pt-3 mt-3{% endif %}" style="{% if not loop.first %}border-top:1px solid var(--border);{% endif %}">
+            <p class="text-sm leading-snug mb-1" style="color:var(--text);">{{ s.title }}</p>
+            <div class="flex flex-wrap gap-2 text-xs" style="color:var(--muted);">
               <span>{{ s.source }}</span>
-              {% if s._score_total %}<span class="text-blue-400">score: {{ s._score_total }}</span>{% endif %}
+              {% if s._score_total %}<span style="color:var(--neon);">score: {{ s._score_total }}</span>{% endif %}
               {% if s.tickers %}<span class="text-yellow-400">{{ s.tickers | join(' ') }}</span>{% endif %}
             </div>
             {% if s._rationale %}
-            <p class="text-xs text-gray-600 mt-1 italic">{{ s._rationale }}</p>
+            <p class="text-xs mt-1 italic" style="color:var(--dim);">{{ s._rationale }}</p>
             {% endif %}
             {% if s.url %}
-            <a href="{{ s.url }}" target="_blank" class="text-xs text-blue-500 hover:text-blue-400 mt-1 block">
+            <a href="{{ s.url }}" target="_blank" class="text-xs mt-1 block hover:text-white" style="color:var(--neon);" data-i18n="slot.read_article">
               🔗 Read article
             </a>
             {% endif %}
           </div>
           {% endfor %}
         {% else %}
-          <p class="text-gray-500 text-sm">No story data found.</p>
+          <p class="text-sm" style="color:var(--muted);" data-i18n="slot.no_story">No story data found.</p>
         {% endif %}
       </div>
 
       <!-- Regenerate posts -->
       <form method="post" action="/slot/{{ name }}/regenerate">
-        <button type="submit" class="btn-secondary w-full">
+        <button type="submit" class="btn-secondary w-full" data-i18n="slot.regen">
           🔄 Regenerate Posts from Template
         </button>
       </form>
@@ -155,82 +235,99 @@
     <!-- RIGHT: Post editors -->
     <div class="lg:col-span-2 space-y-6">
 
-      <!-- TABS -->
       <!-- ═══ PUBLISH BAR — always visible ═══ -->
-      <div class="rounded-xl p-4 mb-2" style="background:#061a10;border:2px solid #065f46;">
+      <div class="card p-4 mb-2" style="border:1px solid rgba(0,255,120,.18);">
+        <p class="text-xs mb-3 font-semibold uppercase tracking-wider" style="color:var(--neon);" data-i18n="slot.publish_bar">🚀 Publish to platforms</p>
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+
+          <!-- Platform toggles — all 6 platforms -->
+          <button id="btn-plat-telegram" onclick="togglePlatform('telegram')"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition"
+            style="background:rgba(0,255,120,.08);border-color:var(--neon);color:var(--cyan);">
+            ✈ Telegram
+          </button>
+          <button id="btn-plat-x" onclick="togglePlatform('x')"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition"
+            style="background:rgba(0,255,120,.08);border-color:var(--neon);color:var(--text);">
+            ✖ X
+          </button>
+          <button id="btn-plat-instagram" onclick="togglePlatform('instagram')"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition"
+            style="background:var(--bg);border-color:var(--border);color:var(--muted);">
+            📸 Instagram
+          </button>
+          <button id="btn-plat-tiktok" onclick="togglePlatform('tiktok')"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition"
+            style="background:var(--bg);border-color:var(--border);color:var(--muted);">
+            🎵 TikTok
+          </button>
+          <button id="btn-plat-youtube" onclick="togglePlatform('youtube')"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition"
+            style="background:var(--bg);border-color:var(--border);color:var(--muted);">
+            ▶ YouTube
+          </button>
+          <button id="btn-plat-facebook" onclick="togglePlatform('facebook')"
+            class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition"
+            style="background:var(--bg);border-color:var(--border);color:var(--muted);">
+            👍 Facebook
+          </button>
+        </div>
+
         <div class="flex flex-wrap items-center gap-3">
-
-          <!-- Platform toggles -->
-          <div class="flex gap-2">
-            <button id="btn-plat-telegram" onclick="togglePlatform('telegram')"
-              class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border-2 transition"
-              style="background:#0d1e35;border-color:#2563eb;color:#60a5fa;">
-              ✈ Telegram
-            </button>
-            <button id="btn-plat-x" onclick="togglePlatform('x')"
-              class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold border-2 transition"
-              style="background:#0d1e35;border-color:#2563eb;color:#60a5fa;">
-              ✖ X
-            </button>
-          </div>
-
-          <div class="w-px h-8 bg-gray-700"></div>
 
           <!-- Variant -->
           <div class="flex items-center gap-1.5">
-            <span class="text-xs text-gray-500">Varianta:</span>
+            <span class="text-xs" style="color:var(--muted);" data-i18n="slot.variant">Variant:</span>
             <button id="vbtn-auto" onclick="setVariant('auto')"
               class="px-2.5 py-1.5 rounded-lg text-xs font-bold border transition"
-              style="background:#1e3a5f;border-color:#2563eb;color:#93c5fd;">Auto</button>
+              style="background:rgba(0,255,120,.08);border-color:var(--neon);color:var(--cyan);">Auto</button>
             <button id="vbtn-A" onclick="setVariant('A')"
               class="px-2.5 py-1.5 rounded-lg text-xs font-bold border transition"
-              style="background:#0a0f1a;border-color:#374151;color:#6b7280;">A</button>
+              style="background:var(--bg);border-color:var(--border);color:var(--muted);">A</button>
             <button id="vbtn-B" onclick="setVariant('B')"
               class="px-2.5 py-1.5 rounded-lg text-xs font-bold border transition"
-              style="background:#0a0f1a;border-color:#374151;color:#6b7280;">B</button>
+              style="background:var(--bg);border-color:var(--border);color:var(--muted);">B</button>
           </div>
 
-          <div class="w-px h-8 bg-gray-700"></div>
+          <div class="w-px h-8" style="background:var(--border);"></div>
 
           <!-- Dry-run toggle -->
           <label class="flex items-center gap-2 cursor-pointer select-none">
             <div onclick="toggleDryRun()" id="dry-toggle"
                  class="w-9 h-5 rounded-full relative transition-colors duration-200 cursor-pointer"
-                 style="background:#374151;">
+                 style="background:var(--dim);">
               <div id="dry-thumb" class="w-4 h-4 bg-white rounded-full absolute top-0.5 left-0.5 transition-transform duration-200 pointer-events-none"></div>
             </div>
-            <span id="dry-label" class="text-xs text-gray-400">Simulare</span>
+            <span id="dry-label" class="text-xs" style="color:var(--muted);" data-i18n="slot.simulation">Simulation</span>
           </label>
 
           <!-- PUBLISH BUTTON -->
           <button onclick="doPublish()" id="pub-btn"
                   class="ml-auto px-6 py-2.5 rounded-xl font-bold text-sm transition"
-                  style="background:#059669;color:#fff;border:none;cursor:pointer;">
-            🚀 Publică acum
+                  style="background:linear-gradient(135deg,#065c28,#059669);color:#fff;border:none;cursor:pointer;box-shadow:0 0 20px rgba(5,150,105,.3);">
+            <span data-i18n="slot.publish">🚀 Publish Now</span>
           </button>
         </div>
 
         <!-- Result -->
-        <div id="pub-result" style="display:none;" class="mt-3 pt-3 border-t border-green-900">
+        <div id="pub-result" style="display:none;" class="mt-3 pt-3" style="border-top:1px solid var(--border);">
           <div id="pub-result-inner"></div>
         </div>
       </div>
 
       <!-- TABS -->
-      <div class="flex gap-0 border-b border-gray-800 mb-0 overflow-x-auto">
+      <div class="flex gap-0 mb-0 overflow-x-auto" style="border-bottom:1px solid var(--border);">
         <button onclick="showTab('x')"   id="tab-x"   class="tab-active   px-4 py-2 text-sm font-medium transition whitespace-nowrap">✖ X Post A</button>
         <button onclick="showTab('x_b')" id="tab-x_b" class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap">✖ X Post B</button>
         <button onclick="showTab('tg')"  id="tab-tg"  class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap">✈ Telegram</button>
-        <button onclick="showTab('img')"    id="tab-img"    class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap">🖼 Images</button>
-        <button onclick="showTab('avatar')" id="tab-avatar" class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap">🤖 Avatar</button>
-        <button onclick="showTab('video')"  id="tab-video"  class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap">🎬 Video</button>
+        <button onclick="showTab('heygen')" id="tab-heygen" class="tab-inactive px-4 py-2 text-sm font-medium transition whitespace-nowrap" style="background:linear-gradient(135deg,rgba(0,255,120,.06),rgba(6,214,160,.04));color:var(--neon);">⚡ HeyGen</button>
       </div>
 
       <!-- X POST A -->
       <div id="panel-x">
-        <div class="panel rounded-xl p-5">
+        <div class="panel p-5">
           <div class="flex items-center justify-between mb-3">
-            <p class="text-sm font-semibold text-gray-300">X / Twitter — Variant A <span class="text-xs text-gray-500">(factual hook)</span></p>
+            <p class="text-sm font-semibold" style="color:var(--text);">X / Twitter — Variant A <span class="text-xs" style="color:var(--muted);">(factual hook)</span></p>
           </div>
           <form method="post" action="/slot/{{ name }}/save-x" id="form-x">
             <input type="hidden" name="variant" value="a">
@@ -244,8 +341,8 @@
           </form>
           <!-- AI Panel A -->
           <div id="ai-x" class="ai-spinner-panel" style="display:none;">
-            <div class="alert-ai mt-3">
-              <p class="text-xs text-green-400 font-semibold mb-2">✨ AI Rewrite — Variant A</p>
+            <div class="alert-ai">
+              <p class="text-xs font-semibold mb-2" style="color:var(--neon);">✨ AI Rewrite — Variant A</p>
               <textarea id="ai-instructions-x" rows="2" placeholder="Optional instructions... (e.g. 'more aggressive tone', 'focus on price impact')"
                         style="font-size:12px;"></textarea>
               <div class="flex gap-2 mt-2">
@@ -259,7 +356,7 @@
                   <button class="btn-secondary" onclick="runAI('x')" style="font-size:13px;padding:6px 14px;">↻ Retry</button>
                 </div>
               </div>
-              <div id="ai-loading-x" style="display:none;" class="flex items-center gap-2 mt-2 text-green-400 text-sm">
+              <div id="ai-loading-x" style="display:none;" class="flex items-center gap-2 mt-2 text-sm" style="color:var(--neon);">
                 <div class="ai-spinner"></div> Generating…
               </div>
               <div id="ai-error-x" class="mt-2 text-red-400 text-sm" style="display:none;"></div>
@@ -270,9 +367,9 @@
 
       <!-- X POST B -->
       <div id="panel-x_b" style="display:none;">
-        <div class="panel rounded-xl p-5">
+        <div class="panel p-5">
           <div class="flex items-center justify-between mb-3">
-            <p class="text-sm font-semibold text-gray-300">X / Twitter — Variant B <span class="text-xs text-gray-500">(question hook)</span></p>
+            <p class="text-sm font-semibold" style="color:var(--text);">X / Twitter — Variant B <span class="text-xs" style="color:var(--muted);">(question hook)</span></p>
           </div>
           <form method="post" action="/slot/{{ name }}/save-x" id="form-x_b">
             <input type="hidden" name="variant" value="b">
@@ -285,8 +382,8 @@
             </div>
           </form>
           <div id="ai-x_b" style="display:none;">
-            <div class="alert-ai mt-3">
-              <p class="text-xs text-green-400 font-semibold mb-2">✨ AI Rewrite — Variant B</p>
+            <div class="alert-ai">
+              <p class="text-xs font-semibold mb-2" style="color:var(--neon);">✨ AI Rewrite — Variant B</p>
               <textarea id="ai-instructions-x_b" rows="2" placeholder="Optional instructions…" style="font-size:12px;"></textarea>
               <div class="flex gap-2 mt-2">
                 <button class="btn-ai" onclick="runAI('x_b')">Generate</button>
@@ -299,7 +396,7 @@
                   <button class="btn-secondary" onclick="runAI('x_b')" style="font-size:13px;padding:6px 14px;">↻ Retry</button>
                 </div>
               </div>
-              <div id="ai-loading-x_b" style="display:none;" class="flex items-center gap-2 mt-2 text-green-400 text-sm">
+              <div id="ai-loading-x_b" style="display:none;" class="flex items-center gap-2 mt-2 text-sm" style="color:var(--neon);">
                 <div class="ai-spinner"></div> Generating…
               </div>
               <div id="ai-error-x_b" class="mt-2 text-red-400 text-sm" style="display:none;"></div>
@@ -308,134 +405,28 @@
         </div>
       </div>
 
-      <!-- IMAGES PANEL -->
-      <div id="panel-img" style="display:none;">
-        <div class="panel rounded-xl p-5 space-y-6">
-          <p class="text-sm font-semibold text-gray-300">Image Editor</p>
-
-          <!-- Controls shared between both sizes -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-lg" style="background:#0a0f1a;border:1px solid #374151;">
-            <div>
-              <label class="text-xs text-gray-400 block mb-1">Mood</label>
-              <select id="img-mood" class="w-full rounded-lg px-3 py-2 text-sm"
-                      style="background:#111827;border:1px solid #374151;color:#e5e7eb;">
-                <option value="auto">Auto (from story)</option>
-                <option value="bull">Bull 📈</option>
-                <option value="bear">Bear 🚨</option>
-                <option value="neutral">Neutral 📰</option>
-              </select>
-            </div>
-            <div>
-              <label class="text-xs text-gray-400 block mb-1">Seed <span class="text-gray-600">(−1 = random)</span></label>
-              <input id="img-seed" type="number" value="-1" min="-1" max="99999"
-                     class="w-full rounded-lg px-3 py-2 text-sm"
-                     style="background:#111827;border:1px solid #374151;color:#e5e7eb;width:100%;">
-            </div>
-            <div>
-              <label class="text-xs text-gray-400 block mb-1">Target</label>
-              <select id="img-target" class="w-full rounded-lg px-3 py-2 text-sm"
-                      style="background:#111827;border:1px solid #374151;color:#e5e7eb;">
-                <option value="both">Both (X + Telegram)</option>
-                <option value="x">X only (1200×675)</option>
-                <option value="tg">Telegram only (1080×1080)</option>
-              </select>
-            </div>
-            <div class="sm:col-span-3">
-              <label class="text-xs text-gray-400 block mb-1">Custom background prompt <span class="text-gray-600">(optional — overrides default)</span></label>
-              <input id="img-prompt" type="text" placeholder="e.g. dark futuristic city skyline, golden bitcoin symbol, neon lights, cinematic..."
-                     class="w-full rounded-lg px-3 py-2 text-sm"
-                     style="background:#111827;border:1px solid #374151;color:#e5e7eb;">
-            </div>
-            <div class="sm:col-span-3 flex gap-2">
-              <button class="btn-ai flex-1" onclick="regenImage()">
-                <span id="regen-btn-text">🎨 Regenerate Image</span>
-              </button>
-              <span id="regen-status" class="text-xs text-gray-500 self-center hidden"></span>
-            </div>
-            <div id="regen-error" class="sm:col-span-3 text-red-400 text-xs hidden"></div>
-          </div>
-
-          <!-- Upload section -->
-          <div class="p-4 rounded-lg" style="background:#0a0f1a;border:1px solid #374151;">
-            <p class="text-xs text-gray-400 font-semibold mb-3 uppercase tracking-wider">Upload Custom Image</p>
-            <p class="text-xs text-gray-500 mb-3">Upload your own PNG/JPG. Will be automatically resized to both X (1200×675) and Telegram (1080×1080) formats.</p>
-            <div class="flex flex-wrap items-center gap-3">
-              <select id="upload-target" class="rounded-lg px-3 py-2 text-sm"
-                      style="background:#111827;border:1px solid #374151;color:#e5e7eb;">
-                <option value="both">Both sizes</option>
-                <option value="x">X only</option>
-                <option value="tg">Telegram only</option>
-              </select>
-              <label class="btn-secondary cursor-pointer" style="padding:8px 16px;font-size:13px;font-weight:600;border-radius:8px;">
-                📂 Choose file
-                <input type="file" id="upload-file" accept="image/*" class="hidden" onchange="uploadImage()">
-              </label>
-              <span id="upload-status" class="text-xs text-gray-500"></span>
-            </div>
-            <div id="upload-error" class="text-red-400 text-xs mt-2 hidden"></div>
-          </div>
-
-          <!-- Image previews -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider">X — 1200×675</p>
-                <a id="dl-x" href="/image/{{ name }}/image_x_1200x675.png" download
-                   class="text-xs text-blue-400 hover:text-blue-300">⬇ Download</a>
-              </div>
-              {% if has_image_x %}
-              <img id="preview-x" src="/image/{{ name }}/image_x_1200x675.png?t={{ name }}"
-                   class="rounded-lg w-full border border-gray-800" alt="X image">
-              {% else %}
-              <div id="preview-x" class="rounded-lg w-full flex items-center justify-center text-gray-600 text-sm"
-                   style="background:#0a0f1a;border:1px dashed #374151;aspect-ratio:16/9;">
-                No image yet
-              </div>
-              {% endif %}
-            </div>
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Telegram — 1080×1080</p>
-                <a id="dl-tg" href="/image/{{ name }}/image_tg_1080x1080.png" download
-                   class="text-xs text-blue-400 hover:text-blue-300">⬇ Download</a>
-              </div>
-              {% if has_image_tg %}
-              <img id="preview-tg" src="/image/{{ name }}/image_tg_1080x1080.png?t={{ name }}"
-                   class="rounded-lg w-full border border-gray-800" alt="TG image">
-              {% else %}
-              <div id="preview-tg" class="rounded-lg w-full flex items-center justify-center text-gray-600 text-sm"
-                   style="background:#0a0f1a;border:1px dashed #374151;aspect-ratio:1/1;">
-                No image yet
-              </div>
-              {% endif %}
-            </div>
-          </div>
-
-        </div>
-      </div>
-
       <!-- PUBLISH PANEL (no duplicate IDs — pub bar above handles the publish action) -->
       <div id="panel-pub" style="display:none;">
-        <div class="panel rounded-xl p-6 space-y-4">
-          <p class="text-sm font-bold text-white">Publish Post</p>
-          <p class="text-xs text-gray-500">Foloseste bara de Publică de mai sus sau setarile de mai jos.</p>
+        <div class="panel p-6 space-y-4">
+          <p class="text-sm font-bold" style="color:var(--text);">Publish Post</p>
+          <p class="text-xs" style="color:var(--muted);" data-i18n="slot.publish_hint">Foloseste bara de Publică de mai sus sau setarile de mai jos.</p>
 
           <!-- Preview rezumat -->
-          <div class="p-4 rounded-lg text-xs" style="background:#0a0f1a;border:1px solid #374151;">
-            <p class="text-gray-500 mb-2 font-semibold uppercase tracking-wider">Preview postare X</p>
-            <p class="text-gray-300 leading-relaxed whitespace-pre-wrap" style="max-height:120px;overflow:hidden;">{{ post_x[:300] }}{% if post_x|length > 300 %}…{% endif %}</p>
+          <div class="p-4 rounded-lg text-xs" style="background:var(--bg);border:1px solid var(--border);">
+            <p class="mb-2 font-semibold uppercase tracking-wider" style="color:var(--muted);">Preview postare X</p>
+            <p class="leading-relaxed whitespace-pre-wrap" style="color:var(--text);max-height:120px;overflow:hidden;">{{ post_x[:300] }}{% if post_x|length > 300 %}…{% endif %}</p>
           </div>
 
           <!-- Previous publish log -->
           {% if publish_log %}
-          <div class="pt-4 border-t border-gray-800">
-            <p class="text-xs text-gray-500 uppercase tracking-wider mb-2 font-semibold">Ultima publicare</p>
+          <div class="pt-4" style="border-top:1px solid var(--border);">
+            <p class="text-xs uppercase tracking-wider mb-2 font-semibold" style="color:var(--muted);" data-i18n="slot.last_pub">Ultima publicare</p>
             <div class="text-xs space-y-1">
-              <p class="text-gray-500">{{ publish_log.timestamp[:19].replace('T',' ') if publish_log.timestamp else '' }}
-                — <span class="{{ 'text-red-400' if not publish_log.dry_run else 'text-gray-500' }}">
+              <p style="color:var(--muted);">{{ publish_log.timestamp[:19].replace('T',' ') if publish_log.timestamp else '' }}
+                — <span class="{{ 'text-red-400' if not publish_log.dry_run else '' }}" style="{{ '' if not publish_log.dry_run else 'color:var(--muted);' }}">
                   {{ 'LIVE' if not publish_log.dry_run else 'dry-run' }}
                 </span>
-                — varianta <span class="text-blue-400">{{ publish_log.variant or '?' }}</span>
+                — varianta <span style="color:var(--neon);">{{ publish_log.variant or '?' }}</span>
               </p>
               {% for plat, res in (publish_log.results or {}).items() %}
               <p class="{{ 'text-green-400' if res.status == 'ok' else 'text-red-400' }}">
@@ -451,8 +442,8 @@
 
       <!-- TELEGRAM -->
       <div id="panel-tg" style="display:none;">
-        <div class="panel rounded-xl p-5">
-          <p class="text-sm font-semibold text-gray-300 mb-3">Telegram Post</p>
+        <div class="panel p-5">
+          <p class="text-sm font-semibold mb-3" style="color:var(--text);">Telegram Post</p>
           <form method="post" action="/slot/{{ name }}/save-tg" id="form-tg">
             <textarea id="ta-tg" name="content" rows="14"
                       oninput="updateCount('ta-tg','cnt-tg')">{{ post_tg }}</textarea>
@@ -463,8 +454,8 @@
             </div>
           </form>
           <div id="ai-tg" style="display:none;">
-            <div class="alert-ai mt-3">
-              <p class="text-xs text-green-400 font-semibold mb-2">✨ AI Rewrite — Telegram</p>
+            <div class="alert-ai">
+              <p class="text-xs font-semibold mb-2" style="color:var(--neon);">✨ AI Rewrite — Telegram</p>
               <textarea id="ai-instructions-tg" rows="2" placeholder="Optional instructions…" style="font-size:12px;"></textarea>
               <div class="flex gap-2 mt-2">
                 <button class="btn-ai" onclick="runAI('tg')">Generate</button>
@@ -477,7 +468,7 @@
                   <button class="btn-secondary" onclick="runAI('tg')" style="font-size:13px;padding:6px 14px;">↻ Retry</button>
                 </div>
               </div>
-              <div id="ai-loading-tg" style="display:none;" class="flex items-center gap-2 mt-2 text-green-400 text-sm">
+              <div id="ai-loading-tg" style="display:none;" class="flex items-center gap-2 mt-2 text-sm" style="color:var(--neon);">
                 <div class="ai-spinner"></div> Generating…
               </div>
               <div id="ai-error-tg" class="mt-2 text-red-400 text-sm" style="display:none;"></div>
@@ -486,187 +477,163 @@
         </div>
       </div>
 
-      <!-- AVATAR PANEL -->
-      <div id="panel-avatar" style="display:none;">
-        <div class="panel rounded-xl p-5">
-          <h3 class="text-white font-bold text-base mb-1">🤖 AI Avatar Video Package</h3>
-          <p class="text-gray-400 text-sm mb-4">Generează script 30s + 60s pentru HeyGen/ElevenLabs + metadata optimizată per platformă (TikTok · Reels · Shorts).</p>
-
-          <!-- Generate button -->
-          <div class="flex items-center gap-3 mb-5">
-            <button onclick="generateAvatar()" id="btn-avatar"
-              class="btn-primary flex items-center gap-2">
-              🎬 Generează Script Avatar
-            </button>
-            <label class="flex items-center gap-2 text-gray-400 text-sm cursor-pointer">
-              <input type="checkbox" id="avatar-llm" class="accent-green-500">
-              ✨ Îmbunătățit cu AI (Claude)
-            </label>
-            <span id="avatar-spinner" style="display:none" class="text-green-400 text-sm flex items-center gap-2">
-              <div class="ai-spinner"></div> Generez…
-            </span>
-          </div>
-
-          <div id="avatar-result" style="display:none;">
-            <!-- Mood badge -->
-            <div class="flex items-center gap-2 mb-4">
-              <span id="avatar-mood-badge" class="px-3 py-1 rounded-full text-xs font-bold"></span>
-              <span class="text-gray-400 text-xs">sentiment detectat automat din titlul știrii</span>
-            </div>
-
-            <!-- Hook preview -->
-            <div class="rounded-lg p-3 mb-4" style="background:#0d1f0d;border:1px solid #1a3a1a;">
-              <div class="text-gray-500 text-xs mb-1">HOOK (primele 3 secunde)</div>
-              <div id="avatar-hook" class="text-white text-sm font-medium"></div>
-            </div>
-
-            <!-- Scripts accordion -->
-            <div class="space-y-3 mb-5">
-              <details class="rounded-lg overflow-hidden" style="background:#111827;border:1px solid #1f2937;">
-                <summary class="px-4 py-3 cursor-pointer text-white text-sm font-medium hover:bg-gray-800 list-none flex items-center justify-between">
-                  <span>📄 Script 30 secunde</span>
-                  <span class="text-gray-500 text-xs">↓ click să vezi</span>
-                </summary>
-                <div class="px-4 py-3">
-                  <pre id="script-30" class="text-gray-300 text-xs whitespace-pre-wrap font-mono leading-relaxed"></pre>
-                </div>
-              </details>
-              <details class="rounded-lg overflow-hidden" style="background:#111827;border:1px solid #1f2937;">
-                <summary class="px-4 py-3 cursor-pointer text-white text-sm font-medium hover:bg-gray-800 list-none flex items-center justify-between">
-                  <span>📄 Script 60 secunde (YouTube Shorts)</span>
-                  <span class="text-gray-500 text-xs">↓ click să vezi</span>
-                </summary>
-                <div class="px-4 py-3">
-                  <pre id="script-60" class="text-gray-300 text-xs whitespace-pre-wrap font-mono leading-relaxed"></pre>
-                </div>
-              </details>
-            </div>
-
-            <!-- Platform cards -->
-            <h4 class="text-white font-semibold text-sm mb-3">📲 Optimizare algoritm per platformă</h4>
-            <div class="grid gap-3" id="platform-cards">
-              <!-- Filled by JS -->
-            </div>
-
-            <!-- Download links -->
-            <div class="mt-5 pt-4" style="border-top:1px solid #1f2937;">
-              <div class="text-gray-400 text-xs mb-2">Fișiere generate în <code class="text-green-400">queue/{{ name }}/avatar/</code>:</div>
-              <div id="avatar-files" class="flex flex-wrap gap-2"></div>
-            </div>
-          </div>
-
-          <div id="avatar-error" class="text-red-400 text-sm mt-3" style="display:none;"></div>
-        </div>
-      </div>
-
-      <!-- VIDEO PANEL -->
-      <div id="panel-video" style="display:none;">
-        <div class="panel rounded-xl p-5">
-          <h3 class="text-white font-bold text-base mb-1">🧑 Avatar AI Video Generator</h3>
-          <p class="text-gray-400 text-sm mb-4">
-            Un singur buton: generează automat <strong class="text-white">script + imagine 9:16 + avatar D-ID</strong>.<br>
-            Rezultat: <span class="text-green-400">reel_avatar.mp4</span> (1080×1920, ready for TikTok / Reels / Shorts).
+      <!-- HEYGEN ONE-CLICK PANEL -->
+      <div id="panel-heygen" style="display:none;">
+        <div class="panel p-5">
+          <h3 class="font-bold text-base mb-1" style="color:var(--neon);">⚡ HeyGen — Video Complet One Click</h3>
+          <p class="text-sm mb-5" style="color:var(--muted);" data-i18n-html="slot.heygen_one_click_desc">
+            Selectează știrea → script auto → imagine futuristă 9:16 → avatar HD perfect încadrat + subtitrări neon.<br>
+            Rezultat: <span style="color:var(--neon);">reel_avatar.mp4</span> gata TikTok / Reels / Shorts.
           </p>
 
-          <!-- Presenter selector -->
-          <div class="mb-4">
-            <label class="text-xs text-gray-400 block mb-2 font-semibold uppercase tracking-wider">Avatar prezentator</label>
-            <select id="avatar-presenter" class="text-sm rounded-lg px-3 py-2 w-full"
-              style="background:#0a0f1a;border:1px solid #374151;color:#e5e7eb;max-width:360px;">
-              <optgroup label="Barbati">
-                <option value="alex_suit">Alex — costum negru (recomandat)</option>
-                <option value="william">William — camasa neagra</option>
-                <option value="arran">Arran — sacou bej</option>
-                <option value="alex_casual">Alex — camasa casual</option>
-                <option value="darren">Darren</option>
-                <option value="ethan">Ethan</option>
-                <option value="lucas">Lucas</option>
-                <option value="jaimie">Jaimie</option>
-              </optgroup>
-              <optgroup label="Femei">
-                <option value="anita">Anita — profesionala</option>
-                <option value="diana">Diana — profesionala</option>
-                <option value="sophia">Sophia</option>
-                <option value="lana">Lana</option>
-                <option value="amber">Amber</option>
-                <option value="flora">Flora</option>
-              </optgroup>
-            </select>
+          <!-- Avatar picker -->
+          <div class="mb-5 p-4 rounded-xl" style="background:rgba(0,255,120,.03);border:1px solid rgba(0,255,120,.12);">
+            <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <label class="text-xs font-semibold uppercase tracking-wider" style="color:var(--muted);">
+                Avatar HeyGen <span id="hg-avatar-count" class="ml-2" style="color:var(--cyan);"></span>
+              </label>
+              <div class="flex gap-2 items-center">
+                <input type="text" id="hg-avatar-search" placeholder="🔍 Caută..." data-i18n-ph="slot.search_ph"
+                  style="font-size:12px;padding:5px 10px;min-width:140px;"
+                  oninput="filterHgAvatars()">
+                <button onclick="fetchHeygenAvatars()" id="btn-fetch-hg"
+                  class="btn-ai" style="padding:6px 14px;font-size:11px;">🔄 Fetch</button>
+              </div>
+            </div>
+
+            <!-- Hidden form value (selected avatar id is mirrored here) -->
+            <input type="hidden" id="hg-avatar-id" value="">
+
+            <!-- Selected card preview -->
+            <div id="hg-avatar-selected" class="mb-3 hidden rounded-lg p-3 flex items-center gap-3"
+              style="background:rgba(0,255,120,.06);border:1px solid var(--neon);">
+              <img id="hg-avatar-selected-img" src="" alt=""
+                style="width:48px;height:48px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-bold" style="color:var(--neon);" id="hg-avatar-selected-name"></div>
+                <div class="text-xs truncate" style="color:var(--muted);" id="hg-avatar-selected-id"></div>
+              </div>
+              <button onclick="clearHgAvatar()" class="text-xs"
+                style="color:var(--muted);" title="Deselectează" data-i18n-title="slot.deselect">✕</button>
+            </div>
+
+            <!-- Grid of avatars (4 per row, scrollable) -->
+            <div id="hg-avatar-grid"
+              style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
+                     max-height:340px;overflow-y:auto;padding:6px;
+                     border-radius:10px;background:rgba(0,0,0,0.25);
+                     border:1px solid rgba(0,255,120,.08);">
+              <p class="muted text-xs col-span-4 text-center py-8" id="hg-avatar-empty" data-i18n="slot.hg_loading">
+                Se încarcă avatarele HeyGen...
+              </p>
+            </div>
+
+            <!-- Manual fallback -->
+            <details class="mt-3">
+              <summary class="text-xs cursor-pointer" style="color:var(--muted);" data-i18n="slot.manual_avatar_id">Sau introdu manual un Avatar ID</summary>
+              <input type="text" id="hg-avatar-manual"
+                placeholder="ex: 2d5b0e6cf36f460aa7fc47e3eee4ba54"
+                style="width:100%;font-size:12px;margin-top:8px;">
+            </details>
+            <div id="hg-fetch-error" class="text-red-400 text-xs mt-2" style="display:none;"></div>
           </div>
 
-          <!-- ONE BIG BUTTON -->
-          <button onclick="buildAvatarVideo()" id="btn-avatar-video"
-            class="w-full py-4 rounded-xl font-bold text-base transition mb-2"
-            style="background:#065f46;color:#34d399;border:2px solid #059669;cursor:pointer;font-size:16px;">
-            🧑 Generează Script + Imagine + Avatar AI
-          </button>
-          <p class="text-xs text-gray-600 mb-4">~2-3 minute • 1 credit D-ID • totul automat</p>
+          <!-- Platform selector -->
+          <div class="mb-5">
+            <label class="text-xs block mb-2 font-semibold uppercase tracking-wider" style="color:var(--muted);" data-i18n="slot.platform_lbl">Platformă</label>
+            <div class="flex gap-2 flex-wrap">
+              <button onclick="setHgPlatform('tiktok')" id="hgbtn-tiktok"
+                class="px-4 py-2 rounded-xl text-xs font-bold border-2 transition"
+                style="background:rgba(6,214,160,.12);color:var(--cyan);border-color:rgba(6,214,160,.4);">
+                🎵 TikTok
+              </button>
+              <button onclick="setHgPlatform('instagram_reel')" id="hgbtn-instagram_reel"
+                class="px-4 py-2 rounded-xl text-xs font-bold border-2 transition"
+                style="background:var(--bg);color:var(--muted);border-color:var(--border);">
+                📸 Instagram
+              </button>
+              <button onclick="setHgPlatform('youtube_shorts')" id="hgbtn-youtube_shorts"
+                class="px-4 py-2 rounded-xl text-xs font-bold border-2 transition"
+                style="background:var(--bg);color:var(--muted);border-color:var(--border);">
+                ▶ YT Shorts
+              </button>
+              <button onclick="setHgPlatform('facebook_reel')" id="hgbtn-facebook_reel"
+                class="px-4 py-2 rounded-xl text-xs font-bold border-2 transition"
+                style="background:var(--bg);color:var(--muted);border-color:var(--border);">
+                👍 Facebook
+              </button>
+            </div>
+          </div>
 
-          <!-- Spinner with step indicator -->
-          <div id="video-spinner" style="display:none;" class="rounded-lg p-4 mb-4" style="background:#0a1a0a;border:1px solid #166534;">
-            <div class="flex items-center gap-3 text-green-400 text-sm font-medium">
+          <!-- Preview Script button -->
+          <div class="mb-4 flex gap-3 flex-wrap">
+            <button onclick="previewAvatarScript()" id="btn-preview-script"
+              class="ebtn ebtn-ghost"
+              style="font-size:12px;padding:8px 18px;border-color:rgba(0,212,170,.35);color:var(--cyan);"
+              data-i18n="slot.preview_script">
+              🔍 Preview & Edit Script
+            </button>
+            <button onclick="openScheduleModal()" id="btn-schedule"
+              class="ebtn ebtn-ghost"
+              style="font-size:12px;padding:8px 18px;border-color:rgba(245,158,11,.35);color:var(--gold);"
+              data-i18n="slot.schedule_post">
+              🕐 Programează post
+            </button>
+          </div>
+
+          <!-- Generate button -->
+          <button onclick="generateHeygenVideo()" id="btn-hg-generate"
+            class="btn-primary mb-5"
+            style="font-size:15px;padding:13px 32px;box-shadow:0 0 30px rgba(0,255,120,.3);letter-spacing:.03em;">
+            <span data-i18n="slot.gen_heygen_btn">⚡ Generează Video HeyGen</span>
+          </button>
+
+          <!-- Script preview (shown after submit) -->
+          <div id="hg-script-preview" style="display:none;" class="rounded-xl p-4 mb-5"
+            style="background:rgba(0,255,120,.04);border:1px solid rgba(0,255,120,.12);">
+            <p class="text-xs font-semibold mb-2 uppercase tracking-wider" style="color:var(--muted);" data-i18n="slot.generated_script_20s">Script generat (20s)</p>
+            <pre id="hg-script-text" class="text-xs whitespace-pre-wrap font-mono leading-relaxed"
+              style="color:var(--text);max-height:130px;overflow-y:auto;"></pre>
+          </div>
+
+          <!-- Progress section -->
+          <div id="hg-progress" style="display:none;" class="rounded-xl p-5 mb-5"
+            style="background:rgba(0,255,120,.03);border:1px solid rgba(0,255,120,.15);">
+            <div class="flex items-center gap-3 mb-4">
               <div class="ai-spinner"></div>
-              <span id="video-spinner-text">Se pregătește...</span>
+              <span id="hg-progress-text" class="text-sm font-bold" style="color:var(--neon);" data-i18n="slot.initializing">Inițializare...</span>
             </div>
-            <div id="video-steps" class="mt-3 space-y-1 text-xs text-gray-500">
-              <div id="step-script"  class="flex items-center gap-2"><span id="step-script-icon">⏳</span> Script reel</div>
-              <div id="step-image"   class="flex items-center gap-2"><span id="step-image-icon">⏳</span> Imagine fundal 9:16</div>
-              <div id="step-did"     class="flex items-center gap-2"><span id="step-did-icon">⏳</span> Avatar D-ID (polling...)</div>
-              <div id="step-compose" class="flex items-center gap-2"><span id="step-compose-icon">⏳</span> Compozitie finala</div>
+            <!-- Neon progress bar -->
+            <div class="w-full rounded-full mb-4" style="background:rgba(0,255,120,.08);height:5px;">
+              <div id="hg-pbar" class="rounded-full transition-all duration-700"
+                style="background:linear-gradient(90deg,var(--neon),var(--cyan));height:5px;width:5%;box-shadow:0 0 8px rgba(0,255,120,.6);"></div>
             </div>
+            <!-- Step indicators -->
+            <div class="space-y-2 text-xs mb-3" style="color:var(--muted);">
+              <div id="hgs-script"  class="flex items-center gap-2"><span id="hgs-script-icon">⏳</span> <span data-i18n="slot.step_script_news">Script auto-generat din știre</span></div>
+              <div id="hgs-render"  class="flex items-center gap-2"><span id="hgs-render-icon">⏳</span> <span data-i18n="slot.step_render_heygen">HeyGen renderizare avatar HD</span></div>
+              <div id="hgs-compose" class="flex items-center gap-2"><span id="hgs-compose-icon">⏳</span> <span data-i18n="slot.step_compose_neon">Composite + subtitrări neon</span></div>
+              <div id="hgs-save"    class="flex items-center gap-2"><span id="hgs-save-icon">⏳</span> <span data-i18n="slot.step_save_reel">Salvare reel_avatar.mp4</span></div>
+            </div>
+            <div class="text-xs" style="color:var(--dim);"><span id="hg-elapsed"></span></div>
           </div>
 
           <!-- Result -->
-          <div id="video-result" style="display:none;">
-            <div class="bg-black rounded-xl overflow-hidden mb-4" style="max-width:360px;">
-              <video id="video-player" controls playsinline
-                style="width:100%; aspect-ratio:9/16; object-fit:contain; background:#000;">
+          <div id="hg-result" style="display:none;">
+            <div class="rounded-xl overflow-hidden mb-4" style="max-width:320px;background:#000;border:2px solid rgba(0,255,120,.3);box-shadow:0 0 40px rgba(0,255,120,.15);">
+              <video id="hg-video-player" controls playsinline
+                style="width:100%;aspect-ratio:9/16;object-fit:contain;background:#000;">
               </video>
             </div>
-            <div id="video-meta" class="text-xs text-green-400 font-semibold mb-3"></div>
-            <a id="video-download" href="#" download
-              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-              style="background:#1f2937;color:#d1d5db;border:1px solid #374151;">
-              ⬇ Descarcă MP4
+            <div id="hg-result-meta" class="text-sm font-bold mb-3" style="color:var(--neon);"></div>
+            <a id="hg-video-dl" href="#" download
+              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold"
+              style="background:rgba(0,255,120,.1);color:var(--neon);border:1px solid rgba(0,255,120,.3);box-shadow:0 0 16px rgba(0,255,120,.1);">
+              ⬇ Download reel_avatar.mp4
             </a>
           </div>
 
-          <!-- Previous video -->
-          {% if reel_video %}
-          <div class="mt-4 pt-4 border-t border-gray-800">
-            <p class="text-xs text-gray-500 mb-2">Video generat anterior:</p>
-            <div class="bg-black rounded-xl overflow-hidden mb-3" style="max-width:360px;">
-              <video controls playsinline
-                style="width:100%; aspect-ratio:9/16; object-fit:contain; background:#000;"
-                src="/video/{{ name }}/reel_avatar.mp4"></video>
-            </div>
-            <a href="/video/{{ name }}/reel_avatar.mp4" download
-              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-              style="background:#1f2937;color:#d1d5db;border:1px solid #374151;">
-              ⬇ Descarcă reel_avatar.mp4
-            </a>
-          </div>
-          {% endif %}
-
-          <!-- Fallback: basic MP4 (no avatar) -->
-          <details class="mt-5">
-            <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-400">
-              ▸ Generează MP4 simplu (fara avatar, mai rapid)
-            </summary>
-            <div class="mt-3 flex flex-wrap items-center gap-3">
-              <button onclick="buildVideo()" id="btn-video"
-                class="px-4 py-2 rounded-lg text-sm font-semibold"
-                style="background:#1f2937;color:#d1d5db;border:1px solid #374151;cursor:pointer;">
-                🎬 Generează MP4 simplu
-              </button>
-              <label class="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
-                <input type="checkbox" id="video-elevenlabs" class="accent-green-500">
-                ElevenLabs TTS
-              </label>
-            </div>
-          </details>
-
-          <div id="video-error" class="text-red-400 text-sm mt-3" style="display:none;"></div>
+          <div id="hg-error" class="text-red-400 text-sm mt-3" style="display:none;"></div>
         </div>
       </div>
 
@@ -688,13 +655,21 @@ function esc(s) {
 
 // --- Tabs ---
 function showTab(id) {
-  ['x','x_b','tg','img','avatar','video'].forEach(t => {
-    document.getElementById('panel-' + t).style.display = t === id ? '' : 'none';
+  ['x','x_b','tg','heygen'].forEach(t => {
+    const panel = document.getElementById('panel-' + t);
+    if (panel) panel.style.display = t === id ? '' : 'none';
     const tab = document.getElementById('tab-' + t);
+    if (!tab) return;
     tab.className = tab.className.replace(/tab-active|tab-inactive/g,'');
     tab.className += ' ' + (t === id ? 'tab-active' : 'tab-inactive');
   });
+  // Auto-fetch HeyGen avatars on first open (like Avatar Studio).
+  if (id === 'heygen' && !_hgAvatarsLoaded) {
+    _hgAvatarsLoaded = true;
+    if (typeof fetchHeygenAvatars === 'function') fetchHeygenAvatars();
+  }
 }
+let _hgAvatarsLoaded = false;
 
 // --- Char counter ---
 function updateCount(taId, cntId) {
@@ -703,7 +678,7 @@ function updateCount(taId, cntId) {
   if (!ta || !el) return;
   const len = ta.value.length;
   el.textContent = len + ' characters';
-  el.style.color = len > 24000 ? '#f87171' : '#6b7280';
+  el.style.color = len > 24000 ? '#f87171' : 'var(--muted)';
 }
 
 // Init counts on load
@@ -757,16 +732,27 @@ async function runAI(platform) {
 
 // --- Publish bar ---
 let _dryRun = false;
-const _platforms = new Set(['telegram', 'x']);
+const _platforms = new Set(['telegram', 'x']);  // default: TG + X on
 let _variant = 'auto';
+
+const _platColors = {
+  telegram:  {on:'rgba(0,255,120,.08)', border:'var(--neon)', text:'var(--cyan)'},
+  x:         {on:'rgba(0,255,120,.08)', border:'var(--neon)', text:'var(--text)'},
+  instagram: {on:'rgba(192,132,252,.06)', border:'rgba(192,132,252,.4)', text:'#c084fc'},
+  tiktok:    {on:'rgba(6,214,160,.08)', border:'rgba(6,214,160,.4)', text:'var(--cyan)'},
+  youtube:   {on:'rgba(248,113,113,.06)', border:'rgba(248,113,113,.4)', text:'#f87171'},
+  facebook:  {on:'rgba(24,119,242,.08)', border:'rgba(24,119,242,.4)', text:'#1877f2'},
+};
 
 function togglePlatform(p) {
   if (_platforms.has(p)) _platforms.delete(p); else _platforms.add(p);
   const on = _platforms.has(p);
   const btn = document.getElementById('btn-plat-' + p);
-  btn.style.borderColor = on ? '#2563eb' : '#374151';
-  btn.style.background  = on ? '#0d1e35' : '#0a0f1a';
-  btn.style.color       = on ? '#60a5fa' : '#6b7280';
+  if (!btn) return;
+  const c = _platColors[p] || _platColors.telegram;
+  btn.style.borderColor = on ? c.border : 'var(--border)';
+  btn.style.background  = on ? c.on    : 'var(--bg)';
+  btn.style.color       = on ? c.text  : 'var(--muted)';
 }
 
 function setVariant(v) {
@@ -775,33 +761,33 @@ function setVariant(v) {
     const b = document.getElementById('vbtn-' + vv);
     if (!b) return;
     const on = vv === v;
-    b.style.background   = on ? '#1e3a5f' : '#0a0f1a';
-    b.style.borderColor  = on ? '#2563eb'  : '#374151';
-    b.style.color        = on ? '#93c5fd'  : '#6b7280';
+    b.style.background   = on ? 'rgba(0,255,120,.08)' : 'var(--bg)';
+    b.style.borderColor  = on ? 'var(--neon)'  : 'var(--border)';
+    b.style.color        = on ? 'var(--cyan)'  : 'var(--muted)';
   });
 }
 
 function toggleDryRun() {
   _dryRun = !_dryRun;
-  document.getElementById('dry-toggle').style.background = _dryRun ? '#3b82f6' : '#374151';
+  document.getElementById('dry-toggle').style.background = _dryRun ? 'var(--neon)' : 'var(--dim)';
   document.getElementById('dry-thumb').style.transform   = _dryRun ? 'translateX(16px)' : 'translateX(0)';
   const lbl = document.getElementById('dry-label');
-  lbl.textContent = _dryRun ? 'Simulare ON' : 'Simulare';
-  lbl.style.color = _dryRun ? '#93c5fd' : '#9ca3af';
+  lbl.textContent = _dryRun ? AP_T('slot.dry_run_on') : AP_T('slot.simulation');
+  lbl.style.color = _dryRun ? 'var(--cyan)' : 'var(--muted)';
   const pubBtn = document.getElementById('pub-btn');
-  pubBtn.style.background = _dryRun ? '#1e3a5f' : '#059669';
-  pubBtn.textContent = _dryRun ? '🔵 Simulează' : '🚀 Publică acum';
+  pubBtn.style.background = _dryRun ? 'rgba(0,255,120,.08)' : 'linear-gradient(135deg,#065c28 0%,#059669 100%)';
+  pubBtn.textContent = _dryRun ? AP_T('slot.simulate_btn') : AP_T('slot.publish');
 }
 
 async function doPublish() {
-  if (_platforms.size === 0) { alert('Selecteaza cel putin o platforma!'); return; }
+  if (_platforms.size === 0) { alert(AP_T('slot.select_platform')); return; }
   const btn        = document.getElementById('pub-btn');
   const resultBox  = document.getElementById('pub-result');
   const resultInner= document.getElementById('pub-result-inner');
 
-  if (!_dryRun && !confirm(`Publici LIVE pe: ${[..._platforms].join(' + ')} ?\nVarianta X: ${_variant}`)) return;
+  if (!_dryRun && !confirm(AP_T('slot.confirm_publish_prefix') + [..._platforms].join(' + ') + ' ?\n' + AP_T('slot.variant') + ' X: ' + _variant)) return;
 
-  btn.textContent = '⏳ Se trimite…';
+  btn.textContent = AP_T('slot.sending');
   btn.disabled = true;
   resultBox.style.display = 'none';
 
@@ -814,7 +800,7 @@ async function doPublish() {
     const res  = await fetch(`/api/slot/${SLOT}/publish-live`, { method:'POST', body:form });
     const data = await res.json();
 
-    btn.textContent = _dryRun ? '🔵 Simulează' : '🚀 Publică acum';
+    btn.textContent = _dryRun ? AP_T('slot.simulate_btn') : AP_T('slot.publish');
     btn.disabled = false;
 
     if (data.error) {
@@ -830,126 +816,28 @@ async function doPublish() {
     }
 
     let html = `<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;">
-      <strong style="color:${_dryRun?'#60a5fa':'#34d399'}">${_dryRun?'🔵 SIMULARE':'🟢 PUBLICAT'}</strong>
-      <span style="color:#6b7280;font-size:12px;">${data.timestamp?data.timestamp.slice(0,19).replace('T',' '):''}</span>
-      <span style="color:#6b7280;font-size:12px;">varianta: <strong style="color:#93c5fd">${data.variant||'?'}</strong></span>
+      <strong style="color:${_dryRun?'var(--cyan)':'var(--neon)'}">${_dryRun?AP_T('slot.simulated'):AP_T('slot.published_live')}</strong>
+      <span style="color:var(--muted);font-size:12px;">${data.timestamp?data.timestamp.slice(0,19).replace('T',' '):''}</span>
+      <span style="color:var(--muted);font-size:12px;">${AP_T('slot.variant_lbl')} <strong style="color:var(--cyan)">${data.variant||'?'}</strong></span>
     </div>`;
     for (const [plat, r] of Object.entries(data.results||{})) {
       const ok = r.status==='ok'||r.status==='dry_run';
-      html += `<div style="display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:8px;background:#0a0f1a;border:1px solid ${ok?'#065f46':'#7f1d1d'};margin-bottom:6px;">
+      html += `<div style="display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:10px;background:var(--bg);border:1px solid ${ok?'rgba(0,255,120,.2)':'rgba(239,68,68,.2)'};margin-bottom:6px;">
         <span style="font-size:18px">${r.status==='ok'?'✅':r.status==='dry_run'?'🔵':'❌'}</span>
         <div>
-          <strong style="color:${ok?'#34d399':'#f87171'};font-size:13px;">${plat.toUpperCase()} — ${r.status}</strong>
+          <strong style="color:${ok?'var(--neon)':'#f87171'};font-size:13px;">${plat.toUpperCase()} — ${r.status}</strong>
           ${r.error?`<p style="color:#fca5a5;font-size:12px;margin-top:4px;">${esc(r.error)}</p>`:''}
-          ${r.message_id?`<p style="color:#6b7280;font-size:11px;margin-top:2px;">id: ${r.message_id}</p>`:''}
+          ${r.message_id?`<p style="color:var(--muted);font-size:11px;margin-top:2px;">id: ${r.message_id}</p>`:''}
         </div>
       </div>`;
     }
     resultInner.innerHTML = html;
     resultBox.style.display = '';
   } catch(e) {
-    btn.textContent = _dryRun ? '🔵 Simulează' : '🚀 Publică acum';
+    btn.textContent = _dryRun ? AP_T('slot.simulate_btn') : AP_T('slot.publish');
     btn.disabled = false;
     resultInner.innerHTML = `<p style="color:#f87171;">❌ ${esc(e.message)}</p>`;
     resultBox.style.display = '';
-  }
-}
-
-// --- Image regenerate ---
-async function regenImage() {
-  const mood   = document.getElementById('img-mood').value;
-  const seed   = document.getElementById('img-seed').value;
-  const target = document.getElementById('img-target').value;
-  const prompt = document.getElementById('img-prompt').value;
-  const btn    = document.getElementById('regen-btn-text');
-  const status = document.getElementById('regen-status');
-  const errEl  = document.getElementById('regen-error');
-
-  btn.innerHTML = '<span class="ai-spinner"></span> Generating… (30-60s)';
-  status.classList.remove('hidden');
-  status.textContent = 'Downloading from Pollinations.ai…';
-  errEl.classList.add('hidden');
-
-  const form = new FormData();
-  form.append('mood', mood);
-  form.append('seed', seed);
-  form.append('target', target);
-  form.append('custom_prompt', prompt);
-
-  try {
-    const res = await fetch(`/api/slot/${SLOT}/regenerate-image`, { method:'POST', body:form });
-    const data = await res.json();
-    btn.textContent = '🎨 Regenerate Image';
-    status.classList.add('hidden');
-    if (data.error) {
-      errEl.textContent = '❌ ' + data.error;
-      errEl.classList.remove('hidden');
-    } else {
-      // Reload previews with cache-buster
-      const ts = Date.now();
-      if (data.files.includes('image_x_1200x675.png')) {
-        const el = document.getElementById('preview-x');
-        if (el && el.tagName === 'IMG') el.src = `/image/${SLOT}/image_x_1200x675.png?t=${ts}`;
-      }
-      if (data.files.includes('image_tg_1080x1080.png')) {
-        const el = document.getElementById('preview-tg');
-        if (el && el.tagName === 'IMG') el.src = `/image/${SLOT}/image_tg_1080x1080.png?t=${ts}`;
-      }
-      status.classList.remove('hidden');
-      status.textContent = `✅ Done — seed ${data.seed}, mood: ${data.mood}`;
-      setTimeout(() => status.classList.add('hidden'), 5000);
-    }
-  } catch (e) {
-    btn.textContent = '🎨 Regenerate Image';
-    status.classList.add('hidden');
-    errEl.textContent = '❌ Network error: ' + e.message;
-    errEl.classList.remove('hidden');
-  }
-}
-
-// --- Image upload ---
-async function uploadImage() {
-  const fileInput = document.getElementById('upload-file');
-  const target    = document.getElementById('upload-target').value;
-  const statusEl  = document.getElementById('upload-status');
-  const errEl     = document.getElementById('upload-error');
-  if (!fileInput.files.length) return;
-
-  statusEl.textContent = 'Uploading & resizing…';
-  errEl.classList.add('hidden');
-
-  const form = new FormData();
-  form.append('file', fileInput.files[0]);
-  form.append('target', target);
-
-  try {
-    const res = await fetch(`/api/slot/${SLOT}/upload-image`, { method:'POST', body:form });
-    const data = await res.json();
-    if (data.error) {
-      errEl.textContent = '❌ ' + data.error;
-      errEl.classList.remove('hidden');
-      statusEl.textContent = '';
-    } else {
-      const ts = Date.now();
-      if (data.saved.includes('image_x_1200x675.png')) {
-        const el = document.getElementById('preview-x');
-        if (el) {
-          el.outerHTML = `<img id="preview-x" src="/image/${SLOT}/image_x_1200x675.png?t=${ts}" class="rounded-lg w-full border border-gray-800" alt="X image">`;
-        }
-      }
-      if (data.saved.includes('image_tg_1080x1080.png')) {
-        const el = document.getElementById('preview-tg');
-        if (el) {
-          el.outerHTML = `<img id="preview-tg" src="/image/${SLOT}/image_tg_1080x1080.png?t=${ts}" class="rounded-lg w-full border border-gray-800" alt="TG image">`;
-        }
-      }
-      statusEl.textContent = `✅ Saved: ${data.saved.join(', ')}`;
-      fileInput.value = '';
-    }
-  } catch (e) {
-    errEl.textContent = '❌ Network error: ' + e.message;
-    errEl.classList.remove('hidden');
-    statusEl.textContent = '';
   }
 }
 
@@ -965,214 +853,470 @@ function applyAI(platform) {
   const form = document.getElementById('form-' + platform);
   if (form) {
     const hint = document.createElement('p');
-    hint.style.cssText = 'color:#4ade80;font-size:12px;margin-top:6px;';
+    hint.style.cssText = 'color:var(--neon);font-size:12px;margin-top:6px;';
     hint.textContent = '✅ AI text applied — click Save to keep it.';
     form.appendChild(hint);
     setTimeout(() => hint.remove(), 4000);
   }
 }
 
-// --- Step indicator helpers ---
-function _setStep(id, state) {
-  const icons = {pending:'⏳', active:'🔄', done:'✅', error:'❌'};
-  const colors = {pending:'#6b7280', active:'#4ade80', done:'#34d399', error:'#f87171'};
-  const el = document.getElementById('step-' + id);
-  const ic = document.getElementById('step-' + id + '-icon');
-  if (!el || !ic) return;
-  ic.textContent = icons[state] || '⏳';
-  el.style.color = colors[state] || '#6b7280';
+// ── HeyGen One-Click Video ─────────────────────────────────────────────────
+let _hgPlatform  = 'tiktok';
+let _hgJobId     = null;
+let _hgTimerInt  = null;
+let _hgStartTime = null;
+
+function setHgPlatform(p) {
+  _hgPlatform = p;
+  ['tiktok','instagram_reel','youtube_shorts','facebook_reel'].forEach(pp => {
+    const btn = document.getElementById('hgbtn-' + pp);
+    if (!btn) return;
+    const on = pp === p;
+    btn.style.background  = on ? 'rgba(6,214,160,.12)' : 'var(--bg)';
+    btn.style.color       = on ? 'var(--cyan)' : 'var(--muted)';
+    btn.style.borderColor = on ? 'rgba(6,214,160,.4)' : 'var(--border)';
+  });
 }
 
-// --- Video builder (basic, no avatar) ---
-async function buildVideo() {
-  const btn     = document.getElementById('btn-video');
-  const spinner = document.getElementById('video-spinner');
-  const errEl   = document.getElementById('video-error');
-  const resEl   = document.getElementById('video-result');
-  const useel   = document.getElementById('video-elevenlabs').checked;
+// In-memory cache of fetched avatars (used by search filter)
+let _hgAvatarCache = [];
 
+async function fetchHeygenAvatars() {
+  const btn   = document.getElementById('btn-fetch-hg');
+  const errEl = document.getElementById('hg-fetch-error');
+  const grid  = document.getElementById('hg-avatar-grid');
+  const cnt   = document.getElementById('hg-avatar-count');
   btn.disabled = true;
-  spinner.style.display = '';
-  document.getElementById('video-spinner-text').textContent = 'Se generează video...';
+  btn.textContent = '⏳';
   errEl.style.display = 'none';
-  resEl.style.display = 'none';
-
   try {
-    const fd = new FormData();
-    fd.append('use_elevenlabs', useel ? 'true' : 'false');
-    const r = await fetch(`/api/slot/${SLOT}/build-video`, {method:'POST', body:fd});
+    const r = await fetch('/api/heygen/avatars');
     const data = await r.json();
-    if (!r.ok || data.error) throw new Error(data.error || r.statusText);
-
-    const url = `/video/${SLOT}/reel_final.mp4?t=${Date.now()}`;
-    document.getElementById('video-player').src = url;
-    document.getElementById('video-download').href = url;
-    document.getElementById('video-meta').textContent = `reel_final.mp4 — ${data.size_mb} MB`;
-    resEl.style.display = '';
+    if (data.error) throw new Error(data.error);
+    const avatars = data.avatars || [];
+    _hgAvatarCache = avatars;
+    cnt.textContent = `(${avatars.length} disponibile)`;
+    renderHgAvatarGrid(avatars);
+    btn.textContent = `🔄 Fetch`;
   } catch(e) {
     errEl.textContent = '❌ ' + e.message;
     errEl.style.display = '';
+    btn.textContent = '🔄 Fetch';
   } finally {
     btn.disabled = false;
-    spinner.style.display = 'none';
   }
 }
 
-// --- ONE BUTTON: Script + Imagine + Avatar D-ID ---
-async function buildAvatarVideo() {
-  const btn       = document.getElementById('btn-avatar-video');
-  const spinner   = document.getElementById('video-spinner');
-  const stText    = document.getElementById('video-spinner-text');
-  const errEl     = document.getElementById('video-error');
-  const resEl     = document.getElementById('video-result');
-  const presenter = document.getElementById('avatar-presenter').value;
+function renderHgAvatarGrid(avatars) {
+  const grid = document.getElementById('hg-avatar-grid');
+  if (!avatars || !avatars.length) {
+    grid.innerHTML = `<p class="muted text-xs col-span-4 text-center py-8">${AP_T('slot.no_heygen_avs')}</p>`;
+    return;
+  }
+  grid.innerHTML = avatars.map(av => {
+    const id   = av.avatar_id || av.id || '';
+    const name = (av.avatar_name || av.name || id || 'Avatar').toString();
+    // HeyGen returns preview_image_url (high-res) or normal preview
+    const img  = av.preview_image_url || av.normal_preview || av.preview_url || '';
+    const gender = (av.gender || '').toLowerCase();
+    const genderIcon = gender === 'male' ? '♂'
+                      : gender === 'female' ? '♀' : '';
+    const safeName = name.replace(/'/g, "&#39;").replace(/"/g, '&quot;');
+    return `
+      <div class="hg-tile cursor-pointer rounded-lg overflow-hidden text-center"
+           data-avatar-id="${id}"
+           data-name="${safeName.toLowerCase()}"
+           onclick="selectHgAvatar('${id}', '${safeName}', '${img}')"
+           style="background:rgba(0,0,0,0.4);border:2px solid transparent;
+                  transition:border-color .15s, transform .15s;">
+        <div style="aspect-ratio:1/1.25;background:#000;overflow:hidden;
+                    display:flex;align-items:center;justify-content:center;">
+          ${img
+            ? `<img src="${img}" alt="${safeName}" loading="lazy"
+                style="width:100%;height:100%;object-fit:cover;">`
+            : `<span style="font-size:32px;color:var(--muted)">🎭</span>`}
+        </div>
+        <div style="padding:5px 4px 7px;">
+          <div style="font-size:11px;line-height:1.2;color:var(--text);
+                      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+               title="${safeName}">${name}</div>
+          ${genderIcon ? `<span style="font-size:10px;color:var(--muted);">${genderIcon}</span>` : ''}
+        </div>
+      </div>`;
+  }).join('');
 
-  btn.disabled = true;
-  spinner.style.display = '';
+  // Hover style + selected style applied via inline JS hooks
+  grid.querySelectorAll('.hg-tile').forEach(t => {
+    t.addEventListener('mouseenter', () => {
+      if (t.dataset.selected !== '1') t.style.borderColor = 'var(--cyan)';
+    });
+    t.addEventListener('mouseleave', () => {
+      if (t.dataset.selected !== '1') t.style.borderColor = 'transparent';
+    });
+  });
+}
+
+function selectHgAvatar(id, name, img) {
+  if (!id) return;
+  document.getElementById('hg-avatar-id').value = id;
+  document.getElementById('hg-avatar-manual').value = '';
+
+  const card = document.getElementById('hg-avatar-selected');
+  card.classList.remove('hidden');
+  document.getElementById('hg-avatar-selected-name').textContent = name;
+  document.getElementById('hg-avatar-selected-id').textContent  = id;
+  document.getElementById('hg-avatar-selected-img').src = img || '';
+
+  document.querySelectorAll('.hg-tile').forEach(t => {
+    if (t.dataset.avatarId === id) {
+      t.dataset.selected = '1';
+      t.style.borderColor = 'var(--neon)';
+      t.style.boxShadow = '0 0 12px rgba(0,255,120,.35)';
+    } else {
+      t.dataset.selected = '';
+      t.style.borderColor = 'transparent';
+      t.style.boxShadow = '';
+    }
+  });
+}
+
+function clearHgAvatar() {
+  document.getElementById('hg-avatar-id').value = '';
+  document.getElementById('hg-avatar-selected').classList.add('hidden');
+  document.querySelectorAll('.hg-tile').forEach(t => {
+    t.dataset.selected = '';
+    t.style.borderColor = 'transparent';
+    t.style.boxShadow = '';
+  });
+}
+
+function filterHgAvatars() {
+  const q = (document.getElementById('hg-avatar-search').value || '').toLowerCase().trim();
+  if (!_hgAvatarCache.length) return;
+  if (!q) { renderHgAvatarGrid(_hgAvatarCache); return; }
+  const filtered = _hgAvatarCache.filter(av => {
+    const name = (av.avatar_name || av.name || '').toLowerCase();
+    return name.includes(q);
+  });
+  renderHgAvatarGrid(filtered);
+}
+
+function _hgSetStep(id, state) {
+  const icons  = {pending:'⏳', active:'🔄', done:'✅', error:'❌'};
+  const colors = {pending:'var(--muted)', active:'var(--neon)', done:'var(--cyan)', error:'#f87171'};
+  const el = document.getElementById('hgs-' + id);
+  const ic = document.getElementById('hgs-' + id + '-icon');
+  if (el) el.style.color = colors[state] || 'var(--muted)';
+  if (ic) ic.textContent = icons[state] || '⏳';
+}
+
+function _hgStartElapsed() {
+  _hgStopElapsed();
+  const el = document.getElementById('hg-elapsed');
+  _hgTimerInt = setInterval(() => {
+    if (!el) return;
+    const sec = Math.floor((Date.now() - _hgStartTime) / 1000);
+    el.textContent = 'Timp scurs: ' + sec + 's';
+  }, 1000);
+}
+
+function _hgStopElapsed() {
+  if (_hgTimerInt) { clearInterval(_hgTimerInt); _hgTimerInt = null; }
+}
+
+async function generateHeygenVideo() {
+  const avatarSel = (document.getElementById('hg-avatar-id').value || '').trim();
+  const avatarMan = (document.getElementById('hg-avatar-manual').value || '').trim();
+  const avatarId  = avatarMan || avatarSel;
+  const btn       = document.getElementById('btn-hg-generate');
+  const progEl    = document.getElementById('hg-progress');
+  const errEl     = document.getElementById('hg-error');
+  const resEl     = document.getElementById('hg-result');
+  const scriptEl  = document.getElementById('hg-script-preview');
+
   errEl.style.display = 'none';
-  resEl.style.display = 'none';
-
-  // Reset steps
-  ['script','image','did','compose'].forEach(s => _setStep(s, 'pending'));
-
-  // Animate steps — server does everything, we just show progress visually
-  stText.textContent = 'Generez script...';
-  _setStep('script', 'active');
-  await new Promise(r => setTimeout(r, 800));
-  _setStep('script', 'done');
-
-  stText.textContent = 'Generez imagine fundal...';
-  _setStep('image', 'active');
-  await new Promise(r => setTimeout(r, 800));
-  _setStep('image', 'done');
-
-  stText.textContent = 'Trimit la D-ID... (2-3 min)';
-  _setStep('did', 'active');
-
-  try {
-    const fd = new FormData();
-    fd.append('presenter', presenter);
-    const r = await fetch(`/api/slot/${SLOT}/build-avatar-video`, {method:'POST', body:fd});
-    const data = await r.json();
-    if (!r.ok || data.error) throw new Error(data.error || r.statusText);
-
-    _setStep('did', 'done');
-    _setStep('compose', 'done');
-    stText.textContent = 'Gata!';
-
-    const url = `/video/${SLOT}/reel_avatar.mp4?t=${Date.now()}`;
-    document.getElementById('video-player').src = url;
-    document.getElementById('video-download').href = url;
-    document.getElementById('video-meta').textContent = `✅ reel_avatar.mp4 — ${data.size_mb} MB`;
-    resEl.style.display = '';
-  } catch(e) {
-    _setStep('did', 'error');
-    errEl.textContent = '❌ ' + e.message;
+  if (!avatarId) {
+    errEl.textContent = AP_T('slot.enter_avatar_id');
     errEl.style.display = '';
-  } finally {
-    btn.disabled = false;
-    setTimeout(() => { spinner.style.display = 'none'; }, 1500);
+    return;
   }
-}
-
-// --- Avatar generator ---
-async function generateAvatar() {
-  const btn     = document.getElementById('btn-avatar');
-  const spinner = document.getElementById('avatar-spinner');
-  const errEl   = document.getElementById('avatar-error');
-  const resEl   = document.getElementById('avatar-result');
-  const useLlm  = document.getElementById('avatar-llm').checked;
 
   btn.disabled = true;
-  spinner.style.display = '';
-  errEl.style.display   = 'none';
-  resEl.style.display   = 'none';
+  progEl.style.display = '';
+  resEl.style.display  = 'none';
+  scriptEl.style.display = 'none';
+
+  ['script','render','compose','save'].forEach(s => _hgSetStep(s, 'pending'));
+  _hgSetStep('script', 'active');
+  document.getElementById('hg-pbar').style.width = '5%';
+  document.getElementById('hg-progress-text').textContent = 'Generare script...';
+
+  _hgStartTime = Date.now();
+  _hgStartElapsed();
 
   const fd = new FormData();
-  fd.append('use_llm', useLlm ? 'true' : 'false');
+  fd.append('heygen_avatar_id', avatarId);
+  fd.append('platform', _hgPlatform);
 
   try {
-    const r    = await fetch(`/api/slot/${SLOT}/generate-avatar`, {method:'POST', body:fd});
+    const r = await fetch(`/api/slot/${SLOT}/heygen-video`, { method:'POST', body:fd });
     const data = await r.json();
-    if (!r.ok || data.error) throw new Error(data.error || 'Unknown error');
+    if (!r.ok || data.error) throw new Error(data.error || r.statusText);
 
-    // Mood badge
-    const moodColors = {bear:'#dc2626', bull:'#16a34a', neutral:'#2563eb'};
-    const moodLabels = {bear:'🐻 BEARISH', bull:'🐂 BULLISH', neutral:'📊 NEUTRAL'};
-    const badge = document.getElementById('avatar-mood-badge');
-    badge.textContent  = moodLabels[data.mood] || data.mood;
-    badge.style.background = moodColors[data.mood] || '#374151';
-    badge.style.color  = '#fff';
+    _hgJobId = data.job_id;
+    _hgPollCount = 0;
 
-    // Hook
-    document.getElementById('avatar-hook').textContent = data.hook || '—';
+    if (data.script) {
+      document.getElementById('hg-script-text').textContent = data.script;
+      scriptEl.style.display = '';
+    }
 
-    // Load script files
-    try {
-      const s30r = await fetch(`/avatar-file/${SLOT}/script_30s.txt`);
-      if (s30r.ok) document.getElementById('script-30').textContent = await s30r.text();
-      const s60r = await fetch(`/avatar-file/${SLOT}/script_60s.txt`);
-      if (s60r.ok) document.getElementById('script-60').textContent = await s60r.text();
-      const cutsR = await fetch(`/avatar-file/${SLOT}/platform_cuts.json`);
-      if (cutsR.ok) renderPlatformCards(await cutsR.json());
-    } catch(e) {}
+    _hgSetStep('script', 'done');
+    _hgSetStep('render', 'active');
+    document.getElementById('hg-pbar').style.width = '18%';
+    document.getElementById('hg-progress-text').textContent = 'HeyGen renderizare avatar...';
 
-    // File badges
-    const filesDiv = document.getElementById('avatar-files');
-    filesDiv.innerHTML = '';
-    (data.files || []).forEach(f => {
-      const a = document.createElement('a');
-      a.href  = `/avatar-file/${SLOT}/${f}`;
-      a.target = '_blank';
-      a.className = 'px-2 py-1 rounded text-xs font-mono text-green-400 hover:text-white';
-      a.style.background = '#0d1f0d';
-      a.style.border = '1px solid #166534';
-      a.textContent = f;
-      filesDiv.appendChild(a);
-    });
+    _hgPollJob();
 
-    resEl.style.display = '';
   } catch(e) {
-    errEl.textContent    = '✗ ' + e.message;
-    errEl.style.display  = '';
-  } finally {
-    btn.disabled        = false;
-    spinner.style.display = 'none';
+    _hgSetStep('script', 'error');
+    errEl.textContent = '❌ ' + e.message;
+    errEl.style.display = '';
+    btn.disabled = false;
+    progEl.style.display = 'none';
+    _hgStopElapsed();
   }
 }
 
-function renderPlatformCards(cuts) {
-  const container = document.getElementById('platform-cards');
-  if (!container) return;
-  const platforms = {
-    tiktok:           {icon:'🎵', label:'TikTok',            color:'#1a1a2e', border:'#e91e63'},
-    instagram_reels:  {icon:'📸', label:'Instagram Reels',   color:'#1a1020', border:'#c13584'},
-    youtube_shorts:   {icon:'▶️', label:'YouTube Shorts',    color:'#1a0a0a', border:'#ff0000'},
-  };
-  container.innerHTML = '';
-  for (const [key, meta] of Object.entries(platforms)) {
-    const data = cuts[key];
-    if (!data) continue;
-    const notes = (data.algorithm_notes || []).slice(0, 4);
-    const card = document.createElement('div');
-    card.style.cssText = `background:${meta.color};border:1px solid ${meta.border};border-radius:12px;padding:16px;`;
-    card.innerHTML = `
-      <div class="flex items-center gap-2 mb-3">
-        <span style="font-size:18px">${meta.icon}</span>
-        <span class="text-white font-bold text-sm">${meta.label}</span>
-        <span class="ml-auto text-xs px-2 py-1 rounded-full" style="background:${meta.border}22;color:${meta.border}">
-          ${data.recommended_length_seconds}s
-        </span>
-      </div>
-      <div class="text-gray-300 text-xs mb-3 leading-relaxed">
-        ${notes.map(n => `<div class="mb-1">• ${n}</div>`).join('')}
-      </div>
-      ${data.hashtags ? `<div class="flex flex-wrap gap-1">${data.hashtags.map(h=>`<span class="px-2 py-0.5 rounded text-xs" style="background:#ffffff11;color:#9ca3af">${h}</span>`).join('')}</div>` : ''}
-      ${data.optimal_post_time ? `<div class="mt-2 text-xs" style="color:${meta.border}">⏰ Postează la: ${data.optimal_post_time}</div>` : ''}
-    `;
-    container.appendChild(card);
+let _hgPollCount = 0;
+const _HG_MAX_POLLS = 300; // 15 min timeout (300 × 3s)
+
+function _hgShowError(msg) {
+  _hgStopElapsed();
+  _hgSetStep('render', 'error');
+  document.getElementById('hg-progress').style.display = 'none';
+  const errEl = document.getElementById('hg-error');
+  errEl.textContent = '❌ ' + msg;
+  errEl.style.display = '';
+  document.getElementById('btn-hg-generate').disabled = false;
+  // Scroll to error so user sees it
+  errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // Browser notification if supported
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('HeyGen', { body: msg, icon: '/static/favicon.ico' });
+  }
+}
+
+async function _hgPollJob() {
+  if (!_hgJobId) return;
+  _hgPollCount++;
+
+  // Client-side timeout
+  if (_hgPollCount > _HG_MAX_POLLS) {
+    _hgShowError(AP_T('slot.timeout_error'));
+    return;
+  }
+
+  try {
+    const r   = await fetch(`/api/avatar/job/${_hgJobId}`);
+    if (!r.ok) { setTimeout(_hgPollJob, 5000); return; }
+    const job = await r.json();
+    const pct = job.progress || 0;
+
+    if (job.status === 'done') {
+      _hgStopElapsed();
+      _hgSetStep('script',  'done');
+      _hgSetStep('render',  'done');
+      _hgSetStep('compose', 'done');
+      _hgSetStep('save',    'done');
+      document.getElementById('hg-pbar').style.width = '100%';
+      document.getElementById('hg-progress-text').textContent = '✅ Video generat!';
+
+      const url = `/video/${SLOT}/reel_avatar.mp4?t=${Date.now()}`;
+      document.getElementById('hg-video-player').src = url;
+      document.getElementById('hg-video-dl').href = url;
+      const engine = job.engine || 'heygen';
+      const dur    = job.duration_s ? ` · ${job.duration_s}s` : '';
+      const rawTag = engine.includes('raw') ? AP_T('slot.raw_tag') : '';
+      document.getElementById('hg-result-meta').textContent =
+        `✅ reel_avatar.mp4${dur} · ${_hgPlatform}${rawTag}`;
+      document.getElementById('hg-result').style.display = '';
+      document.getElementById('btn-hg-generate').disabled = false;
+      document.getElementById('hg-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      setTimeout(() => { document.getElementById('hg-progress').style.display = 'none'; }, 2000);
+      // Browser notification
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('HeyGen ✅', { body: 'Video generat cu succes!', icon: '/static/favicon.ico' });
+      }
+
+    } else if (job.status === 'failed') {
+      _hgShowError(job.error || AP_T('slot.gen_failed'));
+
+    } else {
+      // Use real progress from DB
+      document.getElementById('hg-pbar').style.width = Math.max(pct, 5) + '%';
+
+      const msg = job.error || '';
+      const elapsed = Math.floor((Date.now() - _hgStartTime) / 1000);
+      document.getElementById('hg-progress-text').textContent =
+        msg || `HeyGen procesare... (${elapsed}s)`;
+
+      if (pct >= 10)  _hgSetStep('script', 'done');
+      if (pct >= 10 && pct < 70) _hgSetStep('render', 'active');
+      if (pct >= 70)  { _hgSetStep('render', 'done'); _hgSetStep('compose', 'active'); }
+      if (pct >= 80)  { _hgSetStep('compose', 'done'); _hgSetStep('save', 'active'); }
+      if (pct >= 95)  _hgSetStep('save', 'active');
+
+      setTimeout(_hgPollJob, 3000);
+    }
+  } catch(e) {
+    setTimeout(_hgPollJob, 5000);
+  }
+}
+
+
+// ── Preview & Edit Script Modal ─────────────────────────────────────────────
+async function previewAvatarScript() {
+  const btn = document.getElementById('btn-preview-script');
+  btn.disabled = true; btn.textContent = AP_T('avatar.loading_txt');
+  try {
+    const r = await fetch(`/api/slot/${SLOT}/avatar-script`);
+    const d = await r.json();
+    if (d.error) { alert(AP_T('slot.error_prefix') + d.error); return; }
+    _showScriptModal(d.clean || '', d.words || 0, d.source || '');
+  } catch(e) {
+    alert(AP_T('slot.error_net') + ': ' + e);
+  } finally {
+    btn.disabled = false; btn.textContent = AP_T('slot.preview_script');
+  }
+}
+
+function _showScriptModal(text, words, source) {
+  let overlay = document.getElementById('script-modal-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'script-modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:560px;width:100%;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-size:14px;font-weight:700;color:var(--neon);">${AP_T('slot.preview_script')}</div>
+          <button onclick="document.getElementById('script-modal-overlay').remove()" style="color:var(--muted);font-size:18px;background:none;border:none;cursor:pointer;">✕</button>
+        </div>
+        <div id="sm-meta" style="font-size:11px;color:var(--dim);margin-bottom:8px;"></div>
+        <textarea id="sm-textarea" rows="8"
+          style="width:100%;font-size:12px;font-family:monospace;padding:10px;border-radius:8px;
+                 background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);
+                 resize:vertical;line-height:1.6;"></textarea>
+        <div style="font-size:10px;color:var(--dim);margin:6px 0 12px;">${AP_T('slot.edit_script_hint')}</div>
+        <div style="display:flex;gap:10px;">
+          <button onclick="_saveScript()" id="sm-save-btn"
+            class="ebtn ebtn-primary" style="flex:1;">${AP_T('slot.preview_save')}</button>
+          <button onclick="document.getElementById('script-modal-overlay').remove()"
+            class="ebtn ebtn-ghost" style="flex:1;">${AP_T('slot.cancel')}</button>
+        </div>
+        <div id="sm-msg" style="margin-top:8px;font-size:12px;display:none;"></div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  }
+  document.getElementById('sm-textarea').value = text;
+  document.getElementById('sm-meta').textContent = `${words} ${AP_T('slot.words_lbl')} · ${source}`;
+  document.getElementById('sm-msg').style.display = 'none';
+}
+
+async function _saveScript() {
+  const text = document.getElementById('sm-textarea').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('sm-save-btn');
+  btn.disabled = true; btn.textContent = AP_T('slot.saving');
+  const msg = document.getElementById('sm-msg');
+  try {
+    const fd = new FormData(); fd.append('script', text);
+    const r = await fetch(`/api/slot/${SLOT}/avatar-script`, { method:'POST', body:fd });
+    const d = await r.json();
+    if (d.ok) {
+      msg.style.display = ''; msg.style.color = 'var(--neon)';
+      msg.textContent = `✅ ${AP_T('slot.saved_ok')} (${d.words} ${AP_T('slot.words_lbl')})`;
+      setTimeout(() => document.getElementById('script-modal-overlay')?.remove(), 1200);
+    } else {
+      msg.style.display = ''; msg.style.color = '#f87171';
+      msg.textContent = AP_T('slot.error_prefix') + (d.error || AP_T('slot.error_unknown'));
+    }
+  } catch(e) {
+    msg.style.display = ''; msg.style.color = '#f87171'; msg.textContent = AP_T('slot.error_net');
+  } finally {
+    btn.disabled = false; btn.textContent = AP_T('slot.preview_save');
+  }
+}
+
+// ── Schedule Post Modal ──────────────────────────────────────────────────────
+function openScheduleModal() {
+  let overlay = document.getElementById('sched-modal-overlay');
+  if (!overlay) {
+    const now = new Date(); now.setHours(now.getHours() + 1); now.setMinutes(0);
+    const dtDefault = now.toISOString().slice(0, 16);
+    overlay = document.createElement('div');
+    overlay.id = 'sched-modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:480px;width:100%;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div style="font-size:14px;font-weight:700;color:var(--gold);">${AP_T('slot.schedule_title')}</div>
+          <button onclick="document.getElementById('sched-modal-overlay').remove()" style="color:var(--muted);font-size:18px;background:none;border:none;cursor:pointer;">✕</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Slot: <strong style="color:var(--text);">${SLOT}</strong></div>
+        <label style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;">${AP_T('slot.schedule_date')}</label>
+        <input type="datetime-local" id="sched-datetime" value="${dtDefault}"
+          style="width:100%;font-size:13px;margin-top:4px;margin-bottom:16px;padding:8px 12px;border-radius:8px;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);">
+        <label style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;">${AP_T('slot.platforms')}</label>
+        <div id="sched-plat-btns" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;margin-bottom:16px;">
+          ${['telegram','x','instagram','tiktok','youtube','facebook'].map(p =>
+            `<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid var(--border);">
+               <input type="checkbox" value="${p}" class="sched-plat-cb"> ${p}
+             </label>`
+          ).join('')}
+        </div>
+        <button onclick="_submitSchedule()" id="sched-submit-btn" class="ebtn ebtn-primary" style="width:100%;">${AP_T('slot.schedule_btn')}</button>
+        <div id="sched-msg" style="margin-top:8px;font-size:12px;display:none;"></div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  }
+  overlay.style.display = 'flex';
+}
+
+async function _submitSchedule() {
+  const dt = document.getElementById('sched-datetime').value;
+  if (!dt) { alert(AP_T('slot.select_date')); return; }
+  const cbs = document.querySelectorAll('.sched-plat-cb:checked');
+  const plats = Array.from(cbs).map(c => c.value);
+  if (!plats.length) { alert(AP_T('slot.select_platform')); return; }
+  const btn = document.getElementById('sched-submit-btn');
+  btn.disabled = true; btn.textContent = '⏳...';
+  const msg = document.getElementById('sched-msg');
+  try {
+    const fd = new FormData();
+    fd.append('platforms', plats.join(','));
+    fd.append('scheduled_at', dt);
+    const r = await fetch(`/api/slot/${SLOT}/schedule`, { method:'POST', body:fd });
+    const d = await r.json();
+    if (d.ok) {
+      msg.style.display = ''; msg.style.color = 'var(--gold)';
+      msg.textContent = `${AP_T('slot.scheduled_for')} ${dt}`;
+      setTimeout(() => document.getElementById('sched-modal-overlay')?.remove(), 1500);
+    } else {
+      msg.style.display = ''; msg.style.color = '#f87171';
+      msg.textContent = AP_T('slot.error_prefix') + (d.error || AP_T('slot.error_unknown'));
+    }
+  } catch(e) {
+    msg.style.display = ''; msg.style.color = '#f87171'; msg.textContent = AP_T('slot.error_net');
+  } finally {
+    btn.disabled = false; btn.textContent = AP_T('slot.schedule_btn');
   }
 }
 </script>
+<script src="/static/i18n.js"></script>
+</div><!-- /main-wrap -->
 </body>
 </html>
