@@ -81,21 +81,7 @@ body::after {
   </div>
 
   <div class="card">
-    <h2 class="text-lg font-bold mb-2" style="color:#e8f5ec;">Create Account</h2>
-
-    {% if pending %}
-    <div class="mb-4 px-4 py-3 rounded-lg text-sm" style="background:#071a0d;border:1px solid #166534;color:#4ade80;">
-      ✅ Account creat! Un admin va aproba contul tău în scurt timp.
-    </div>
-    <p class="text-center mt-4">
-      <a href="/login" style="color:#4ade80;font-size:14px;">← Înapoi la Login</a>
-    </p>
-
-    {% else %}
-
-    <p class="text-sm mb-6" style="color:#4d7a60;">
-      Un admin trebuie să aprobe contul tău înainte să te poți autentifica.
-    </p>
+    <h2 class="text-lg font-bold mb-2" style="color:#e8f5ec;" data-i18n="auth.register_title">Create Account</h2>
 
     {% if error %}
     <div class="mb-4 px-4 py-3 rounded-lg text-sm" style="background:#1c0a0a;border:1px solid #7f1d1d;color:#f87171;">
@@ -135,16 +121,16 @@ body::after {
         <input type="hidden" name="captcha_token" value="{{ captcha_token }}">
       </div>
 
-      <button type="submit" class="btn-primary mt-2">Solicită Acces →</button>
+      <button type="submit" class="btn-primary mt-2" data-i18n="auth.register_btn">Create Account →</button>
     </form>
 
     <p class="text-center text-sm mt-6" style="color:#4d7a60;">
-      Ai deja cont?
-      <a href="/login" style="color:#4ade80;font-weight:600;">Sign In</a>
+      <span data-i18n="auth.have_account">Already have an account?</span>
+      <a href="/login" style="color:#4ade80;font-weight:600;" data-i18n="auth.sign_in">Sign In</a>
     </p>
-    {% endif %}
   </div>
 
 </div>
+<script src="/static/i18n.js"></script>
 </body>
 </html>

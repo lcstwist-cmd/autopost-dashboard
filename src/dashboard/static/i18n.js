@@ -10,6 +10,11 @@
 
   var T = {
     en: {
+      /* ── Auth ─────────────────────────────────── */
+      'auth.register_title': 'Create Account',
+      'auth.register_btn':   'Create Account →',
+      'auth.have_account':   'Already have an account?',
+      'auth.sign_in':        'Sign In',
       /* ── Nav / common ─────────────────────────── */
       'nav.dashboard':    'Dashboard',
       'nav.backoffice':   'Backoffice',
@@ -679,6 +684,11 @@
     },
 
     ro: {
+      /* ── Auth ─────────────────────────────────── */
+      'auth.register_title': 'Înregistrare',
+      'auth.register_btn':   'Înregistrează-te →',
+      'auth.have_account':   'Ai deja cont?',
+      'auth.sign_in':        'Autentifică-te',
       /* ── Nav / common ─────────────────────────── */
       'nav.dashboard':    'Dashboard',
       'nav.backoffice':   'Backoffice',
