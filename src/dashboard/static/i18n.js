@@ -16,10 +16,10 @@
       'auth.have_account':   'Already have an account?',
       'auth.sign_in':        'Sign In',
       /* ── Nav / common ─────────────────────────── */
-      'nav.dashboard':    '🏠 Dashboard',
+      'nav.dashboard':    'Dashboard',
       'nav.backoffice':   'Backoffice',
-      'nav.avatar':       '🎭 Avatar Studio',
-      'nav.settings':     '⚙️ Settings',
+      'nav.avatar':       'Avatar Studio',
+      'nav.settings':     'Settings',
       'nav.users':        'Users',
       'nav.back':         '← Dashboard',
       'nav.logout':       'Logout',
@@ -549,11 +549,11 @@
       'dash.no_data':         'No data',
 
       /* ── Nav extra ───────────────────────────── */
-      'nav.history':    '📋 History',
-      'nav.viral':      '📊 Viral Scout',
-      'nav.competitors':'🕵️ Competitors',
-      'nav.plans':      '💎 Plans',
-      'nav.ad_studio':  '📢 Ad Studio',
+      'nav.history':    'History',
+      'nav.viral':      'Viral Scout',
+      'nav.competitors':'Competitors',
+      'nav.plans':      'Plans',
+      'nav.ad_studio':  'Ad Studio',
 
       /* ── History page ────────────────────────── */
       'hist.title':         'Post History',
@@ -795,10 +795,10 @@
       'auth.have_account':   'Ai deja cont?',
       'auth.sign_in':        'Autentifică-te',
       /* ── Nav / common ─────────────────────────── */
-      'nav.dashboard':    '🏠 Dashboard',
+      'nav.dashboard':    'Dashboard',
       'nav.backoffice':   'Backoffice',
-      'nav.avatar':       '🎭 Studio Avatar',
-      'nav.settings':     '⚙️ Setări',
+      'nav.avatar':       'Studio Avatar',
+      'nav.settings':     'Setări',
       'nav.users':        'Utilizatori',
       'nav.back':         '← Dashboard',
       'nav.logout':       'Ieșire',
@@ -1328,11 +1328,11 @@
       'dash.no_data':         'Lipsă date',
 
       /* ── Nav extra ───────────────────────────── */
-      'nav.history':    '📋 Istoric',
-      'nav.viral':      '📊 Viral Scout',
-      'nav.competitors':'🕵️ Competitors',
-      'nav.plans':      '💎 Planuri',
-      'nav.ad_studio':  '📢 Ad Studio',
+      'nav.history':    'Istoric',
+      'nav.viral':      'Viral Scout',
+      'nav.competitors':'Competitors',
+      'nav.plans':      'Planuri',
+      'nav.ad_studio':  'Ad Studio',
 
       /* ── History page ────────────────────────── */
       'hist.title':         'Istoric Publicări',
