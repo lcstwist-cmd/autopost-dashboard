@@ -4853,7 +4853,7 @@ async def heygen_stats(request: Request):
 async def history_page(request: Request):
     uid = request.state.user["id"]
     history = get_publish_history(uid, limit=100)
-    return _render("history.html", user=request.state.user, history=history)
+    return _render("history.html", current_user=request.state.user, user=request.state.user, history=history)
 
 
 @app.get("/api/publish-history")
