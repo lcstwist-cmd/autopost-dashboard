@@ -13,6 +13,7 @@ direct file upload. This module provides both options:
 """
 from __future__ import annotations
 
+import hmac as _hmac
 import os
 from pathlib import Path
 
@@ -117,10 +118,16 @@ def upload_litterbox(path: Path, hours: int = 72) -> str | None:
     return None
 
 
-def public_url_via_base(path: Path) -> str | None:
-    """Build a URL under PUBLIC_BASE_URL (e.g. https://xxx.ngrok.io).
+def _media_token(user_id: str, slot_name: str, filename: str) -> str:
+    secret = os.environ.get("AUTOPOST_SECRET", "dev-secret")
+    msg = f"{user_id}/{slot_name}/{filename}"
+    return _hmac.new(secret.encode(), msg.encode(), "sha256").hexdigest()[:20]
 
-    The FastAPI dashboard serves /media/<user_id>/<slot>/<filename>.
+
+def public_url_via_base(path: Path) -> str | None:
+    """Build a signed URL under PUBLIC_BASE_URL (e.g. https://emdautopost.eu).
+
+    The FastAPI dashboard serves /media/<user_id>/<slot>/<filename>?t=<token>.
     Set PUBLIC_BASE_URL to the publicly-accessible address of your server.
     """
     base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
@@ -130,8 +137,13 @@ def public_url_via_base(path: Path) -> str | None:
         rel = path.resolve().relative_to((_REPO_ROOT / "queue").resolve())
     except Exception:
         return None
-    # rel is "<user_id>/<slot>/<file>" or "<slot>/<file>"
-    return f"{base}/media/{rel.as_posix()}"
+    # rel is "<user_id>/<slot>/<file>"
+    parts = rel.parts
+    if len(parts) < 3:
+        return None
+    user_id, slot_name, filename = parts[0], parts[1], parts[-1]
+    tok = _media_token(user_id, slot_name, filename)
+    return f"{base}/media/{rel.as_posix()}?t={tok}"
 
 
 def get_public_url(path: Path) -> tuple[str | None, str]:

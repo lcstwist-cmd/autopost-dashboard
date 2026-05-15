@@ -280,6 +280,17 @@ if not os.environ.get("AUTOPOST_SECRET"):
           "     Add: AUTOPOST_SECRET=" + _SEC_SECRET[:16] + "... to your .env file.\n",
           flush=True)
 
+
+def _media_token(user_id: str, slot_name: str, filename: str) -> str:
+    """Short HMAC token that authorises a specific /media/ URL."""
+    msg = f"{user_id}/{slot_name}/{filename}"
+    return _hmac.new(_SEC_SECRET.encode(), msg.encode(), "sha256").hexdigest()[:20]
+
+
+def _media_url(user_id, slot_name: str, filename: str) -> str:
+    tok = _media_token(str(user_id), slot_name, filename)
+    return f"/media/{user_id}/{slot_name}/{filename}?t={tok}"
+
 # ---------------------------------------------------------------------------
 # Math CAPTCHA (register page)  — no external services required
 # ---------------------------------------------------------------------------
@@ -1121,7 +1132,7 @@ async def admin_backoffice(request: Request):
                         vpath.stat().st_mtime
                     ).strftime("%Y-%m-%d %H:%M")
                     recent_videos.append({
-                        "url": f"/media/{u['id']}/{slot_dir.name}/{vid_name}",
+                        "url": _media_url(u['id'], slot_dir.name, vid_name),
                         "slot": slot_dir.name,
                         "user": u.get("display_name") or u.get("email", "?").split("@")[0],
                         "size_mb": size_mb,
@@ -2866,11 +2877,13 @@ def _with_did(settings: dict, fn):
 # ---------------------------------------------------------------------------
 
 @app.get("/media/{user_id}/{slot_name}/{filename}")
-async def serve_public_media(user_id: str, slot_name: str, filename: str):
-    """Unauthenticated public endpoint used by Instagram/TikTok/YouTube APIs
-    when they fetch the image/video by URL. Requires knowing user_id +
-    slot_name + filename — low-risk obscurity since queue paths aren't enumerable.
+async def serve_public_media(user_id: str, slot_name: str, filename: str, t: str = ""):
+    """Media endpoint — requires a server-signed token (?t=...) to prevent
+    unauthorized access to other users' files by URL guessing.
+    Tokens are generated via _media_url() when building backoffice links.
     """
+    if not _hmac.compare_digest(t, _media_token(user_id, slot_name, filename)):
+        raise HTTPException(403, "Invalid or missing media token")
     f = _safe_path(BASE_QUEUE, user_id, slot_name, filename)
     if not f.exists():
         raise HTTPException(404, "Media not found")
