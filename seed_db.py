@@ -10,10 +10,16 @@ If the database already exists it will only update the settings
 from __future__ import annotations
 
 import hashlib
+import io
 import os
 import secrets
 import sys
 from pathlib import Path
+
+# Force UTF-8 output on Windows
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parent
 

@@ -14,6 +14,7 @@ Prima rulare:
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import signal
@@ -23,6 +24,11 @@ import time
 import urllib.request
 import webbrowser
 from pathlib import Path
+
+# Force UTF-8 output on Windows
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 ROOT  = Path(__file__).resolve().parent
 PORT  = int(os.environ.get("PORT", 8000))
@@ -37,7 +43,13 @@ def _print(msg: str, color: str = "") -> None:
     codes = {"green": "\033[92m", "red": "\033[91m", "yellow": "\033[93m",
              "cyan": "\033[96m", "bold": "\033[1m", "": ""}
     end = "\033[0m" if color else ""
-    print(f"  {codes[color]}{msg}{end}")
+    line = f"  {codes[color]}{msg}{end}"
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        # Very old Windows consoles that don't support UTF-8 — strip non-ASCII.
+        safe = line.encode("ascii", errors="replace").decode("ascii")
+        print(safe)
 
 
 def _check_port_free(port: int) -> bool:
@@ -141,6 +153,12 @@ def main() -> None:
 
     # ── Start uvicorn ────────────────────────────────────────────────────────
     _print(f"Pornesc serverul pe portul {PORT}...", "yellow")
+    # Ensure the child process also uses UTF-8 stdio, otherwise any print
+    # with unicode in uvicorn/dashboard will crash it.
+    child_env = os.environ.copy()
+    child_env.setdefault("PYTHONIOENCODING", "utf-8")
+    child_env.setdefault("PYTHONUTF8", "1")
+
     server = subprocess.Popen(
         [sys.executable, "-m", "uvicorn",
          "src.dashboard.app:app",
@@ -148,8 +166,9 @@ def main() -> None:
          "--port", str(PORT),
          "--app-dir", str(ROOT)],
         cwd=str(ROOT),
-        stdout=open(ROOT / "server.log", "w"),
+        stdout=open(ROOT / "server.log", "w", encoding="utf-8"),
         stderr=subprocess.STDOUT,
+        env=child_env,
     )
     time.sleep(2)
 

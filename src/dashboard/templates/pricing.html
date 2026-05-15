@@ -7,13 +7,6 @@
 <script src="/static/tailwind.js"></script>
 <link rel="stylesheet" href="/static/elite.css">
 <style>
-body { display:flex; min-height:100vh; }
-.sidebar {
-  width:200px; flex-shrink:0; position:fixed; top:0; left:0; bottom:0;
-  background:rgba(2,8,6,.98); border-right:1px solid var(--border);
-  display:flex; flex-direction:column; z-index:20; overflow-y:auto;
-}
-.main-wrap { margin-left:200px; flex:1; min-width:0; }
 .top-bar {
   position:sticky; top:0; z-index:10;
   background:rgba(2,8,6,.96); border-bottom:1px solid var(--border);
@@ -21,17 +14,6 @@ body { display:flex; min-height:100vh; }
   backdrop-filter:blur(8px);
 }
 .main-content { padding:28px 28px 60px; max-width:1200px; margin:0 auto; }
-
-.snav-section { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); padding:12px 16px 4px; }
-.snav-item {
-  display:flex; align-items:center; gap:10px; padding:9px 14px;
-  font-size:13px; font-weight:600; color:var(--muted);
-  text-decoration:none; border-radius:8px; margin:1px 8px;
-  transition:all .15s;
-}
-.snav-item:hover { color:var(--text); background:rgba(255,255,255,.04); }
-.snav-item.active { color:var(--cyan); background:rgba(6,214,160,.09); }
-.snav-badge { margin-left:auto; font-size:11px; font-weight:800; color:var(--gold); }
 
 /* ── Toggle billing ── */
 .bill-toggle { display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:4px 6px; }
@@ -165,38 +147,13 @@ body { display:flex; min-height:100vh; }
 <body style="background:var(--bg);">
 
 <!-- ═══ SIDEBAR ═══ -->
-<aside class="sidebar">
-  <div style="padding:18px 16px 10px;">
-    <div class="elite-logo" style="font-size:13px;line-height:1.2;">ELITEMARGINDESK</div>
-    <div style="font-size:10px;color:var(--muted);margin-top:2px;letter-spacing:.06em;">AutoPost System</div>
-  </div>
-
-  <nav style="margin-top:8px;flex:1;">
-    <div class="snav-section">Main</div>
-    <a href="/" class="snav-item">🏠 Dashboard</a>
-    <a href="/settings" class="snav-item">⚙️ Settings</a>
-    <a href="/pricing" class="snav-item active">💎 Plans</a>
-    <a href="/viral" class="snav-item">📊 Viral Scout</a>
-    <a href="/competitor-tracker" class="snav-item">🕵️ Competitors</a>
-    <a href="/avatar-studio" class="snav-item">🎭 Avatar Studio</a>
-
-    {% if current_user.is_admin %}
-    <div class="snav-section" style="margin-top:8px;">Admin</div>
-    <a href="/admin/backoffice" class="snav-item">🖥️ Backoffice</a>
-    <a href="/admin/users" class="snav-item">👥 Users</a>
-    {% endif %}
-  </nav>
-
-  <div style="padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);">
-    {{ current_user.email }}
-  </div>
-</aside>
+{% include '_sidebar.html' %}
 
 <!-- ═══ MAIN ═══ -->
 <div class="main-wrap">
   <div class="top-bar">
     <div style="display:flex;align-items:center;gap:12px;">
-      <span style="font-size:15px;font-weight:800;color:var(--text);">💎 Plans & Pricing</span>
+      <span style="font-size:15px;font-weight:800;color:var(--text);" data-i18n="pricing.page_title">💎 Plans & Pricing</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
       {% if current_plan %}
@@ -212,11 +169,11 @@ body { display:flex; min-height:100vh; }
 
     <!-- Hero -->
     <div style="text-align:center;padding:20px 0 8px;">
-      <div class="sec-h">Pricing</div>
+      <div class="sec-h" data-i18n="pricing.label">Pricing</div>
       <h1 style="font-size:34px;font-weight:900;color:var(--text);line-height:1.15;margin:6px 0;">
-        Automated Social Media,<br><span style="color:var(--neon);">From $19 to $149/month</span>
+        <span data-i18n="pricing.hero_title">Automated Social Media,</span><br><span style="color:var(--neon);" data-i18n="pricing.hero_price">From $19 to $149/month</span>
       </h1>
-      <p style="font-size:14px;color:var(--muted);max-width:520px;margin:12px auto 0;line-height:1.6;">
+      <p style="font-size:14px;color:var(--muted);max-width:520px;margin:12px auto 0;line-height:1.6;" data-i18n="pricing.hero_desc">
         One platform posts for you on X, Telegram, Instagram, TikTok and YouTube —
         every morning and evening, with AI-generated images and videos.
       </p>
@@ -224,10 +181,10 @@ body { display:flex; min-height:100vh; }
       <!-- Billing toggle -->
       <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:20px;">
         <div class="bill-toggle">
-          <button class="bill-btn active" id="btn-monthly" onclick="setBilling('monthly')">Monthly</button>
-          <button class="bill-btn" id="btn-annual" onclick="setBilling('annual')">Annual</button>
+          <button class="bill-btn active" id="btn-monthly" onclick="setBilling('monthly')" data-i18n="pricing.bill_monthly">Monthly</button>
+          <button class="bill-btn" id="btn-annual" onclick="setBilling('annual')" data-i18n="pricing.bill_annual">Annual</button>
         </div>
-        <span class="save-badge">Save 20% annually</span>
+        <span class="save-badge" data-i18n="pricing.save_badge">Save 20% annually</span>
       </div>
     </div>
 
@@ -236,60 +193,60 @@ body { display:flex; min-height:100vh; }
 
       <!-- STARTER -->
       <div class="plan-card">
-        {% if current_plan == 'starter' %}<div class="current-badge">Current Plan</div>{% endif %}
+        {% if current_plan == 'starter' %}<div class="current-badge" data-i18n="pricing.current_badge">Current Plan</div>{% endif %}
         <div class="plan-name">Starter</div>
         <div class="plan-price" id="price-starter"><sup>$</sup><span class="p-val">19</span><span class="period"> / mo</span></div>
-        <div class="plan-annual" id="ann-starter" style="display:none;color:var(--gold);font-size:12px;font-weight:600;">$15/mo · billed $180/yr — save $48</div>
-        <div class="plan-desc" style="margin-top:10px;">For solo creators who want consistent daily presence on X and Telegram.</div>
+        <div class="plan-annual" id="ann-starter" style="display:none;color:var(--gold);font-size:12px;font-weight:600;" data-i18n="pricing.ann_starter">$15/mo · billed $180/yr — save $48</div>
+        <div class="plan-desc" style="margin-top:10px;" data-i18n="pricing.starter_desc">For solo creators who want consistent daily presence on X and Telegram.</div>
         <hr class="plan-divider">
         <ul class="feat-list">
-          <li><span class="ico">📡</span> 2 platforms — Telegram + X</li>
-          <li><span class="ico">⏰</span> 2 posts / day (morning + evening)</li>
-          <li><span class="ico">🗞️</span> AI news scouting — 1 niche</li>
-          <li><span class="ico">🖼️</span> AI image cards + short reels</li>
-          <li><span class="ico">📊</span> Viral Scout — basic view</li>
-          <li><span class="ico">🔔</span> Failure alerts on Telegram</li>
-          <li><span class="ico">🔁</span> Auto-retry on failure</li>
-          <li class="dim"><span class="ico">❌</span> No avatar video</li>
-          <li class="dim"><span class="ico">❌</span> No competitor tracking</li>
+          <li><span class="ico">📡</span><span data-i18n="pricing.fs1"> 2 platforms — Telegram + X</span></li>
+          <li><span class="ico">⏰</span><span data-i18n="pricing.fs2"> 2 posts / day (morning + evening)</span></li>
+          <li><span class="ico">🗞️</span><span data-i18n="pricing.fs3"> AI news scouting — 1 niche</span></li>
+          <li><span class="ico">🖼️</span><span data-i18n="pricing.fs4"> AI image cards + short reels</span></li>
+          <li><span class="ico">📊</span><span data-i18n="pricing.fs5"> Viral Scout — basic view</span></li>
+          <li><span class="ico">🔔</span><span data-i18n="pricing.fs6"> Failure alerts on Telegram</span></li>
+          <li><span class="ico">🔁</span><span data-i18n="pricing.fs7"> Auto-retry on failure</span></li>
+          <li class="dim"><span class="ico">❌</span><span data-i18n="pricing.fs8"> No avatar video</span></li>
+          <li class="dim"><span class="ico">❌</span><span data-i18n="pricing.fs9"> No competitor tracking</span></li>
         </ul>
         {% if current_plan == 'starter' %}
-        <a href="/billing/portal" class="plan-btn btn-starter" style="margin-top:auto;">Manage Subscription</a>
+        <a href="/billing/portal" class="plan-btn btn-starter" style="margin-top:auto;" data-i18n="pricing.btn_manage">Manage Subscription</a>
         {% else %}
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto;padding-top:24px;">
-          <a href="#" class="plan-btn btn-starter" style="margin-top:0;" onclick="checkout('starter')">💳 Pay with Card</a>
-          <button onclick="openCryptoModal('starter')" style="width:100%;padding:12px 14px;border-radius:12px;background:rgba(0,255,120,.05);border:1px solid rgba(0,255,120,.2);color:#4d9966;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='rgba(0,255,120,.4)';this.style.color='var(--neon)'" onmouseout="this.style.borderColor='rgba(0,255,120,.2)';this.style.color='#4d9966'">🔷 Pay with USDC</button>
+          <a href="#" class="plan-btn btn-starter" style="margin-top:0;" onclick="checkout('starter')" data-i18n="pricing.btn_card">💳 Pay with Card</a>
+          <button onclick="openCryptoModal('starter')" style="width:100%;padding:12px 14px;border-radius:12px;background:rgba(0,255,120,.05);border:1px solid rgba(0,255,120,.2);color:#4d9966;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='rgba(0,255,120,.4)';this.style.color='var(--neon)'" onmouseout="this.style.borderColor='rgba(0,255,120,.2)';this.style.color='#4d9966'" data-i18n="pricing.btn_crypto">🔷 Pay with USDC</button>
         </div>
         {% endif %}
       </div>
 
       <!-- PRO — popular -->
       <div class="plan-card popular">
-        <div class="popular-badge">⚡ Most Popular</div>
-        {% if current_plan == 'pro' %}<div class="current-badge">Current Plan</div>{% endif %}
+        <div class="popular-badge" data-i18n="pricing.popular_badge">⚡ Most Popular</div>
+        {% if current_plan == 'pro' %}<div class="current-badge" data-i18n="pricing.current_badge">Current Plan</div>{% endif %}
         <div class="plan-name" style="color:var(--neon);">Pro</div>
         <div class="plan-price" id="price-pro"><sup>$</sup><span class="p-val">49</span><span class="period"> / mo</span></div>
-        <div class="plan-annual" id="ann-pro" style="display:none;color:var(--gold);font-size:12px;font-weight:600;">$39/mo · billed $468/yr — save $120</div>
-        <div class="plan-desc" style="margin-top:10px;">Full automation across all platforms with AI avatars, analytics, and competitor tracking.</div>
+        <div class="plan-annual" id="ann-pro" style="display:none;color:var(--gold);font-size:12px;font-weight:600;" data-i18n="pricing.ann_pro">$39/mo · billed $468/yr — save $120</div>
+        <div class="plan-desc" style="margin-top:10px;" data-i18n="pricing.pro_desc">Full automation across all platforms with AI avatars, analytics, and competitor tracking.</div>
         <hr class="plan-divider" style="border-color:rgba(0,255,120,.15);">
         <ul class="feat-list">
-          <li><span class="ico">📡</span> All 6 platforms incl. Instagram + TikTok + YouTube</li>
-          <li><span class="ico">⏰</span> 2 posts / day per platform</li>
-          <li><span class="ico">🎯</span> 3 niches (your choice)</li>
-          <li><span class="ico">🖼️</span> Images + Reels + <strong>Avatar video (D-ID)</strong></li>
-          <li><span class="ico">📊</span> Full Viral Scout + Trend Predictor</li>
-          <li><span class="ico">🕵️</span> Competitor Tracker — up to 5 accounts</li>
-          <li><span class="ico">🔬</span> A/B Testing + Engagement Optimizer</li>
-          <li><span class="ico">🎬</span> Ad Studio — 12 industries</li>
-          <li><span class="ico">🌐</span> Daily Web Learner (AI research)</li>
-          <li><span class="ico">⚡</span> Pre-Post Hook Optimizer</li>
+          <li><span class="ico">📡</span><span data-i18n="pricing.fp1"> All 6 platforms incl. Instagram + TikTok + YouTube</span></li>
+          <li><span class="ico">⏰</span><span data-i18n="pricing.fp2"> 2 posts / day per platform</span></li>
+          <li><span class="ico">🎯</span><span data-i18n="pricing.fp3"> 3 niches (your choice)</span></li>
+          <li><span class="ico">🖼️</span><span data-i18n-html="pricing.fp4"> Images + Reels + <strong>Avatar video (D-ID)</strong></span></li>
+          <li><span class="ico">📊</span><span data-i18n="pricing.fp5"> Full Viral Scout + Trend Predictor</span></li>
+          <li><span class="ico">🕵️</span><span data-i18n="pricing.fp6"> Competitor Tracker — up to 5 accounts</span></li>
+          <li><span class="ico">🔬</span><span data-i18n="pricing.fp7"> A/B Testing + Engagement Optimizer</span></li>
+          <li><span class="ico">🎬</span><span data-i18n="pricing.fp8"> Ad Studio — 12 industries</span></li>
+          <li><span class="ico">🌐</span><span data-i18n="pricing.fp9"> Daily Web Learner (AI research)</span></li>
+          <li><span class="ico">⚡</span><span data-i18n="pricing.fp10"> Pre-Post Hook Optimizer</span></li>
         </ul>
         {% if current_plan == 'pro' %}
-        <a href="/billing/portal" class="plan-btn btn-pro" style="margin-top:auto;">Manage Subscription</a>
+        <a href="/billing/portal" class="plan-btn btn-pro" style="margin-top:auto;" data-i18n="pricing.btn_manage">Manage Subscription</a>
         {% else %}
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto;padding-top:24px;">
-          <a href="#" class="plan-btn btn-pro" style="margin-top:0;" onclick="checkout('pro')">💳 Pay with Card</a>
-          <button onclick="openCryptoModal('pro')" style="width:100%;padding:12px 14px;border-radius:12px;background:rgba(0,255,122,.06);border:1px solid rgba(0,255,122,.3);color:var(--neon);font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(0,255,122,.14)'" onmouseout="this.style.background='rgba(0,255,122,.06)'">🔷 Pay with USDC</button>
+          <a href="#" class="plan-btn btn-pro" style="margin-top:0;" onclick="checkout('pro')" data-i18n="pricing.btn_card">💳 Pay with Card</a>
+          <button onclick="openCryptoModal('pro')" style="width:100%;padding:12px 14px;border-radius:12px;background:rgba(0,255,122,.06);border:1px solid rgba(0,255,122,.3);color:var(--neon);font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(0,255,122,.14)'" onmouseout="this.style.background='rgba(0,255,122,.06)'" data-i18n="pricing.btn_crypto">🔷 Pay with USDC</button>
         </div>
         {% endif %}
       </div>
@@ -299,27 +256,27 @@ body { display:flex; min-height:100vh; }
         {% if current_plan == 'elite' %}<div class="current-badge" style="background:rgba(251,191,36,.12);color:var(--gold);border-color:rgba(251,191,36,.3);">Current Plan</div>{% endif %}
         <div class="plan-name" style="color:var(--gold);">Elite</div>
         <div class="plan-price" id="price-elite" style="color:var(--gold);"><sup>$</sup><span class="p-val">149</span><span class="period"> / mo</span></div>
-        <div class="plan-annual" id="ann-elite" style="display:none;color:var(--gold);font-size:12px;font-weight:600;">$119/mo · billed $1,428/yr — save $360</div>
-        <div class="plan-desc" style="margin-top:10px;">For agencies and power users who need the full AI stack — unlimited, white-label ready.</div>
+        <div class="plan-annual" id="ann-elite" style="display:none;color:var(--gold);font-size:12px;font-weight:600;" data-i18n="pricing.ann_elite">$119/mo · billed $1,428/yr — save $360</div>
+        <div class="plan-desc" style="margin-top:10px;" data-i18n="pricing.elite_desc">For agencies and power users who need the full AI stack — unlimited, white-label ready.</div>
         <hr class="plan-divider" style="border-color:rgba(251,191,36,.15);">
         <ul class="feat-list">
-          <li><span class="ico">📡</span> All 6 platforms — unlimited posts</li>
-          <li><span class="ico">🎯</span> All 10 niches simultaneously</li>
-          <li><span class="ico">🎬</span> <strong>HeyGen premium avatars</strong></li>
-          <li><span class="ico">🕵️</span> Competitor Tracker — unlimited accounts</li>
-          <li><span class="ico">📊</span> Advanced analytics dashboard</li>
-          <li><span class="ico">🧠</span> Priority AI brain cycles</li>
-          <li><span class="ico">🏢</span> White-label option (+$99/mo)</li>
-          <li><span class="ico">👥</span> Team seats — up to 3 users</li>
-          <li><span class="ico">📞</span> Onboarding call + priority support</li>
-          <li><span class="ico">⚙️</span> Custom RSS feeds + webhooks</li>
+          <li><span class="ico">📡</span><span data-i18n="pricing.fe1"> All 6 platforms — unlimited posts</span></li>
+          <li><span class="ico">🎯</span><span data-i18n="pricing.fe2"> All 10 niches simultaneously</span></li>
+          <li><span class="ico">🎬</span><span data-i18n-html="pricing.fe3"> <strong>HeyGen premium avatars</strong></span></li>
+          <li><span class="ico">🕵️</span><span data-i18n="pricing.fe4"> Competitor Tracker — unlimited accounts</span></li>
+          <li><span class="ico">📊</span><span data-i18n="pricing.fe5"> Advanced analytics dashboard</span></li>
+          <li><span class="ico">🧠</span><span data-i18n="pricing.fe6"> Priority AI brain cycles</span></li>
+          <li><span class="ico">🏢</span><span data-i18n="pricing.fe7"> White-label option (+$99/mo)</span></li>
+          <li><span class="ico">👥</span><span data-i18n="pricing.fe8"> Team seats — up to 3 users</span></li>
+          <li><span class="ico">📞</span><span data-i18n="pricing.fe9"> Onboarding call + priority support</span></li>
+          <li><span class="ico">⚙️</span><span data-i18n="pricing.fe10"> Custom RSS feeds + webhooks</span></li>
         </ul>
         {% if current_plan == 'elite' %}
-        <a href="/billing/portal" class="plan-btn btn-elite" style="margin-top:auto;">Manage Subscription</a>
+        <a href="/billing/portal" class="plan-btn btn-elite" style="margin-top:auto;" data-i18n="pricing.btn_manage">Manage Subscription</a>
         {% else %}
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto;padding-top:24px;">
-          <a href="#" class="plan-btn btn-elite" style="margin-top:0;" onclick="checkout('elite')">💳 Pay with Card</a>
-          <button onclick="openCryptoModal('elite')" style="width:100%;padding:12px 14px;border-radius:12px;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(251,191,36,.16)'" onmouseout="this.style.background='rgba(251,191,36,.07)'">🔷 Pay with USDC</button>
+          <a href="#" class="plan-btn btn-elite" style="margin-top:0;" onclick="checkout('elite')" data-i18n="pricing.btn_card">💳 Pay with Card</a>
+          <button onclick="openCryptoModal('elite')" style="width:100%;padding:12px 14px;border-radius:12px;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;" onmouseover="this.style.background='rgba(251,191,36,.16)'" onmouseout="this.style.background='rgba(251,191,36,.07)'" data-i18n="pricing.btn_crypto">🔷 Pay with USDC</button>
         </div>
         {% endif %}
       </div>
@@ -328,62 +285,62 @@ body { display:flex; min-height:100vh; }
 
     <!-- ═══ ADD-ONS ═══ -->
     <div style="margin-top:52px;">
-      <div class="sec-h">Add-ons</div>
-      <div class="sec-title">Enhance any plan</div>
-      <div class="sec-sub">Available as monthly add-ons on Starter, Pro, or Elite.</div>
+      <div class="sec-h" data-i18n="pricing.addons_label">Add-ons</div>
+      <div class="sec-title" data-i18n="pricing.addons_title">Enhance any plan</div>
+      <div class="sec-sub" data-i18n="pricing.addons_sub">Available as monthly add-ons on Starter, Pro, or Elite.</div>
 
       <div class="addons-grid">
         <div class="addon-card">
           <div class="addon-icon">🧠</div>
           <div>
-            <div class="addon-name">AI Rewrite (Claude)</div>
-            <div class="addon-desc">Every post is rewritten by Claude AI before publishing — better hooks, higher reach.</div>
-            <div class="addon-price">+$10 / month</div>
+            <div class="addon-name" data-i18n="pricing.a1_name">AI Rewrite (Claude)</div>
+            <div class="addon-desc" data-i18n="pricing.a1_desc">Every post is rewritten by Claude AI before publishing — better hooks, higher reach.</div>
+            <div class="addon-price" data-i18n="pricing.a1_price">+$10 / month</div>
           </div>
         </div>
 
         <div class="addon-card">
           <div class="addon-icon">🎯</div>
           <div>
-            <div class="addon-name">Extra Niche</div>
-            <div class="addon-desc">Add a new niche (fitness, finance, fashion etc.) to your existing plan.</div>
-            <div class="addon-price">+$10 / niche / month</div>
+            <div class="addon-name" data-i18n="pricing.a2_name">Extra Niche</div>
+            <div class="addon-desc" data-i18n="pricing.a2_desc">Add a new niche (fitness, finance, fashion etc.) to your existing plan.</div>
+            <div class="addon-price" data-i18n="pricing.a2_price">+$10 / niche / month</div>
           </div>
         </div>
 
         <div class="addon-card">
           <div class="addon-icon">📡</div>
           <div>
-            <div class="addon-name">Custom RSS Feeds</div>
-            <div class="addon-desc">Add your own news sources — blogs, newsletters, trade publications.</div>
-            <div class="addon-price">+$5 / month</div>
+            <div class="addon-name" data-i18n="pricing.a3_name">Custom RSS Feeds</div>
+            <div class="addon-desc" data-i18n="pricing.a3_desc">Add your own news sources — blogs, newsletters, trade publications.</div>
+            <div class="addon-price" data-i18n="pricing.a3_price">+$5 / month</div>
           </div>
         </div>
 
         <div class="addon-card">
           <div class="addon-icon">⏰</div>
           <div>
-            <div class="addon-name">Extra Post Slot</div>
-            <div class="addon-desc">Add a third posting window (midday, night, or custom time).</div>
-            <div class="addon-price">+$5 / slot / month</div>
+            <div class="addon-name" data-i18n="pricing.a4_name">Extra Post Slot</div>
+            <div class="addon-desc" data-i18n="pricing.a4_desc">Add a third posting window (midday, night, or custom time).</div>
+            <div class="addon-price" data-i18n="pricing.a4_price">+$5 / slot / month</div>
           </div>
         </div>
 
         <div class="addon-card">
           <div class="addon-icon">🏢</div>
           <div>
-            <div class="addon-name">White-Label Agency</div>
-            <div class="addon-desc">Your logo, your domain, your brand — resell AutoPost to your clients. (Elite only)</div>
-            <div class="addon-price">+$99 / month</div>
+            <div class="addon-name" data-i18n="pricing.a5_name">White-Label Agency</div>
+            <div class="addon-desc" data-i18n="pricing.a5_desc">Your logo, your domain, your brand — resell AutoPost to your clients. (Elite only)</div>
+            <div class="addon-price" data-i18n="pricing.a5_price">+$99 / month</div>
           </div>
         </div>
 
         <div class="addon-card">
           <div class="addon-icon">🚀</div>
           <div>
-            <div class="addon-name">Setup & Onboarding</div>
-            <div class="addon-desc">We configure everything for you — credentials, niches, schedule, platforms.</div>
-            <div class="addon-price">$99 one-time</div>
+            <div class="addon-name" data-i18n="pricing.a6_name">Setup & Onboarding</div>
+            <div class="addon-desc" data-i18n="pricing.a6_desc">We configure everything for you — credentials, niches, schedule, platforms.</div>
+            <div class="addon-price" data-i18n="pricing.a6_price">$99 one-time</div>
           </div>
         </div>
       </div>
@@ -391,62 +348,62 @@ body { display:flex; min-height:100vh; }
 
     <!-- ═══ COMING SOON ═══ -->
     <div style="margin-top:52px;">
-      <div class="sec-h">Roadmap</div>
-      <div class="sec-title">Coming soon</div>
-      <div class="sec-sub">Features in development — available free to all active subscribers when released.</div>
+      <div class="sec-h" data-i18n="pricing.soon_label">Roadmap</div>
+      <div class="sec-title" data-i18n="pricing.soon_title">Coming soon</div>
+      <div class="sec-sub" data-i18n="pricing.soon_sub">Features in development — available free to all active subscribers when released.</div>
 
       <div class="soon-grid">
         <div class="soon-card">
-          <div class="soon-label">Soon</div>
+          <div class="soon-label" data-i18n="pricing.soon_badge">Soon</div>
           <div class="soon-icon">📅</div>
           <div>
-            <div class="soon-name">Content Calendar</div>
-            <div class="soon-desc">Plan exactly what to post and when — manual scheduling alongside auto-posts.</div>
+            <div class="soon-name" data-i18n="pricing.s1_name">Content Calendar</div>
+            <div class="soon-desc" data-i18n="pricing.s1_desc">Plan exactly what to post and when — manual scheduling alongside auto-posts.</div>
           </div>
         </div>
 
         <div class="soon-card">
-          <div class="soon-label">Soon</div>
+          <div class="soon-label" data-i18n="pricing.soon_badge">Soon</div>
           <div class="soon-icon">💬</div>
           <div>
-            <div class="soon-name">Auto-Reply Bot</div>
-            <div class="soon-desc">AI replies to DMs and comments on X and Instagram on your behalf.</div>
+            <div class="soon-name" data-i18n="pricing.s2_name">Auto-Reply Bot</div>
+            <div class="soon-desc" data-i18n="pricing.s2_desc">AI replies to DMs and comments on X and Instagram on your behalf.</div>
           </div>
         </div>
 
         <div class="soon-card">
-          <div class="soon-label">Soon</div>
+          <div class="soon-label" data-i18n="pricing.soon_badge">Soon</div>
           <div class="soon-icon">⚡</div>
           <div>
-            <div class="soon-name">Price Alert Trigger</div>
-            <div class="soon-desc">Post automatically when BTC, ETH or any coin crosses a price level.</div>
+            <div class="soon-name" data-i18n="pricing.s3_name">Price Alert Trigger</div>
+            <div class="soon-desc" data-i18n="pricing.s3_desc">Post automatically when BTC, ETH or any coin crosses a price level.</div>
           </div>
         </div>
 
         <div class="soon-card">
-          <div class="soon-label">Soon</div>
+          <div class="soon-label" data-i18n="pricing.soon_badge">Soon</div>
           <div class="soon-icon">📈</div>
           <div>
-            <div class="soon-name">Monthly Analytics Report</div>
-            <div class="soon-desc">Automated PDF with your real engagement stats, top posts, and AI recommendations.</div>
+            <div class="soon-name" data-i18n="pricing.s4_name">Monthly Analytics Report</div>
+            <div class="soon-desc" data-i18n="pricing.s4_desc">Automated PDF with your real engagement stats, top posts, and AI recommendations.</div>
           </div>
         </div>
 
         <div class="soon-card">
-          <div class="soon-label">Soon</div>
+          <div class="soon-label" data-i18n="pricing.soon_badge">Soon</div>
           <div class="soon-icon">👥</div>
           <div>
-            <div class="soon-name">Team Seats</div>
-            <div class="soon-desc">Multiple collaborators on one account — perfect for agencies and trading desks.</div>
+            <div class="soon-name" data-i18n="pricing.s5_name">Team Seats</div>
+            <div class="soon-desc" data-i18n="pricing.s5_desc">Multiple collaborators on one account — perfect for agencies and trading desks.</div>
           </div>
         </div>
 
         <div class="soon-card">
-          <div class="soon-label">Soon</div>
+          <div class="soon-label" data-i18n="pricing.soon_badge">Soon</div>
           <div class="soon-icon">🔔</div>
           <div>
-            <div class="soon-name">Webhook Triggers</div>
-            <div class="soon-desc">Connect any external system — post when a signal fires, trade executes, or event happens.</div>
+            <div class="soon-name" data-i18n="pricing.s6_name">Webhook Triggers</div>
+            <div class="soon-desc" data-i18n="pricing.s6_desc">Connect any external system — post when a signal fires, trade executes, or event happens.</div>
           </div>
         </div>
       </div>
@@ -454,8 +411,8 @@ body { display:flex; min-height:100vh; }
 
     <!-- ═══ COMPARE TABLE ═══ -->
     <div style="margin-top:52px;">
-      <div class="sec-h">Compare</div>
-      <div class="sec-title">Full feature comparison</div>
+      <div class="sec-h" data-i18n="pricing.cmp_label">Compare</div>
+      <div class="sec-title" data-i18n="pricing.cmp_title">Full feature comparison</div>
 
       <div style="overflow-x:auto;margin-top:16px;">
         <table class="cmp-table">
@@ -506,29 +463,29 @@ body { display:flex; min-height:100vh; }
 
     <!-- ═══ FAQ ═══ -->
     <div style="margin-top:52px;max-width:720px;">
-      <div class="sec-h">FAQ</div>
-      <div class="sec-title">Common questions</div>
+      <div class="sec-h" data-i18n="pricing.faq_label">FAQ</div>
+      <div class="sec-title" data-i18n="pricing.faq_title">Common questions</div>
 
       <div style="margin-top:16px;">
         <div class="faq-item" onclick="this.classList.toggle('open')">
-          <div class="faq-q">Can I switch plans at any time? <span class="faq-arr">▾</span></div>
-          <div class="faq-a">Yes. Upgrades take effect immediately. Downgrades apply at the next billing cycle.</div>
+          <div class="faq-q"><span data-i18n="pricing.faq_q1">Can I switch plans at any time?</span> <span class="faq-arr">▾</span></div>
+          <div class="faq-a" data-i18n="pricing.faq_a1">Yes. Upgrades take effect immediately. Downgrades apply at the next billing cycle.</div>
         </div>
         <div class="faq-item" onclick="this.classList.toggle('open')">
-          <div class="faq-q">Do I need to provide API keys for each platform? <span class="faq-arr">▾</span></div>
-          <div class="faq-a">Yes. Each platform (X, Instagram, TikTok, YouTube) requires your own credentials in Settings. We never share accounts between users. Telegram only needs a bot token.</div>
+          <div class="faq-q"><span data-i18n="pricing.faq_q2">Do I need to provide API keys for each platform?</span> <span class="faq-arr">▾</span></div>
+          <div class="faq-a" data-i18n="pricing.faq_a2">Yes. Each platform (X, Instagram, TikTok, YouTube) requires your own credentials in Settings. We never share accounts between users. Telegram only needs a bot token.</div>
         </div>
         <div class="faq-item" onclick="this.classList.toggle('open')">
-          <div class="faq-q">Is avatar video included in Pro? <span class="faq-arr">▾</span></div>
-          <div class="faq-a">Yes — D-ID avatar videos are included in Pro. You need your own D-ID API key (Lite plan ~$9/month) and optionally ElevenLabs for voice.</div>
+          <div class="faq-q"><span data-i18n="pricing.faq_q3">Is avatar video included in Pro?</span> <span class="faq-arr">▾</span></div>
+          <div class="faq-a" data-i18n="pricing.faq_a3">Yes — D-ID avatar videos are included in Pro. You need your own D-ID API key (Lite plan ~$9/month) and optionally ElevenLabs for voice.</div>
         </div>
         <div class="faq-item" onclick="this.classList.toggle('open')">
-          <div class="faq-q">What niches are supported? <span class="faq-arr">▾</span></div>
-          <div class="faq-a">10 niches: Crypto, Fitness, Business, Food, Fashion, Travel, Technology, Marketing, Real Estate, Entertainment. Each niche has its own news sources, hashtags, image styles, and tone.</div>
+          <div class="faq-q"><span data-i18n="pricing.faq_q4">What niches are supported?</span> <span class="faq-arr">▾</span></div>
+          <div class="faq-a" data-i18n="pricing.faq_a4">10 niches: Crypto, Fitness, Business, Food, Fashion, Travel, Technology, Marketing, Real Estate, Entertainment. Each niche has its own news sources, hashtags, image styles, and tone.</div>
         </div>
         <div class="faq-item" onclick="this.classList.toggle('open')">
-          <div class="faq-q">Can I see a demo before subscribing? <span class="faq-arr">▾</span></div>
-          <div class="faq-a">Contact us at lcstwist@gmail.com and we'll walk you through the platform live.</div>
+          <div class="faq-q"><span data-i18n="pricing.faq_q5">Can I see a demo before subscribing?</span> <span class="faq-arr">▾</span></div>
+          <div class="faq-a" data-i18n="pricing.faq_a5">Contact us at lcstwist@gmail.com and we'll walk you through the platform live.</div>
         </div>
       </div>
     </div>
@@ -589,11 +546,11 @@ body { display:flex; min-height:100vh; }
 
     <!-- ═══ CTA ═══ -->
     <div style="margin-top:52px;text-align:center;padding:40px;background:var(--surface);border:1px solid var(--border);border-radius:20px;">
-      <div style="font-size:28px;font-weight:900;color:var(--text);">Ready to automate your social media?</div>
-      <div style="font-size:14px;color:var(--muted);margin-top:8px;">Choose your plan and start posting on autopilot today.</div>
+      <div style="font-size:28px;font-weight:900;color:var(--text);" data-i18n="pricing.cta_title">Ready to automate your social media?</div>
+      <div style="font-size:14px;color:var(--muted);margin-top:8px;" data-i18n="pricing.cta_sub">Choose your plan and start posting on autopilot today.</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:24px;">
-        <a href="/settings" style="padding:13px 32px;background:var(--neon);color:#020806;font-size:14px;font-weight:800;border-radius:10px;text-decoration:none;transition:all .2s;" onmouseover="this.style.boxShadow='0 0 24px rgba(0,255,120,.4)'" onmouseout="this.style.boxShadow=''">Get Started</a>
-        <a href="/admin/backoffice" style="padding:13px 28px;background:rgba(255,255,255,.05);color:var(--muted);font-size:14px;font-weight:700;border-radius:10px;text-decoration:none;border:1px solid var(--border);">View Dashboard</a>
+        <a href="/settings" style="padding:13px 32px;background:var(--neon);color:#020806;font-size:14px;font-weight:800;border-radius:10px;text-decoration:none;transition:all .2s;" onmouseover="this.style.boxShadow='0 0 24px rgba(0,255,120,.4)'" onmouseout="this.style.boxShadow=''" data-i18n="pricing.cta_start">Get Started</a>
+        <a href="/admin/backoffice" style="padding:13px 28px;background:rgba(255,255,255,.05);color:var(--muted);font-size:14px;font-weight:700;border-radius:10px;text-decoration:none;border:1px solid var(--border);" data-i18n="pricing.cta_dash">View Dashboard</a>
       </div>
     </div>
 
@@ -729,5 +686,6 @@ function checkout(plan) {
   window.location.href = '/billing/checkout/' + plan + '/' + _billingMode;
 }
 </script>
+<script src="/static/i18n.js"></script>
 </body>
 </html>

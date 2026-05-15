@@ -3,8 +3,17 @@ title AutoPost Dashboard
 cd /d "%~dp0"
 
 echo.
-echo   AutoPost — Pornire locala
-echo   ═══════════════════════════════════════
+echo   AutoPost - Pornire locala
+echo   ===================================================
+echo.
+echo   Runari pipeline disponibile:
+echo   - python src/agents/pipeline.py --slot morning --publish
+echo   - python src/agents/pipeline.py --slot evening --publish
+echo.
+echo   X / Twitter posting: Make.com webhook OR tweepy API
+echo   Telegram: Direct Bot API (functioneaza intotdeauna)
+echo.
+echo   ===================================================
 echo.
 
 REM Use the Python from PATH (or venv if activated)
@@ -27,7 +36,7 @@ if errorlevel 1 (
 
 REM Create DB + admin user on first run
 if not exist autopost.db (
-    echo   Prima rulare — creare baza de date...
+    echo   Prima rulare - creare baza de date...
     python seed_db.py
 )
 
