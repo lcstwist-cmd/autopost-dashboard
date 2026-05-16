@@ -9,6 +9,12 @@
 <style>
 /* ── Layout: fixed header + fixed control strip + scrollable tabs ── */
 html, body { height: 100%; overflow: hidden; }
+@media (max-width: 767px) {
+  html, body { height: auto !important; overflow: auto !important; }
+  .main-wrap { overflow: auto !important; height: auto !important; }
+  .bo-hide-mob { display: none !important; }
+  .bo-mob-pl { padding-left: 52px !important; }
+}
 
 .log-line  { font-family:'JetBrains Mono','Fira Code',monospace; font-size:11px; line-height:1.7; }
 .log-error { color:#f87171; }
@@ -61,7 +67,7 @@ input[type=time]:focus { border-color:rgba(45,126,248,.45); }
 
 <!-- ═══ HEADER — simplified ═══ -->
 <header class="elite-header" style="position:relative;">
-  <div class="max-w-full px-4 py-2 flex items-center gap-3">
+  <div class="max-w-full px-4 py-2 flex items-center gap-3 bo-mob-pl" style="flex-wrap:wrap;row-gap:6px;">
 
     <!-- Logo + back -->
     <a href="/" class="ebtn ebtn-ghost ebtn-sm" style="flex-shrink:0;">← Dashboard</a>
@@ -73,7 +79,7 @@ input[type=time]:focus { border-color:rgba(45,126,248,.45); }
     <span class="epill epill-gold" style="font-size:9px;flex-shrink:0;">ADMIN</span>
 
     <!-- Stats strip -->
-    <div class="flex items-stretch ml-2" style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface);flex-shrink:0;">
+    <div class="flex items-stretch ml-2 bo-hide-mob" style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface);flex-shrink:0;">
       <div class="cstat"><span class="cstat-val">{{ stats.total_users }}</span><span class="cstat-lbl">Users</span></div>
       <div class="cstat"><span class="cstat-val {{ 'text-gold' if stats.pending_users > 0 else '' }}">{{ stats.pending_users }}</span><span class="cstat-lbl">Pending</span></div>
       <div class="cstat"><span class="cstat-val text-blue">{{ stats.total_slots }}</span><span class="cstat-lbl">Slots</span></div>
@@ -81,7 +87,7 @@ input[type=time]:focus { border-color:rgba(45,126,248,.45); }
     </div>
 
     <!-- Platform health -->
-    <div id="healthRow" class="hidden md:flex items-center gap-1.5 flex-wrap" style="flex:1;min-width:0;">
+    <div id="healthRow" class="hidden md:flex items-center gap-1.5 flex-wrap bo-hide-mob" style="flex:1;min-width:0;">
       <span style="font-size:9px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;">Platforms</span>
     </div>
 
@@ -101,20 +107,20 @@ input[type=time]:focus { border-color:rgba(45,126,248,.45); }
         {% endif %}
       </div>
 
-      <!-- Hidden emergency buttons (kept for JS) -->
-      <button id="btnStopAll"   onclick="emergencyStop()"   class="ebtn ebtn-danger ebtn-sm"  title="Emergency stop">🛑</button>
-      <button id="btnStartAll"  onclick="emergencyResume()" class="ebtn ebtn-primary ebtn-sm" title="Resume all">▶</button>
-      <button id="btnSysRestart" onclick="sysRestart()"     class="ebtn ebtn-ghost ebtn-sm"   title="Restart server" style="color:var(--purple);">⚡</button>
+      <!-- Emergency buttons — hidden on mobile (accessible via Triggers tab) -->
+      <button id="btnStopAll"   onclick="emergencyStop()"   class="ebtn ebtn-danger ebtn-sm bo-hide-mob"  title="Emergency stop">🛑</button>
+      <button id="btnStartAll"  onclick="emergencyResume()" class="ebtn ebtn-primary ebtn-sm bo-hide-mob" title="Resume all">▶</button>
+      <button id="btnSysRestart" onclick="sysRestart()"     class="ebtn ebtn-ghost ebtn-sm bo-hide-mob"   title="Restart server" style="color:var(--purple);">⚡</button>
 
-      <div style="width:1px;height:20px;background:var(--dim);margin:0 2px;"></div>
+      <div class="bo-hide-mob" style="width:1px;height:20px;background:var(--dim);margin:0 2px;"></div>
       <a href="/admin/users" class="ebtn ebtn-ghost ebtn-sm" title="Users">
         👥{% if pending_count > 0 %}<span style="color:var(--gold);font-size:10px;"> {{ pending_count }}</span>{% endif %}
       </a>
-      <a href="/settings" class="ebtn ebtn-ghost ebtn-sm" title="Settings">⚙</a>
+      <a href="/settings" class="ebtn ebtn-ghost ebtn-sm bo-hide-mob" title="Settings">⚙</a>
       <form method="post" action="/logout" style="margin:0;">
         <button type="submit" class="ebtn ebtn-danger ebtn-sm">Out</button>
       </form>
-      <div class="flex gap-1">
+      <div class="flex gap-1 bo-hide-mob">
         <button class="lang-btn ebtn ebtn-ghost ebtn-sm" data-lang="en" onclick="setLang('en')">EN</button>
         <button class="lang-btn ebtn ebtn-ghost ebtn-sm" data-lang="ro" onclick="setLang('ro')">RO</button>
       </div>
@@ -125,7 +131,7 @@ input[type=time]:focus { border-color:rgba(45,126,248,.45); }
 </header>
 
 <!-- ═══ TAB BAR ═══ -->
-<div style="background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;" class="flex items-center gap-1 z-10 relative">
+<div style="background:var(--surface);border-bottom:1px solid var(--border);padding:0 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;" class="flex items-center gap-1 z-10 relative">
   <button class="etab active" onclick="switchMainTab('logs')" id="main-tab-logs">📋 Logs</button>
   <button class="etab" onclick="switchMainTab('brains')" id="main-tab-brains">🧠 Agent Brains <span id="brain-status-short" class="text-xs ml-1" style="color:var(--muted);"></span></button>
   <button class="etab" onclick="switchMainTab('intel')" id="main-tab-intel">📈 Intelligence</button>
@@ -145,7 +151,7 @@ input[type=time]:focus { border-color:rgba(45,126,248,.45); }
 </div>
 
 <!-- ═══ TAB CONTENT ═══ -->
-<div style="height:calc(100vh - 110px);overflow:hidden;position:relative;z-index:1;">
+<div id="tab-content-wrap" style="height:calc(100vh - 110px);overflow:hidden;position:relative;z-index:1;">
 
   <!-- LOGS TAB -->
   <div class="tab-pane active" id="pane-logs" style="padding:12px 20px;display:flex;flex-direction:column;gap:8px;height:100%;">
@@ -362,6 +368,25 @@ input[type=time]:focus { border-color:rgba(45,126,248,.45); }
 </div><!-- /tab content -->
 
 <script>
+// ── Mobile layout fix ─────────────────────────────────────────────────────────
+const _isMob = () => window.innerWidth < 768;
+function _applyMobLayout() {
+  const wrap = document.getElementById('tab-content-wrap');
+  if (!wrap) return;
+  if (_isMob()) {
+    wrap.style.height = 'auto';
+    wrap.style.overflow = 'visible';
+    document.querySelectorAll('.tab-pane').forEach(p => {
+      p.style.height = 'auto';
+      p.style.overflow = 'visible';
+    });
+    const logPane = document.getElementById('pane-logs');
+    if (logPane) logPane.style.minHeight = '60vh';
+  }
+}
+window.addEventListener('resize', _applyMobLayout);
+_applyMobLayout();
+
 // ── Tab switching ──────────────────────────────────────────────────────────────
 function switchMainTab(name) {
   // Force hide all panes via inline style so we override any inline display:flex on logs pane
@@ -372,6 +397,8 @@ function switchMainTab(name) {
   if (pane) {
     pane.style.display = (name === 'logs') ? 'flex' : 'block';
     pane.classList.add('active');
+    // scroll to top of page on mobile when switching tabs
+    if (_isMob()) window.scrollTo({top: 0, behavior: 'smooth'});
   }
   if (btn) btn.classList.add('active');
   // lazy-load on first open
