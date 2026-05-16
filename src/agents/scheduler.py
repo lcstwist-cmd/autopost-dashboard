@@ -917,8 +917,6 @@ def start_scheduler(publish: bool = True) -> None:
         raise SystemExit("schedule not installed — run: pip install schedule")
 
     viral_time          = os.environ.get("VIRAL_SCOUT_TIME",      "06:30")
-    web_learn_time_am   = os.environ.get("WEB_LEARN_TIME",        "07:00")
-    web_learn_time_pm   = os.environ.get("WEB_LEARN_TIME_PM",     "19:00")
     competitor_time     = os.environ.get("COMPETITOR_SCAN_TIME",  "09:00")
 
     # Per-user scheduling: check every minute which users have a slot due.
@@ -927,8 +925,7 @@ def start_scheduler(publish: bool = True) -> None:
     schedule.every().minute.do(_check_scheduled_posts, publish=publish)
 
     schedule.every().day.at(viral_time).do(run_viral_scout)
-    schedule.every().day.at(web_learn_time_am).do(_run_web_learning)
-    schedule.every().day.at(web_learn_time_pm).do(_run_web_learning)
+    schedule.every(2).hours.do(_run_web_learning)   # continuous — every 2h
     schedule.every().day.at(competitor_time).do(_run_competitor_tracker)
     schedule.every(30).minutes.do(_run_health_check)
     schedule.every(15).minutes.do(_run_retry_cycle)
@@ -942,7 +939,7 @@ def start_scheduler(publish: bool = True) -> None:
     schedule.every(1).hours.do(_run_feedback_loop)
     schedule.every(4).hours.do(_run_platform_timing)
 
-    log.info(f"Scheduler started (per-user mode). Viral scout: {viral_time} | Web learning: {web_learn_time_am} + {web_learn_time_pm}")
+    log.info(f"Scheduler started (per-user mode). Viral scout: {viral_time} | Web learning: every 2h")
     log.info(f"Publishing: {'YES' if publish else 'DRY-RUN'}")
     log.info("Each user posts at their own configured morning/evening time.")
 
@@ -959,6 +956,11 @@ def start_scheduler(publish: bool = True) -> None:
                 _viral_run_once(force=False)
     except Exception as exc:
         log.warning(f"[viral] startup warm-up skipped: {exc}")
+
+    # Immediate web learning run at startup — force so it always runs once now
+    import threading as _th_wl
+    _th_wl.Thread(target=_run_web_learning, daemon=True, name="web-learn-startup").start()
+    log.info("[web_learner] Startup cycle launched in background")
 
     # Catch-up missed runs (machine was off at scheduled time)
     try:

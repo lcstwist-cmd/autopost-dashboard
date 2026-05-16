@@ -512,10 +512,10 @@ _TODAY_KEY = "web_learned_at"
 
 
 def _session_key() -> str:
-    """Return a session identifier: 'YYYY-MM-DD_am' before 13:00, '_pm' after."""
+    """Return a session ID per 2-hour window so the learner runs every 2h."""
     now = datetime.now()
-    session = "am" if now.hour < 13 else "pm"
-    return f"{now.strftime('%Y-%m-%d')}_{session}"
+    bucket = (now.hour // 2) * 2  # 0,2,4,...,22
+    return f"{now.strftime('%Y-%m-%d')}_{bucket:02d}"
 
 
 def run_web_learning(force: bool = False, only_agent: str = "") -> dict[str, int]:
