@@ -436,7 +436,9 @@ def catch_up_missed_runs(publish: bool = True) -> list[str]:
             now_mins  = now_local.hour * 60 + now_local.minute
             if now_mins < slot_mins:
                 continue   # slot hasn't been due yet today
-            if _slot_already_ran_today(slot, user_id=uid):
+            if _slot_already_ran_today(slot):              # global run_slot ran today
+                continue
+            if _slot_already_ran_today(slot, user_id=uid): # per-user ran today
                 continue
 
             log.warning(f"[catch-up] user {uid} missed {slot} at {slot_time} — running now")
@@ -873,6 +875,12 @@ def _run_slot_locked(slot: str, publish: bool = True) -> bool:
         fail_users  = [r for r in results if r.get("status") != "ok"]
         log.info(f"Slot {slot} completed — {len(ok_users)} OK, {len(fail_users)} failed")
         _mark_run(slot, success=bool(ok_users))
+
+        # Mark per-user state so catch_up_missed_runs won't re-run these users.
+        for r in results:
+            uid = r.get("user_id")
+            if uid is not None:
+                _mark_user_slot(int(uid), slot, started=False)
 
         if fail_users:
             fail_info = "; ".join(f"user {r['user_id']}: {r.get('error','?')[:80]}" for r in fail_users)
