@@ -339,7 +339,10 @@ def run_pipeline(slot, hours_back, out_root, stop_after, model, template_path,
             except Exception as exc2:
                 print(f"[pipeline] ffmpeg fallback error (non-fatal): {exc2}")
 
-    if stop_idx >= STAGES.index("avatar"):
+    # Avatar stage is only needed for TikTok/YouTube video content.
+    # Skip it when neither platform is in the enabled set to save ~5 minutes.
+    _video_platforms = {"tiktok", "youtube"}
+    if stop_idx >= STAGES.index("avatar") and (platforms or set()) & _video_platforms:
         try:
             from src.agents.avatar_video import build_avatar_reel
             presenter = os.environ.get("DID_PRESENTER", "default")
@@ -347,16 +350,11 @@ def run_pipeline(slot, hours_back, out_root, stop_after, model, template_path,
             print(f"[pipeline] avatar video -> {out}")
         except Exception as exc:
             import traceback
-            print("\n" + "!" * 70)
-            print(f"[pipeline] !!! AVATAR STAGE FAILED (non-fatal, continuing) !!!")
-            print(f"[pipeline] Error: {exc}")
-            print(f"[pipeline] Full traceback:")
+            print(f"[pipeline] avatar stage failed (non-fatal): {exc}")
             traceback.print_exc()
-            print("!" * 70 + "\n")
+    elif stop_idx >= STAGES.index("avatar"):
+        print(f"[pipeline] avatar stage skipped — no TikTok/YouTube in platforms {sorted(platforms or [])}")
 
-    # PRE-POST OPTIMIZATION — analiza zilei + selectia variantei optime
-    # Rulează după copy+reel și înainte de publish.
-    # Generează 4 variante per platformă, scorează pe 5 dimensiuni, scrie câștigătoarea.
     if stop_idx >= STAGES.index("publish"):
         try:
             from src.agents.pre_post_optimizer import optimize as _optimize

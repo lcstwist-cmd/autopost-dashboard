@@ -135,7 +135,7 @@ def _resolve_platforms() -> tuple[str, ...]:
 
 def scan_topics(topics: Iterable[str] | None = None,
                 platforms: Iterable[str] | None = None,
-                limit_per_platform: int = 15,
+                limit_per_platform: int = 100,
                 youtube_api_key: str | None = None,
                 niche: str | None = None) -> list[dict]:
     """Run a viral scan for each topic. Returns a list of blueprints.
@@ -203,7 +203,7 @@ def refresh_for_user(user_id: int,
         bp_list = scan_topics(
             topics=[topic],
             platforms=platforms,
-            limit_per_platform=15,
+            limit_per_platform=100,
             youtube_api_key=yt_key,
             niche=niche,
         )

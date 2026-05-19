@@ -236,6 +236,205 @@ def whoami_via_cookies(cookies: list[dict]) -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# Post a tweet via pure HTTP (no playwright) using stored cookies
+# ---------------------------------------------------------------------------
+
+_BEARER = (
+    "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%"
+    "3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
+)
+
+# Known stable CreateTweet GraphQL query IDs (try in order).
+_CREATE_TWEET_QUERY_IDS = [
+    "SoVnbfCycZ7fERGCwpZkYA",
+    "a1p9RWpkYKBjWv_fsagpyA",
+    "tTsjMKyhajZvK4q76mpIBg",
+]
+
+_TWEET_FEATURES = {
+    "tweetypie_unmention_optimization_enabled": True,
+    "responsive_web_edit_tweet_api_enabled": True,
+    "graphql_is_translatable_rweb_tweet_is_translatable_enabled": True,
+    "view_counts_everywhere_api_enabled": True,
+    "longform_notetweets_consumption_enabled": True,
+    "responsive_web_twitter_article_tweet_consumption_enabled": False,
+    "tweet_awards_web_tipping_enabled": False,
+    "freedom_of_speech_not_reach_fetch_enabled": True,
+    "standardized_nudges_misinfo": True,
+    "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": True,
+    "longform_notetweets_rich_text_read_enabled": True,
+    "longform_notetweets_inline_media_enabled": True,
+    "responsive_web_graphql_exclude_directive_enabled": True,
+    "verified_phone_label_enabled": False,
+    "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+    "responsive_web_graphql_timeline_navigation_enabled": True,
+    "responsive_web_enhance_cards_enabled": False,
+    "interactive_text_enabled": True,
+}
+
+
+def _x_session_headers(ct0: str) -> dict:
+    return {
+        "Authorization":               f"Bearer {_BEARER}",
+        "x-csrf-token":                ct0,
+        "User-Agent":                  ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                        "Chrome/124.0.0.0 Safari/537.36"),
+        "Accept":                      "*/*",
+        "Accept-Language":             "en-US,en;q=0.9",
+        "Referer":                     "https://x.com/compose/tweet",
+        "Origin":                      "https://x.com",
+        "x-twitter-auth-type":         "OAuth2Session",
+        "x-twitter-client-language":   "en",
+        "x-twitter-active-user":       "yes",
+    }
+
+
+def _upload_media_http(jar: dict, ct0: str, image_path: Path) -> str | None:
+    """Upload image to X media upload endpoint. Returns media_id_string or None."""
+    try:
+        import requests
+        suffix = image_path.suffix.lower()
+        mime = "image/png" if suffix == ".png" else "image/jpeg"
+        hdrs = _x_session_headers(ct0)
+        hdrs.pop("Content-Type", None)
+        resp = requests.post(
+            "https://upload.twitter.com/1.1/media/upload.json",
+            files={"media": (image_path.name, image_path.read_bytes(), mime)},
+            headers=hdrs,
+            cookies=jar,
+            timeout=60,
+        )
+        if resp.status_code == 200:
+            return str(resp.json().get("media_id_string", ""))
+        print(f"[x_cookies] media upload HTTP {resp.status_code}: {resp.text[:120]}")
+    except Exception as exc:
+        print(f"[x_cookies] media upload error: {exc}")
+    return None
+
+
+def post_via_cookies_http(cookies: list[dict], text: str,
+                          image_path: Path | None = None) -> dict[str, Any]:
+    """Post a tweet via X's internal GraphQL API using session cookies.
+
+    No playwright needed — uses pure HTTP with the same bearer + CSRF auth
+    that the x.com web app uses. Falls back to text-only if image upload fails.
+    """
+    try:
+        import requests
+    except ImportError:
+        return {"status": "error", "error": "requests not installed"}
+
+    jar: dict[str, str] = {c["name"]: c["value"] for c in cookies}
+    if "auth_token" not in jar or "ct0" not in jar:
+        return {"status": "error", "error": "Missing auth_token/ct0 cookies"}
+
+    ct0 = jar["ct0"]
+    headers = {**_x_session_headers(ct0), "Content-Type": "application/json"}
+
+    media_id: str | None = None
+    if image_path and Path(image_path).exists():
+        media_id = _upload_media_http(jar, ct0, Path(image_path))
+        if not media_id:
+            print("[x_cookies] image upload failed — posting text-only")
+
+    media_entities = (
+        [{"media_id": media_id, "tagged_users": []}] if media_id else []
+    )
+    variables = {
+        "tweet_text": text,
+        "dark_request": False,
+        "media": {
+            "media_entities": media_entities,
+            "possibly_sensitive": False,
+        },
+        "semantic_annotation_ids": [],
+    }
+
+    last_err = ""
+    for qid in _CREATE_TWEET_QUERY_IDS:
+        try:
+            resp = requests.post(
+                f"https://x.com/i/api/graphql/{qid}/CreateTweet",
+                json={"variables": variables, "features": _TWEET_FEATURES,
+                      "queryId": qid},
+                headers=headers,
+                cookies=jar,
+                timeout=30,
+            )
+        except Exception as exc:
+            last_err = f"network: {exc}"
+            continue
+
+        if resp.status_code in (401, 403):
+            return {
+                "status": "error",
+                "error": (f"X rejected cookies (HTTP {resp.status_code}) — "
+                          "they may be expired. Re-export from x.com and paste again."),
+            }
+
+        if resp.status_code != 200:
+            last_err = f"HTTP {resp.status_code}: {resp.text[:160]}"
+            continue
+
+        try:
+            data = resp.json()
+        except Exception:
+            last_err = f"JSON decode error: {resp.text[:120]}"
+            continue
+
+        # X sometimes returns 200 with an errors payload — that means the tweet
+        # was NOT created (e.g. duplicate, rate-limit, auth).
+        if data.get("errors"):
+            errs  = data["errors"]
+            codes = [e.get("code") for e in errs]
+            msgs  = "; ".join(e.get("message", "")[:80] for e in errs)
+            last_err = f"X API error {codes}: {msgs}"
+            print(f"[x_cookies] CreateTweet error ({qid}): {last_err}")
+            if 187 in codes:
+                # duplicate content — treat as transient, try next query-ID
+                continue
+            # auth / permission errors — no point retrying other query-IDs
+            if any(c in codes for c in (32, 64, 89, 135, 215, 326)):
+                return {"status": "error",
+                        "error": (f"X auth/permission error {codes}: {msgs}. "
+                                  "Cookies may be expired — re-export from x.com.")}
+            continue
+
+        top_data = data.get("data") or {}
+        result   = (top_data
+                    .get("create_tweet", {})
+                    .get("tweet_results", {})
+                    .get("result", {}))
+
+        # X sometimes wraps the tweet in TweetWithVisibilityResults
+        if result.get("__typename") == "TweetWithVisibilityResults":
+            result = result.get("tweet", {})
+
+        tweet_id = (result.get("rest_id")
+                    or result.get("legacy", {}).get("id_str", ""))
+
+        if not tweet_id:
+            if not result:
+                # tweet_results.result was null — tweet was NOT created by this qid
+                last_err = f"tweet_results.result was null (qid={qid})"
+                print(f"[x_cookies] result null for qid={qid}, trying next")
+                continue
+            # result has keys but no rest_id — tweet probably posted, just
+            # can't extract the URL (X changed schema). Log and return ok.
+            print(f"[x_cookies] WARN: posted but no tweet_id. "
+                  f"result keys={list(result.keys()) if isinstance(result, dict) else result}")
+
+        url = (f"https://x.com/i/web/status/{tweet_id}"
+               if tweet_id else "https://x.com/home")
+        return {"status": "ok", "url": url, "via": "cookies-http",
+                "has_image": media_id is not None}
+
+    return {"status": "error",
+            "error": f"X GraphQL CreateTweet failed: {last_err}"}
+
+
+# ---------------------------------------------------------------------------
 # Post a tweet via Playwright using stored cookies
 # ---------------------------------------------------------------------------
 

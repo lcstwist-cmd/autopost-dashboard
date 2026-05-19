@@ -51,6 +51,7 @@ from src.dashboard.database import (
     log_publish_history, get_publish_history,
     create_scheduled_post, get_scheduled_posts, delete_scheduled_post,
     get_due_scheduled_posts, update_scheduled_post_status,
+    DB_PATH,
 )
 
 init_db()
@@ -58,37 +59,52 @@ init_db()
 app = FastAPI(title="AutoPost Dashboard")
 app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
 
+print(f"[dashboard] Database initialized at {DB_PATH}")
+print(f"[dashboard] App ready on {_HERE}")
 
 @app.on_event("startup")
 async def _startup() -> None:
     """Start the agent-brain background learning loop and scheduler on server boot."""
-    try:
-        from src.agents.agent_brain import manager as _brain_mgr
-        _brain_mgr.start_background_loop(interval_minutes=30)
-    except Exception as exc:
-        print(f"[dashboard] agent_brain startup failed (non-fatal): {exc}")
+    import asyncio
+    print("[dashboard] Startup event triggered — initializing background tasks...")
+    
+    # Start agent_brain in background thread so it doesn't block startup
+    def _start_brain():
+        try:
+            from src.agents.agent_brain import manager as _brain_mgr
+            _brain_mgr.start_background_loop(interval_minutes=30)
+        except Exception as exc:
+            print(f"[dashboard] agent_brain startup failed (non-fatal): {exc}")
+    
+    # Run in thread pool to avoid blocking
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, _start_brain)
 
-    # Auto-launch scheduler.py if it is not already running
-    try:
-        if not _bot_status()["running"]:
-            kwargs: dict = {"cwd": str(_REPO)}
-            if platform.system() == "Windows":
-                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-            import time as _t
-            proc = subprocess.Popen(
-                [sys.executable, str(_REPO / "src" / "agents" / "scheduler.py")],
-                **kwargs,
-            )
-            _t.sleep(1.5)
-            if proc.poll() is None:
-                PID_FILE.write_text(str(proc.pid))
-                print(f"[dashboard] scheduler auto-started at boot (pid={proc.pid})")
+    # Auto-launch scheduler.py if it is not already running (non-blocking)
+    def _start_scheduler():
+        try:
+            if not _bot_status()["running"]:
+                kwargs: dict = {"cwd": str(_REPO)}
+                if platform.system() == "Windows":
+                    kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+                proc = subprocess.Popen(
+                    [sys.executable, str(_REPO / "src" / "agents" / "scheduler.py")],
+                    **kwargs,
+                )
+                import time as _t
+                _t.sleep(0.5)  # reduced from 1.5s
+                if proc.poll() is None:
+                    PID_FILE.write_text(str(proc.pid))
+                    print(f"[dashboard] scheduler auto-started at boot (pid={proc.pid})")
+                else:
+                    print("[dashboard] scheduler exited immediately at startup — check scheduler.log")
             else:
-                print("[dashboard] scheduler exited immediately at startup — check scheduler.log")
-        else:
-            print("[dashboard] scheduler already running at startup")
-    except Exception as exc:
-        print(f"[dashboard] scheduler auto-start failed (non-fatal): {exc}")
+                print("[dashboard] scheduler already running at startup")
+        except Exception as exc:
+            print(f"[dashboard] scheduler auto-start failed (non-fatal): {exc}")
+    
+    # Also run scheduler start in background
+    loop.run_in_executor(None, _start_scheduler)
 
 
 # Global safety net: convert any unhandled exception into a JSON response,
@@ -732,6 +748,16 @@ def get_slot_detail(name: str, queue_root: Path) -> dict[str, Any]:
         detail["avatar_status"] = None
 
     return detail
+
+
+# ---------------------------------------------------------------------------
+# Health check route (fast, for Railway)
+# ---------------------------------------------------------------------------
+
+@app.get("/health")
+async def health_check():
+    """Minimal health check — just verify the app is running."""
+    return JSONResponse({"status": "ok"})
 
 
 # ---------------------------------------------------------------------------

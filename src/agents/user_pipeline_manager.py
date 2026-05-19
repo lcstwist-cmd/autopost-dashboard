@@ -152,7 +152,7 @@ def _run_pipeline_subprocess(
     try:
         proc = subprocess.run(
             cmd, env=env, cwd=str(_REPO),
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1800,
         )
         elapsed = time.time() - t0
         if proc.returncode == 0:
@@ -163,7 +163,7 @@ def _run_pipeline_subprocess(
             print(f"[upm] user {user_id} ({email}) — FAILED: {err}")
             return {"status": "error", "user_id": user_id, "error": err, "elapsed": elapsed}
     except subprocess.TimeoutExpired:
-        return {"status": "error", "user_id": user_id, "error": "timeout after 600s"}
+        return {"status": "error", "user_id": user_id, "error": "timeout after 1800s"}
     except Exception as exc:
         return {"status": "error", "user_id": user_id, "error": str(exc)}
 

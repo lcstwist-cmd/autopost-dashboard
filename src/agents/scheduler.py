@@ -1,21 +1,15 @@
-"""Scheduler — runs the full AutoPost pipeline twice per day.
+"""AutoPost Scheduler — per-user posting pipeline.
 
-Morning slot: 08:00 GMT+2  — covers news published BEFORE 08:00 GMT+2 (overnight)
-Evening slot: 18:00 GMT+2  — covers news published AFTER 08:00 GMT+2 up to 18:00 GMT+2
+Each user has their own morning/evening time configured in DB settings.
+The scheduler checks every minute and fires for each user individually.
 
 Usage:
-    # Run scheduler (stays running, triggers at 08:00 and 18:00 every day)
-    python src/agents/scheduler.py
-
-    # Dry-run mode (no actual publishing, useful for testing)
-    python src/agents/scheduler.py --dry-run
-
-    # Run a single slot right now (skip scheduler, useful for manual triggers)
+    python src/agents/scheduler.py            # start (stays running)
+    python src/agents/scheduler.py --dry-run  # no actual publishing
     python src/agents/scheduler.py --now morning
     python src/agents/scheduler.py --now evening
-
-    # Run both slots now
     python src/agents/scheduler.py --now both
+    python src/agents/scheduler.py --now viral
 
 Requires:
     pip install schedule
@@ -463,6 +457,8 @@ def catch_up_missed_runs(publish: bool = True) -> list[str]:
             except Exception as exc:
                 log.error(f"[catch-up] user {uid} {slot} failed: {exc}")
 
+    return caught_up
+
 
 # ---------------------------------------------------------------------------
 # Pipeline runner
@@ -511,7 +507,7 @@ def _inject_admin_settings():
             "X_ACCESS_TOKEN_SECRET": s.get("x_access_secret", ""),
             "MAKE_X_WEBHOOK_URL":    s.get("make_x_webhook_url", ""),
             "X_USERNAME":            s.get("x_username", ""),
-            "X_EMAIL":                s.get("x_email", ""),
+            "X_EMAIL":               s.get("x_email", ""),
             "X_PASSWORD":            s.get("x_password", ""),
             # X cookies path (priority #1 in publish_x — preferred, free)
             "X_COOKIES_JSON":        s.get("x_cookies_json", ""),
@@ -693,7 +689,7 @@ def _run_health_check() -> None:
 
 
 def _run_web_learning() -> None:
-    """Daily internet research for all agent brains — runs at 07:00."""
+    """Internet research for all agent brains — runs every 2 hours."""
     log.info("[web_learner] Starting daily web learning cycle...")
     try:
         from src.agents.web_learner import run_web_learning
@@ -942,12 +938,19 @@ def start_scheduler(publish: bool = True) -> None:
     schedule.every(2).hours.do(_run_trend_prediction)
     schedule.every(6).hours.do(_run_engagement_optimizer)
     schedule.every(6).hours.do(_run_ab_test)
-    # New intelligence agents
     schedule.every(30).minutes.do(_run_market_intelligence)
     schedule.every(1).hours.do(_run_feedback_loop)
     schedule.every(4).hours.do(_run_platform_timing)
 
-    log.info(f"Scheduler started (per-user mode). Viral scout: {viral_time} | Web learning: every 2h")
+    # Start live health monitor (Telegram alerts + interactive fixes)
+    try:
+        from src.agents.live_monitor import start_live_monitor
+        start_live_monitor()
+        log.info("[live_monitor] started — watching logs and publish results")
+    except Exception as _lm_exc:
+        log.warning(f"[live_monitor] could not start (non-fatal): {_lm_exc}")
+
+    log.info(f"Scheduler started. Viral scout: {viral_time} | Web learning: every 2h")
     log.info(f"Publishing: {'YES' if publish else 'DRY-RUN'}")
     log.info("Each user posts at their own configured morning/evening time.")
 

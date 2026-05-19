@@ -1,52 +1,27 @@
-"""Publisher — Agent 6 of the Crypto AutoPost pipeline.
+"""Publisher — multi-platform social media publisher.
 
-Hybrid publisher:
-  * Telegram: direct call to Telegram Bot API (sendPhoto with caption)
-  * X / Twitter: POST to a Make.com webhook which handles OAuth + media upload
-
-Reads a queue directory produced by the earlier agents:
-    queue/<date>_<slot>/
-        post_x.txt
-        post_telegram.md
-        image_x_1200x675.png
-        image_tg_1080x1080.png
+Platforms:
+  * Telegram: Telegram Bot API (sendPhoto with caption)
+  * X / Twitter: pasted cookies (pure HTTP) → OAuth 2.0 → Make.com → tweepy
+  * Instagram: Meta Graph API (native)
+  * TikTok: Content Posting API (native)
+  * YouTube: Data API v3 (native)
 
 Env vars:
-    TELEGRAM_BOT_TOKEN      — from @BotFather
-    TELEGRAM_CHAT_ID        — channel id ("@yourchannel") or numeric chat id
+    TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
     X / Twitter (tried in order):
-      X_USERNAME + X_EMAIL + X_PASSWORD   → browser automation (no plan)
-      MAKE_X_WEBHOOK_URL                  → Make.com (optional, legacy path)
-      X_API_KEY/SECRET/ACCESS_TOKEN/...   → tweepy (needs Basic $100/mo)
+      X_COOKIES_JSON               → pasted session cookies (preferred, free)
+      X_OAUTH_ACCESS_TOKEN         → OAuth 2.0 user-context
+      MAKE_X_WEBHOOK_URL           → Make.com webhook (legacy)
+      X_API_KEY + X_API_SECRET + X_ACCESS_TOKEN + X_ACCESS_TOKEN_SECRET → tweepy
 
-    Instagram (Meta Graph API, native):
-      IG_USER_ID         — Instagram Business Account ID
-      IG_ACCESS_TOKEN    — long-lived Page Access Token
-      IMGBB_API_KEY      — (optional) host image publicly for Meta to fetch
-      PUBLIC_BASE_URL    — (optional) ngrok URL that exposes /media/...
-
-    TikTok (Content Posting API, native):
-      TIKTOK_ACCESS_TOKEN, TIKTOK_REFRESH_TOKEN,
-      TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET
-
-    YouTube (Data API v3, native):
-      YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN
-
-Default mode is --dry-run: no HTTP calls are made, the payloads are only printed
-to stdout so you can inspect them. Pass --publish to actually send.
-
-Safety rails:
-  * Refuses to publish if post_x.txt is over 280 weighted characters.
-  * Refuses to publish if the required image file is missing.
-  * --platforms lets you restrict to {telegram, x} for partial runs.
-  * Writes publish_log.json next to the queue dir on every run (dry or live).
+    Instagram: IG_USER_ID, IG_ACCESS_TOKEN, PUBLIC_BASE_URL
+    TikTok:    TIKTOK_ACCESS_TOKEN, TIKTOK_REFRESH_TOKEN, TIKTOK_CLIENT_KEY/SECRET
+    YouTube:   YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN
 
 Usage:
-    # safe preview
-    python src/agents/publisher.py queue/2026-04-19_morning
-
-    # live publish to both channels
+    python src/agents/publisher.py queue/2026-04-19_morning          # dry-run
     python src/agents/publisher.py queue/2026-04-19_morning --publish
 
     # only Telegram
@@ -507,9 +482,10 @@ def publish_x_oauth2(queue: dict[str, Any], dry_run: bool = True) -> dict[str, A
 def publish_x_cookies(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
     """Post using cookies the user pasted in dashboard Settings.
 
-    Reads `X_COOKIES_JSON` (set by dashboard from per-user DB row) and
-    drives Playwright headlessly. Zero developer account, zero credentials
-    stored. Works even for accounts with 2FA (2FA happened at manual login).
+    Reads `X_COOKIES_JSON` and tries:
+      1. Pure-HTTP via X's internal GraphQL API (no playwright needed).
+      2. Playwright headless browser (fallback, requires playwright installed).
+    Zero developer account, zero credentials stored.
     """
     text:       str  = queue["post_x"]
     image_path: Path = queue["image_x"]
@@ -526,13 +502,13 @@ def publish_x_cookies(queue: dict[str, Any], dry_run: bool = True) -> dict[str, 
         return {"status": "error", "error": "no X cookies in env"}
 
     try:
-        from agents.x_cookies import validate_cookies, post_via_cookies
+        from agents.x_cookies import validate_cookies, post_via_cookies_http, post_via_cookies
     except ImportError:
         try:
-            from .x_cookies import validate_cookies, post_via_cookies  # type: ignore
+            from .x_cookies import validate_cookies, post_via_cookies_http, post_via_cookies  # type: ignore
         except ImportError:
             try:
-                from src.agents.x_cookies import validate_cookies, post_via_cookies  # type: ignore
+                from src.agents.x_cookies import validate_cookies, post_via_cookies_http, post_via_cookies  # type: ignore
             except ImportError as exc:
                 return {"status": "error", "error": f"x_cookies import failed: {exc}"}
 
@@ -540,6 +516,14 @@ def publish_x_cookies(queue: dict[str, Any], dry_run: bool = True) -> dict[str, 
     if err:
         return {"status": "error", "error": f"cookies invalid: {err}"}
 
+    # Try pure-HTTP first (no playwright needed — same session auth x.com uses).
+    result = post_via_cookies_http(cookies, text, image_path=image_path)
+    if result.get("status") == "ok":
+        return result
+    http_err = result.get("error", "unknown")
+    print(f"[publisher] cookies-http: {http_err} — trying playwright fallback")
+
+    # Playwright fallback (requires: pip install playwright && playwright install chromium).
     return post_via_cookies(cookies, text, image_path=image_path, headless=True)
 
 
@@ -1154,12 +1138,12 @@ def publish_youtube(queue_dir: Path, queue: dict[str, Any],
 def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
     """Post tweet + image via Twitter/X.
 
-    Priority order (tries fallbacks):
-    1. Pasted cookies (X_COOKIES_JSON)                — FREE, no API, 10-sec setup
-    2. OAuth 2.0 user-context (X_OAUTH_ACCESS_TOKEN) — official, per-user
-    3. Tweepy BYOK (user's own X API keys)            — fallback, needs Basic plan
-    4. Make.com webhook                               — legacy
-    5. Browser automation with on-disk cookies        — last resort
+    Priority order:
+    1. X_COOKIES_JSON        — pasted session cookies (HTTP, no playwright, free)
+    2. X_OAUTH_ACCESS_TOKEN  — OAuth 2.0 user-context
+    3. MAKE_X_WEBHOOK_URL    — Make.com webhook (legacy)
+    4. .x_browser_cookies    — on-disk Playwright cookies (needs playwright)
+    5. X_API_KEY + secrets   — tweepy, requires X Basic plan ($100/mo)
     """
     text:       str  = queue["post_x"]
     image_path: Path = queue["image_x"]
@@ -1192,23 +1176,29 @@ def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
         failures.append(f"OAuth: {err}")
         print(f"[publisher] oauth2: {err}")
 
-    # ── Try Make.com webhook (most reliable, free) ────────────────────
+    # ── Priority 3: Make.com webhook ────────────────────────────────────────
     makecom_url = os.environ.get("MAKE_X_WEBHOOK_URL", "").strip()
     if makecom_url:
+        tried.append("make.com")
         result = _publish_x_makecom(text, image_path, makecom_url)
         if result["status"] == "ok":
             return result
-        print(f"[publisher] make.com: {result.get('error', 'unknown error')}")
+        err = result.get("error", "unknown error")
+        failures.append(f"Make.com: {err}")
+        print(f"[publisher] make.com: {err}")
 
-    # ── Try browser automation (fallback, if cookies exist) ──────────────
+    # ── Priority 4: Browser automation with on-disk Playwright cookies ───────
     cookies_file = _HERE / ".x_browser_cookies.json"
     if cookies_file.exists() and os.environ.get("X_USERNAME"):
+        tried.append("browser")
         result = publish_x_browser(queue, dry_run=False)
         if result["status"] == "ok":
             return result
-        print(f"[publisher] browser: {result.get('error', 'unknown error')}")
+        err = result.get("error", "unknown error")
+        failures.append(f"Browser: {err}")
+        print(f"[publisher] browser: {err}")
 
-    # ── Direct tweepy (requires X Basic plan $100/mo for write access) ───────
+    # ── Priority 5: Tweepy (requires X Basic plan $100/mo) ──────────────────
     api_key    = os.environ.get("X_API_KEY", "").strip()
     api_secret = os.environ.get("X_API_SECRET", "").strip()
     acc_token  = os.environ.get("X_ACCESS_TOKEN", "").strip()
@@ -1221,21 +1211,15 @@ def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
         "X_ACCESS_TOKEN_SECRET":   acc_secret,
     }.items() if not v]
     if missing:
-        # Build a helpful error message that explains exactly what the user
-        # needs to do. We prefer the cookie path (free, 10-sec setup).
-        tried_summary = (
-            " (attempted: " + ", ".join(tried) + ")" if tried else ""
-        )
-        fail_detail = ""
-        if failures:
-            fail_detail = " — " + " | ".join(failures[:2])
+        tried_str  = (" (attempted: " + ", ".join(tried) + ")") if tried else ""
+        fail_str   = (" — " + " | ".join(failures[:2])) if failures else ""
         return {
             "status": "error",
             "error": (
                 "X nu este conectat. Recomandat (gratis): deschide "
                 "Settings -> X / Twitter -> Paste cookies si urmeaza pasii. "
                 "Dureaza ~30 de secunde si nu are nevoie de plan platit."
-                + tried_summary + fail_detail
+                + tried_str + fail_str
             ),
         }
 
@@ -1318,20 +1302,6 @@ def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
         return {"status": "error", "error": f"X API error: {exc}"}
     except Exception as exc:
         return {"status": "error", "error": f"X unexpected error: {exc}"}
-
-
-def _publish_x_playwright_unused(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
-    """Legacy Playwright method — kept for reference, not used."""
-    if dry_run:
-        return {"status": "dry_run"}
-
-    try:
-        from playwright.sync_api import sync_playwright  # noqa: F401
-    except ImportError:
-        return {"status": "error",
-                "error": "playwright not installed — run: pip install playwright && playwright install chromium"}
-
-    return {"status": "error", "error": "Legacy playwright method not active"}
 
 
 # --- Orchestrator -----------------------------------------------------------

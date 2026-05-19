@@ -94,23 +94,33 @@ def fetch_youtube(topic: str, limit: int = 20, api_key: str | None = None) -> li
         return []
 
     try:
-        # Step 1: search for video IDs
-        params = {
-            "key":             api_key,
-            "q":               topic,
-            "type":            "video",
-            "videoDuration":   "short",
-            "order":           "viewCount",
-            "maxResults":      min(limit, 50),
-            "part":            "id,snippet",
-            "relevanceLanguage": "en",
-        }
-        r = requests.get(YOUTUBE_SEARCH_URL, params=params, timeout=15)
-        if r.status_code != 200:
-            print(f"[viral] YouTube search HTTP {r.status_code}: {r.text[:200]}")
-            return []
-        ids = [item["id"]["videoId"] for item in r.json().get("items", [])
-               if "videoId" in item.get("id", {})]
+        # Step 1: collect video IDs with pageToken pagination (max 50/call)
+        ids: list[str] = []
+        page_token: str | None = None
+        while len(ids) < limit:
+            params: dict = {
+                "key":               api_key,
+                "q":                 topic,
+                "type":              "video",
+                "videoDuration":     "short",
+                "order":             "viewCount",
+                "maxResults":        50,
+                "part":              "id,snippet",
+                "relevanceLanguage": "en",
+            }
+            if page_token:
+                params["pageToken"] = page_token
+            r = requests.get(YOUTUBE_SEARCH_URL, params=params, timeout=15)
+            if r.status_code != 200:
+                print(f"[viral] YouTube search HTTP {r.status_code}: {r.text[:200]}")
+                break
+            resp_json  = r.json()
+            new_ids    = [item["id"]["videoId"] for item in resp_json.get("items", [])
+                          if "videoId" in item.get("id", {})]
+            ids.extend(new_ids)
+            page_token = resp_json.get("nextPageToken")
+            if not page_token or not new_ids:
+                break
         if not ids:
             return []
 
@@ -337,57 +347,76 @@ def _fallback_hashtags_for(niche: str) -> list[str]:
 
 
 def _fetch_tiktok_rapidapi(topic: str, limit: int, api_key: str) -> list[dict]:
-    """Fetch real TikTok videos via RapidAPI TikTok Scraper7."""
-    try:
-        url = "https://tiktok-scraper7.p.rapidapi.com/feed/search"
-        headers = {
-            "x-rapidapi-key":  api_key,
-            "x-rapidapi-host": "tiktok-scraper7.p.rapidapi.com",
-        }
-        params = {
-            "keywords":  topic,
-            "count":     str(min(limit, 20)),
-            "cursor":    "0",
-            "region":    "US",
-            "publish_time": "0",
-            "sort_type": "0",
-        }
-        r = requests.get(url, headers=headers, params=params, timeout=15)
-        if r.status_code != 200:
-            print(f"[viral] TikTok RapidAPI HTTP {r.status_code}: {r.text[:200]}")
-            return []
-        data = r.json()
-        items = data.get("data", {}).get("videos") or data.get("data") or []
-        if not isinstance(items, list):
-            return []
+    """Fetch real TikTok videos via RapidAPI TikTok Scraper7 with cursor pagination."""
+    url = "https://tiktok-scraper7.p.rapidapi.com/feed/search"
+    headers = {
+        "x-rapidapi-key":  api_key,
+        "x-rapidapi-host": "tiktok-scraper7.p.rapidapi.com",
+    }
+    records: list[dict] = []
+    cursor = "0"
+    seen_ids: set[str] = set()
 
-        records: list[dict] = []
-        for it in items[:limit]:
-            desc     = it.get("title") or it.get("desc") or ""
-            stats    = it.get("play_count") or it.get("playCount") or 0
-            likes    = it.get("digg_count") or it.get("diggCount") or 0
-            comments = it.get("comment_count") or it.get("commentCount") or 0
-            dur      = it.get("duration") or 0
-            vid_id   = it.get("video_id") or it.get("id") or ""
-            author   = it.get("author") or ""
-            if isinstance(author, dict):
-                author = author.get("unique_id") or author.get("uniqueId") or ""
-            tags = _extract_hashtags(desc)
-            records.append({
-                "platform": "tiktok",
-                "id":       str(vid_id),
-                "title":    desc,
-                "duration": float(dur) if dur else None,
-                "views":    int(stats),
-                "likes":    int(likes),
-                "comments": int(comments),
-                "tags":     tags,
-                "url":      f"https://www.tiktok.com/@{author}/video/{vid_id}" if vid_id else "",
-            })
-        return records
-    except Exception as e:
-        print(f"[viral] TikTok RapidAPI failed: {e}")
-        return []
+    while len(records) < limit:
+        try:
+            params = {
+                "keywords":     topic,
+                "count":        "20",   # API max per call
+                "cursor":       cursor,
+                "region":       "US",
+                "publish_time": "0",
+                "sort_type":    "0",
+            }
+            r = requests.get(url, headers=headers, params=params, timeout=15)
+            if r.status_code != 200:
+                print(f"[viral] TikTok RapidAPI HTTP {r.status_code}: {r.text[:200]}")
+                break
+            data    = r.json()
+            payload = data.get("data") or {}
+            items   = (payload.get("videos") if isinstance(payload, dict) else None) or []
+            if not isinstance(items, list) or not items:
+                break
+
+            for it in items:
+                if len(records) >= limit:
+                    break
+                desc     = it.get("title") or it.get("desc") or ""
+                stats    = it.get("play_count") or it.get("playCount") or 0
+                likes    = it.get("digg_count") or it.get("diggCount") or 0
+                comments = it.get("comment_count") or it.get("commentCount") or 0
+                dur      = it.get("duration") or 0
+                vid_id   = str(it.get("video_id") or it.get("id") or "")
+                if not vid_id or vid_id in seen_ids:
+                    continue
+                seen_ids.add(vid_id)
+                author = it.get("author") or ""
+                if isinstance(author, dict):
+                    author = author.get("unique_id") or author.get("uniqueId") or ""
+                tags = _extract_hashtags(desc)
+                records.append({
+                    "platform": "tiktok",
+                    "id":       vid_id,
+                    "title":    desc,
+                    "duration": float(dur) if dur else None,
+                    "views":    int(stats),
+                    "likes":    int(likes),
+                    "comments": int(comments),
+                    "tags":     tags,
+                    "url":      f"https://www.tiktok.com/@{author}/video/{vid_id}" if vid_id else "",
+                })
+
+            # Advance cursor for next page
+            next_cursor  = str(payload.get("cursor") or data.get("cursor") or "")
+            has_more     = bool(payload.get("hasMore") or data.get("hasMore"))
+            if not has_more or not next_cursor or next_cursor == cursor:
+                break
+            cursor = next_cursor
+
+        except Exception as e:
+            print(f"[viral] TikTok RapidAPI failed: {e}")
+            break
+
+    return records
 
 
 def fetch_tiktok(topic: str, limit: int = 20, niche: str | None = None) -> list[dict]:
@@ -646,45 +675,61 @@ def fetch_x(topic: str, limit: int = 20, niche: str | None = None) -> list[dict]
     }
     records: list[dict] = []
 
-    # --- Pass 1: keyword search (high-engagement filter) ---
+    # --- Pass 1: multiple keyword search queries to reach `limit` ---
+    # Each search call returns max 20 results; run several queries to reach limit.
+    _search_queries = [
+        f"{topic} -is:retweet lang:en",
+        f"#{topic.replace(' ', '')} -is:retweet lang:en",
+        f"{topic} price analysis -is:retweet lang:en",
+        f"{topic} news update -is:retweet lang:en",
+        f"{topic} market -is:retweet lang:en",
+    ]
+    seen_ids: set[str] = set()
     try:
-        query = f"{topic} -is:retweet lang:en"
-        r = requests.get(
-            f"https://{_X_HOST}/search.php",
-            headers=headers,
-            params={"query": query, "count": str(min(limit, 20))},
-            timeout=12,
-        )
-        if r.status_code == 403:
-            print(f"[viral] X RapidAPI 403 — not subscribed to {_X_HOST}")
-            return []
-        if r.status_code == 200:
-            for t in r.json().get("timeline", []):
-                if t.get("type") != "tweet":
-                    continue
-                text = t.get("text") or ""
-                if not text:
-                    continue
-                # Extract hashtags from entities + text
-                ents = t.get("entities") or {}
-                ht_list = ents.get("hashtags") or []
-                tags = [f"#{h['text'].lower()}" for h in ht_list if h.get("text")]
-                tags += _extract_hashtags(text)
-                tags = list(dict.fromkeys(tags))  # dedupe, preserve order
-                views = int(t.get("views") or 0)
-                records.append({
-                    "platform": "x",
-                    "id":       t.get("tweet_id", ""),
-                    "title":    text,
-                    "duration": None,
-                    "views":    views,
-                    "likes":    int(t.get("favorites") or 0),
-                    "comments": int(t.get("replies") or 0),
-                    "retweets": int(t.get("retweets") or 0),
-                    "bookmarks":int(t.get("bookmarks") or 0),
-                    "tags":     tags,
-                    "url":      f"https://x.com/{t.get('screen_name','i')}/status/{t.get('tweet_id','')}",
-                })
+        for query in _search_queries:
+            if len(records) >= limit:
+                break
+            r = requests.get(
+                f"https://{_X_HOST}/search.php",
+                headers=headers,
+                params={"query": query, "count": "20"},
+                timeout=12,
+            )
+            if r.status_code == 403:
+                print(f"[viral] X RapidAPI 403 — not subscribed to {_X_HOST}")
+                return []
+            if r.status_code == 200:
+                for t in r.json().get("timeline", []):
+                    if len(records) >= limit:
+                        break
+                    if t.get("type") != "tweet":
+                        continue
+                    text = t.get("text") or ""
+                    if not text:
+                        continue
+                    tid = str(t.get("tweet_id") or "")
+                    if not tid or tid in seen_ids:
+                        continue
+                    seen_ids.add(tid)
+                    ents = t.get("entities") or {}
+                    ht_list = ents.get("hashtags") or []
+                    tags = [f"#{h['text'].lower()}" for h in ht_list if h.get("text")]
+                    tags += _extract_hashtags(text)
+                    tags = list(dict.fromkeys(tags))
+                    views = int(t.get("views") or 0)
+                    records.append({
+                        "platform": "x",
+                        "id":       tid,
+                        "title":    text,
+                        "duration": None,
+                        "views":    views,
+                        "likes":    int(t.get("favorites") or 0),
+                        "comments": int(t.get("replies") or 0),
+                        "retweets": int(t.get("retweets") or 0),
+                        "bookmarks":int(t.get("bookmarks") or 0),
+                        "tags":     tags,
+                        "url":      f"https://x.com/{t.get('screen_name','i')}/status/{tid}",
+                    })
     except Exception as e:
         print(f"[viral] X search failed: {e}")
 
@@ -756,7 +801,7 @@ def fetch_x(topic: str, limit: int = 20, niche: str | None = None) -> list[dict]
 # Facebook — Reels / Pages via RapidAPI 'facebook-scraper3'
 # ---------------------------------------------------------------------------
 
-_FB_HOST = "facebook-scraper-api4.p.rapidapi.com"
+_FB_HOST = "facebook-scraper3.p.rapidapi.com"
 
 _FB_NICHE_PAGES: dict[str, list[str]] = {
     "crypto":        ["CoinDesk", "cointelegraph", "Binance", "coinbase", "Bitcoin"],
@@ -781,17 +826,18 @@ def _fb_parse_item(it: dict) -> dict | None:
     if not isinstance(it, dict):
         return None
     text = (it.get("message") or it.get("text") or it.get("description")
-            or it.get("caption") or it.get("title") or "")
+            or it.get("caption") or it.get("title") or it.get("name") or "")
     if not text:
         return None
     views    = int(it.get("video_view_count") or it.get("play_count")
-                   or it.get("views_count") or it.get("views") or 0)
+                   or it.get("views_count") or it.get("views")
+                   or it.get("members_count") or it.get("member_count") or 0)
     likes    = int(it.get("reactions_count") or it.get("reaction_count")
                    or it.get("likes_count") or it.get("likes") or 0)
     comments = int(it.get("comments_count") or it.get("comment_count")
                    or it.get("comments") or 0)
     shares   = int(it.get("shares_count") or it.get("share_count")
-                   or it.get("shares") or 0)
+                   or it.get("reshare_count") or it.get("shares") or 0)
     url      = (it.get("url") or it.get("permalink") or it.get("post_url")
                 or it.get("video_url") or "")
     duration = it.get("video_duration") or it.get("duration") or None
@@ -811,79 +857,85 @@ def _fb_parse_item(it: dict) -> dict | None:
 
 def _fetch_facebook_rapidapi(topic: str, limit: int, api_key: str,
                              pages: list[str] | None = None) -> list[dict]:
-    """Search Facebook posts/Reels via RapidAPI 'facebook-scraper-api4'.
+    """Search Facebook posts/videos via RapidAPI 'facebook-scraper3'.
 
-    Strategy:
-      1. Try a topic search endpoint (several known path variants).
-      2. Fall back to scraping the niche's top pages for recent videos.
-    Returns [] if every endpoint is 403 (not subscribed) or returns no data.
+    Uses /search/posts and /search/videos with cursor pagination.
     """
     headers = {
         "x-rapidapi-key":  api_key,
         "x-rapidapi-host": _FB_HOST,
+        "Content-Type":    "application/json",
     }
     records: list[dict] = []
+    seen_ids: set[str] = set()
 
-    # --- Pass 1: search by topic (try several endpoint shapes) ---
-    search_attempts = [
-        ("/search_videos",  {"query": topic}),
-        ("/search_posts",   {"query": topic}),
-        ("/get_facebook_videos_search", {"query": topic, "count": str(limit)}),
-        ("/search",         {"query": topic, "type": "videos"}),
-    ]
-    for path, params in search_attempts:
-        try:
-            r = requests.get(f"https://{_FB_HOST}{path}",
-                             headers=headers, params=params, timeout=15)
-        except Exception as e:
-            print(f"[viral] Facebook {path} request failed: {e}")
-            continue
-        if r.status_code == 403:
-            print(f"[viral] Facebook RapidAPI 403 — not subscribed to {_FB_HOST}")
-            return []
-        if r.status_code == 404:
-            continue  # endpoint not on this API — try next shape
-        if r.status_code != 200:
-            print(f"[viral] Facebook {path} HTTP {r.status_code}: {r.text[:160]}")
-            continue
-        try:
-            payload = r.json()
-        except Exception:
-            continue
-        # Items can live under many keys; be permissive.
-        items = (payload.get("results") or payload.get("data")
-                 or payload.get("videos") or payload.get("posts")
-                 or payload.get("items") or [])
-        if isinstance(items, dict):
-            items = items.get("videos") or items.get("posts") or list(items.values())
-        for it in items[:limit]:
-            rec = _fb_parse_item(it if isinstance(it, dict) else {})
-            if rec:
-                records.append(rec)
+    # --- Pass 1: paginated search (posts then videos) ---
+    for path in ("/search/posts", "/search/videos"):
+        if len(records) >= limit:
+            break
+        cursor = None
+        for _ in range(6):  # max 6 pages per endpoint
+            if len(records) >= limit:
+                break
+            params: dict = {"query": topic}
+            if cursor:
+                import json as _json
+                params["cursor"] = _json.dumps(cursor)
+            try:
+                r = requests.get(f"https://{_FB_HOST}{path}",
+                                 headers=headers, params=params, timeout=15)
+            except Exception as e:
+                print(f"[viral] Facebook {path} request failed: {e}")
+                break
+            if r.status_code in (429, 403, 404):
+                if r.status_code == 429:
+                    print(f"[viral] Facebook RapidAPI 429 rate limit on {path}")
+                elif r.status_code == 403:
+                    try:
+                        msg = r.json().get("message", "")
+                    except Exception:
+                        msg = ""
+                    if "not subscribed" not in msg.lower():
+                        return records  # hard block
+                break
+            if r.status_code != 200:
+                break
+            try:
+                payload = r.json()
+            except Exception:
+                break
+            items = payload.get("results") or []
+            if not isinstance(items, list) or not items:
+                break
+            for it in items:
+                if len(records) >= limit:
+                    break
+                rec = _fb_parse_item(it if isinstance(it, dict) else {})
+                if rec and rec["id"] not in seen_ids:
+                    seen_ids.add(rec["id"])
+                    records.append(rec)
+            cursor = payload.get("cursor")
+            if not cursor:
+                break
         if records:
-            print(f"[viral] Facebook {path}: {len(records)} records")
-            return records
+            print(f"[viral] Facebook {path}: {len(records)} records so far")
 
-    # --- Pass 2: niche page video timelines ---
+    # --- Pass 2: niche page video timelines (facebook-scraper3 paths) ---
     if pages:
-        page_attempts = [
-            "/get_facebook_page_videos",
-            "/get_page_videos",
-            "/page_videos",
-        ]
+        page_paths = ["/page/videos", "/page/posts", "/page/reels", "/get_page_videos"]
         for handle in pages:
             if len(records) >= limit:
                 break
-            for path in page_attempts:
+            for path in page_paths:
                 try:
                     r = requests.get(f"https://{_FB_HOST}{path}",
                                      headers=headers,
-                                     params={"page_id": handle, "delay": "0"},
+                                     params={"page_id": handle},
                                      timeout=12)
                 except Exception:
                     continue
                 if r.status_code == 403:
-                    return records  # global 403 — give up gracefully
+                    return records
                 if r.status_code != 200:
                     continue
                 try:
@@ -903,7 +955,7 @@ def _fetch_facebook_rapidapi(topic: str, limit: int, api_key: str,
                     if len(records) >= limit:
                         break
                 if added:
-                    break  # got data from this page, move to next handle
+                    break
     if records:
         print(f"[viral] Facebook page-scrape: {len(records)} records")
     return records

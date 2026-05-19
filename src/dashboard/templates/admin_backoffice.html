@@ -781,14 +781,7 @@ function renderPlatformTiming(d, el) {
     const icon  = _PLATFORM_ICONS[plat] || '●';
 
     if (!info) {
-      html += `<div class="ecard p-3 flex flex-col gap-2" style="opacity:.45;">
-        <div class="flex items-center justify-between">
-          <span class="text-sm font-bold" style="color:${color};">${icon} ${plat.toUpperCase()}</span>
-          <span class="text-xs" style="color:var(--muted);">no data</span>
-        </div>
-        <p class="text-xs" style="color:var(--dim);">Agent hasn't collected data yet.</p>
-      </div>`;
-      continue;
+      continue; // skip platforms with no timing data (not connected / never posted)
     }
     const hours = info.best_hours || [];
     const days  = (info.best_days || []).slice(0,3).join(', ');
