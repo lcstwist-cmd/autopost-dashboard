@@ -54,6 +54,7 @@ scheduler_heartbeat.txt
 scheduler_state.json
 watchdog.pid
 watchdog.log
+autopost_paused.flag
 output/
 data/
 

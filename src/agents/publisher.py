@@ -1308,6 +1308,24 @@ def publish_x(queue: dict[str, Any], dry_run: bool = True) -> dict[str, Any]:
 
 def publish(queue_dir: Path, platforms: set[str], dry_run: bool,
             variant: str | None = None) -> dict[str, Any]:
+    # Global kill switch — AUTOPOST_DISABLED=1 in .env blocks ALL publishing.
+    if os.environ.get("AUTOPOST_DISABLED", "").strip() == "1":
+        return {
+            "status":    "disabled",
+            "queue_dir": str(queue_dir),
+            "platforms": sorted(platforms),
+            "results":   {p: {"status": "disabled", "error": "AUTOPOST_DISABLED=1"} for p in platforms},
+        }
+    # Pause flag kill switch — autopost_paused.flag blocks ALL publishing.
+    _pause = Path(__file__).resolve().parent.parent.parent / "autopost_paused.flag"
+    if _pause.exists():
+        return {
+            "status":    "paused",
+            "queue_dir": str(queue_dir),
+            "platforms": sorted(platforms),
+            "results":   {p: {"status": "paused", "error": "autopost_paused.flag exists"} for p in platforms},
+        }
+
     queue = load_queue(queue_dir, variant_override=variant)
 
     # Non-blocking fact check on X post text

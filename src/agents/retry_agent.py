@@ -224,6 +224,10 @@ def _retry_platform(queue_dir: Path, platform: str) -> dict[str, Any]:
 
 def run_retry_cycle(queue_root: Path = QUEUE_ROOT) -> list[dict[str, Any]]:
     """Scan for failed posts and retry eligible ones with per-user credentials."""
+    pause_flag = _REPO / "autopost_paused.flag"
+    if pause_flag.exists():
+        print("[retry] autopost_paused.flag is set — retry blocked.")
+        return []
     candidates = _scan_failed(queue_root)
     outcomes: list[dict[str, Any]] = []
 

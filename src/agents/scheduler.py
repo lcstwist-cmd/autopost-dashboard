@@ -341,6 +341,8 @@ def _check_per_user_slots(publish: bool = True) -> None:
 
 def _check_scheduled_posts(publish: bool = True) -> None:
     """Every minute: run any pending scheduled posts whose time has arrived."""
+    if PAUSE_FILE.exists():
+        return
     try:
         if str(_REPO_ROOT) not in __import__("sys").path:
             __import__("sys").path.insert(0, str(_REPO_ROOT))
@@ -402,6 +404,9 @@ def _check_scheduled_posts(publish: bool = True) -> None:
 
 def catch_up_missed_runs(publish: bool = True) -> list[str]:
     """At startup: run slots for users who missed their time (e.g. machine was off)."""
+    if PAUSE_FILE.exists():
+        log.info("[catch-up] autopost_paused.flag is set — catch-up blocked.")
+        return []
     try:
         if str(_REPO_ROOT) not in __import__("sys").path:
             __import__("sys").path.insert(0, str(_REPO_ROOT))
@@ -666,6 +671,8 @@ def _tg_alert(message: str) -> None:
 
 def _run_retry_cycle() -> None:
     """Retry failed platform posts (called every 15 min)."""
+    if PAUSE_FILE.exists():
+        return
     try:
         from src.agents.retry_agent import run_retry_cycle
         outcomes = run_retry_cycle()
