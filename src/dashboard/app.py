@@ -4906,55 +4906,22 @@ async def api_publish_history(request: Request, limit: int = 50):
 # Instagram Growth Analytics
 # ---------------------------------------------------------------------------
 
+def _ig_niche_and_competitors(settings: dict) -> tuple[str, list[str] | None]:
+    """Extract niche and competitor handles from user settings."""
+    niche = (settings.get("ig_niche") or "crypto").strip()
+    raw = (settings.get("ig_competitor_handles") or "").strip()
+    competitors = [h.strip() for h in raw.split(",") if h.strip()] or None
+    return niche, competitors
+
+
 def _ig_load_all(settings: dict, force: bool = False) -> dict:
-    """Load all IG analytics using user's saved API credentials."""
-    from src.agents.instagram_analytics import (
-        fetch_account_overview, fetch_recent_posts,
-        fetch_audience_demographics, fetch_growth_history,
-        generate_recommendations, list_content_kit_items,
-    )
-    overview: dict = {}
-    posts: list = []
-    audience: dict = {}
-    growth: list = []
-    tips: list = []
-    kit: list = []
-
+    """Load all IG analytics via the unified growth engine."""
+    from src.agents import ig_growth_engine as _ige
+    niche, competitors = _ig_niche_and_competitors(settings)
     with _uenv(settings):
-        try:
-            overview = fetch_account_overview(force=force)
-        except Exception as e:
-            print(f"[ig] overview error: {e}")
-        try:
-            posts = fetch_recent_posts(force=force)
-        except Exception as e:
-            print(f"[ig] posts error: {e}")
-        try:
-            audience = fetch_audience_demographics(force=force)
-        except Exception as e:
-            print(f"[ig] audience error: {e}")
-        try:
-            growth = fetch_growth_history()
-        except Exception as e:
-            print(f"[ig] growth error: {e}")
-        try:
-            tips = generate_recommendations(overview, posts, audience)
-        except Exception as e:
-            print(f"[ig] tips error: {e}")
-
-    try:
-        kit = list_content_kit_items()
-    except Exception as e:
-        print(f"[ig] kit error: {e}")
-
-    return {
-        "overview": overview,
-        "posts": posts,
-        "audience": audience,
-        "growth_history": growth,
-        "tips": tips,
-        "content_kit": kit,
-    }
+        if force:
+            _ige.full_refresh(niche, competitors)
+        return _ige.load_dashboard_data(niche, competitors)
 
 
 @app.get("/instagram-growth", response_class=HTMLResponse)
@@ -4973,77 +4940,66 @@ async def instagram_growth_page(request: Request):
 
 @app.get("/api/instagram/overview")
 async def api_ig_overview(request: Request):
-    from src.agents.instagram_analytics import fetch_account_overview
+    from src.agents.ig_growth_engine import get_own_account
     settings = get_user_settings(request.state.user["id"])
-    try:
-        with _uenv(settings):
-            return JSONResponse(fetch_account_overview(force=False))
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    with _uenv(settings):
+        return JSONResponse(get_own_account(force=False))
 
 
 @app.get("/api/instagram/posts")
 async def api_ig_posts(request: Request):
-    from src.agents.instagram_analytics import fetch_recent_posts
+    from src.agents.ig_growth_engine import get_own_posts
     settings = get_user_settings(request.state.user["id"])
-    try:
-        with _uenv(settings):
-            return JSONResponse({"posts": fetch_recent_posts(force=False)})
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    with _uenv(settings):
+        return JSONResponse({"posts": get_own_posts(force=False)})
 
 
 @app.get("/api/instagram/audience")
 async def api_ig_audience(request: Request):
-    from src.agents.instagram_analytics import fetch_audience_demographics
+    from src.agents.ig_growth_engine import get_audience
     settings = get_user_settings(request.state.user["id"])
-    try:
-        with _uenv(settings):
-            return JSONResponse(fetch_audience_demographics(force=False))
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    with _uenv(settings):
+        return JSONResponse(get_audience(force=False))
 
 
 @app.get("/api/instagram/growth-chart")
 async def api_ig_growth(request: Request):
-    from src.agents.instagram_analytics import fetch_growth_history
-    try:
-        return JSONResponse({"history": fetch_growth_history()})
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    from src.agents.ig_growth_engine import get_growth_history
+    return JSONResponse({"history": get_growth_history()})
 
 
 @app.get("/api/instagram/recommendations")
 async def api_ig_recommendations(request: Request, force: int = 0):
-    from src.agents.instagram_analytics import (
-        fetch_account_overview, fetch_recent_posts,
-        fetch_audience_demographics, generate_recommendations,
+    from src.agents.ig_growth_engine import (
+        get_own_account, get_own_posts, get_niche_viral_reels,
+        analyze_viral_patterns, generate_content_briefs,
     )
     settings = get_user_settings(request.state.user["id"])
-    try:
+    niche, _ = _ig_niche_and_competitors(settings)
+    loop = asyncio.get_event_loop()
+    def _do():
         with _uenv(settings):
-            overview = fetch_account_overview(force=False)
-            posts = fetch_recent_posts(force=False)
-            audience = fetch_audience_demographics(force=False)
-            tips = generate_recommendations(overview, posts, audience)
-        return JSONResponse({"tips": tips})
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+            acc     = get_own_account(force=False)
+            posts   = get_own_posts(force=False)
+            reels   = get_niche_viral_reels(niche, force=bool(force))
+            pats    = analyze_viral_patterns(reels)
+            briefs  = generate_content_briefs(acc, reels, pats, force=bool(force))
+        return briefs
+    briefs = await loop.run_in_executor(_publish_executor, _do)
+    return JSONResponse({"briefs": briefs})
 
 
 @app.post("/api/instagram/refresh")
 async def api_ig_refresh(request: Request):
-    from src.agents.instagram_analytics import refresh_all
+    from src.agents.ig_growth_engine import full_refresh
     settings = get_user_settings(request.state.user["id"])
+    niche, competitors = _ig_niche_and_competitors(settings)
     loop = asyncio.get_event_loop()
-    try:
-        def _do():
-            with _uenv(settings):
-                return refresh_all(force=True)
-        result = await loop.run_in_executor(_publish_executor, _do)
-        return JSONResponse(result)
-    except Exception as e:
-        return JSONResponse({"ok": False, "errors": [str(e)]}, status_code=500)
+    def _do():
+        with _uenv(settings):
+            return full_refresh(niche, competitors)
+    result = await loop.run_in_executor(_publish_executor, _do)
+    return JSONResponse(result)
 
 
 @app.post("/api/instagram/queue-content")
