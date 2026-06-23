@@ -4903,6 +4903,170 @@ async def api_publish_history(request: Request, limit: int = 50):
 
 
 # ---------------------------------------------------------------------------
+# Instagram Growth Analytics
+# ---------------------------------------------------------------------------
+
+def _ig_load_all(settings: dict, force: bool = False) -> dict:
+    """Load all IG analytics using user's saved API credentials."""
+    from src.agents.instagram_analytics import (
+        fetch_account_overview, fetch_recent_posts,
+        fetch_audience_demographics, fetch_growth_history,
+        generate_recommendations, list_content_kit_items,
+    )
+    overview: dict = {}
+    posts: list = []
+    audience: dict = {}
+    growth: list = []
+    tips: list = []
+    kit: list = []
+
+    with _uenv(settings):
+        try:
+            overview = fetch_account_overview(force=force)
+        except Exception as e:
+            print(f"[ig] overview error: {e}")
+        try:
+            posts = fetch_recent_posts(force=force)
+        except Exception as e:
+            print(f"[ig] posts error: {e}")
+        try:
+            audience = fetch_audience_demographics(force=force)
+        except Exception as e:
+            print(f"[ig] audience error: {e}")
+        try:
+            growth = fetch_growth_history()
+        except Exception as e:
+            print(f"[ig] growth error: {e}")
+        try:
+            tips = generate_recommendations(overview, posts, audience)
+        except Exception as e:
+            print(f"[ig] tips error: {e}")
+
+    try:
+        kit = list_content_kit_items()
+    except Exception as e:
+        print(f"[ig] kit error: {e}")
+
+    return {
+        "overview": overview,
+        "posts": posts,
+        "audience": audience,
+        "growth_history": growth,
+        "tips": tips,
+        "content_kit": kit,
+    }
+
+
+@app.get("/instagram-growth", response_class=HTMLResponse)
+async def instagram_growth_page(request: Request):
+    settings = get_user_settings(request.state.user["id"])
+    data = await asyncio.get_event_loop().run_in_executor(
+        _publish_executor,
+        lambda: _ig_load_all(settings, force=False),
+    )
+    return _render(
+        "instagram_growth.html",
+        **data,
+        **_user_ctx(request),
+    )
+
+
+@app.get("/api/instagram/overview")
+async def api_ig_overview(request: Request):
+    from src.agents.instagram_analytics import fetch_account_overview
+    settings = get_user_settings(request.state.user["id"])
+    try:
+        with _uenv(settings):
+            return JSONResponse(fetch_account_overview(force=False))
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/instagram/posts")
+async def api_ig_posts(request: Request):
+    from src.agents.instagram_analytics import fetch_recent_posts
+    settings = get_user_settings(request.state.user["id"])
+    try:
+        with _uenv(settings):
+            return JSONResponse({"posts": fetch_recent_posts(force=False)})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/instagram/audience")
+async def api_ig_audience(request: Request):
+    from src.agents.instagram_analytics import fetch_audience_demographics
+    settings = get_user_settings(request.state.user["id"])
+    try:
+        with _uenv(settings):
+            return JSONResponse(fetch_audience_demographics(force=False))
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/instagram/growth-chart")
+async def api_ig_growth(request: Request):
+    from src.agents.instagram_analytics import fetch_growth_history
+    try:
+        return JSONResponse({"history": fetch_growth_history()})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/instagram/recommendations")
+async def api_ig_recommendations(request: Request, force: int = 0):
+    from src.agents.instagram_analytics import (
+        fetch_account_overview, fetch_recent_posts,
+        fetch_audience_demographics, generate_recommendations,
+    )
+    settings = get_user_settings(request.state.user["id"])
+    try:
+        with _uenv(settings):
+            overview = fetch_account_overview(force=False)
+            posts = fetch_recent_posts(force=False)
+            audience = fetch_audience_demographics(force=False)
+            tips = generate_recommendations(overview, posts, audience)
+        return JSONResponse({"tips": tips})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.post("/api/instagram/refresh")
+async def api_ig_refresh(request: Request):
+    from src.agents.instagram_analytics import refresh_all
+    settings = get_user_settings(request.state.user["id"])
+    loop = asyncio.get_event_loop()
+    try:
+        def _do():
+            with _uenv(settings):
+                return refresh_all(force=True)
+        result = await loop.run_in_executor(_publish_executor, _do)
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"ok": False, "errors": [str(e)]}, status_code=500)
+
+
+@app.post("/api/instagram/queue-content")
+async def api_ig_queue_content(request: Request):
+    """Accept a content-kit item and log it for manual posting."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    path = body.get("path", "")
+    name = body.get("name", "")
+    media_type = body.get("media_type", "")
+    log_publish_history(
+        user_id=request.state.user["id"],
+        slot_name="content_kit",
+        title=name,
+        platforms=["instagram"],
+        results={"path": path, "media_type": media_type, "status": "queued"},
+    )
+    return JSONResponse({"ok": True, "queued": name})
+
+
+# ---------------------------------------------------------------------------
 # Feature: Schedule posts
 # ---------------------------------------------------------------------------
 

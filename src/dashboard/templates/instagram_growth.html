@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instagram Growth — EliteMarginDesk</title>
+<script src="/static/tailwind.js"></script>
+<style>
+  :root {
+    --bg:       #020806;
+    --surface:  rgba(4,13,7,.95);
+    --border:   rgba(0,255,120,.1);
+    --border-h: rgba(0,255,120,.38);
+    --neon:     #00ff7a;
+    --green:    #22c55e;
+    --cyan:     #06d6a0;
+    --pink:     #f472b6;
+    --orange:   #fb923c;
+    --purple:   #a78bfa;
+    --text:     #dff7e8;
+    --muted:    #3d7a55;
+    --dim:      #1a3d26;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  body::after {
+    content:''; position:fixed; inset:0;
+    background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,255,120,.04) 0%, transparent 70%);
+    pointer-events:none; z-index:0;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    backdrop-filter: blur(12px);
+    transition: border-color .2s;
+  }
+  .card:hover { border-color: rgba(0,255,120,.22); }
+  .neon   { color: var(--neon); }
+  .muted  { color: var(--muted); }
+  .pink   { color: var(--pink); }
+  .orange { color: var(--orange); }
+  .purple { color: var(--purple); }
+  .cyan   { color: var(--cyan); }
+  h1,h2,h3 { color: var(--text); }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s, transform .15s;
+  }
+  .stat-card:hover { border-color: rgba(0,255,120,.3); transform: translateY(-2px); }
+  .stat-card .glow {
+    position: absolute; top: -30px; right: -30px;
+    width: 100px; height: 100px; border-radius: 50%;
+    filter: blur(40px); opacity: .25;
+  }
+
+  .btn {
+    background: linear-gradient(135deg, var(--neon), var(--cyan));
+    color: #000; font-weight: 700; padding: .5rem 1.25rem;
+    border-radius: 8px; border: 0; cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+    font-size: .875rem;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 18px rgba(0,255,120,.35); }
+  .btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+  .btn-ghost {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border-h); padding: .3rem .75rem;
+    border-radius: 8px; font-size: .8rem; cursor: pointer;
+  }
+  .btn-ghost:hover { border-color: var(--neon); color: var(--neon); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 10px; border-radius: 20px; font-size: .7rem; font-weight: 600;
+  }
+  .pill-green  { background: rgba(0,255,120,.1);  color: var(--neon);   border: 1px solid rgba(0,255,120,.2);  }
+  .pill-pink   { background: rgba(244,114,182,.1); color: var(--pink);   border: 1px solid rgba(244,114,182,.2); }
+  .pill-orange { background: rgba(251,146,60,.1);  color: var(--orange); border: 1px solid rgba(251,146,60,.2);  }
+  .pill-purple { background: rgba(167,139,250,.1); color: var(--purple); border: 1px solid rgba(167,139,250,.2); }
+  .pill-cyan   { background: rgba(6,214,160,.1);   color: var(--cyan);   border: 1px solid rgba(6,214,160,.2);   }
+
+  .bar { background: linear-gradient(90deg, var(--cyan), var(--neon)); height: 6px; border-radius: 3px; transition: width .6s ease; }
+  .bar-pink { background: linear-gradient(90deg, var(--pink), var(--purple)); }
+  .bar-orange { background: linear-gradient(90deg, var(--orange), var(--pink)); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th,td { padding: .5rem .75rem; text-align: left; border-bottom: 1px solid rgba(0,255,120,.06); }
+  th { color: var(--muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+  tr:hover td { background: rgba(0,255,120,.02); }
+
+  .section-title {
+    font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem;
+    display: flex; align-items: center; gap: .5rem;
+  }
+
+  /* Chart canvas */
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* Skeleton loader */
+  .skeleton {
+    background: linear-gradient(90deg, rgba(0,255,120,.04) 25%, rgba(0,255,120,.08) 50%, rgba(0,255,120,.04) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+  }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  /* Heatmap */
+  .heatmap-cell {
+    width: 28px; height: 28px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .6rem; font-weight: 600; cursor: default;
+    border: 1px solid rgba(0,255,120,.06);
+    transition: transform .1s;
+  }
+  .heatmap-cell:hover { transform: scale(1.2); z-index: 10; position: relative; }
+
+  /* Toast */
+  #toast {
+    position:fixed; bottom:24px; right:24px; z-index:9999;
+    padding:10px 18px; border-radius:10px;
+    background:rgba(2,8,6,.98); border:1px solid var(--neon);
+    color:var(--neon); font-size:.875rem; font-weight:600;
+    transform:translateY(80px); opacity:0;
+    transition:transform .3s, opacity .3s;
+    pointer-events:none;
+  }
+  #toast.show { transform:translateY(0); opacity:1; }
+
+  /* Tip priority colors */
+  .pri-high   { border-left: 3px solid var(--neon);   }
+  .pri-medium { border-left: 3px solid var(--orange);  }
+  .pri-low    { border-left: 3px solid var(--muted);   }
+
+  /* Content kit badges */
+  .ck-badge-REEL          { background: rgba(244,114,182,.12); color: var(--pink);   border: 1px solid rgba(244,114,182,.25); }
+  .ck-badge-IMAGE         { background: rgba(0,255,120,.08);   color: var(--neon);   border: 1px solid rgba(0,255,120,.2);   }
+  .ck-badge-CAROUSEL_ALBUM{ background: rgba(167,139,250,.1);  color: var(--purple); border: 1px solid rgba(167,139,250,.25); }
+</style>
+</head>
+<body class="relative">
+{% include "_sidebar.html" %}
+
+<div class="main-wrap relative z-10">
+<main class="p-5 md:p-8 space-y-7 max-w-7xl mx-auto">
+
+  <!-- Header -->
+  <header class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-3 mb-1">
+        <span class="text-3xl">📸</span>
+        <h1 class="text-2xl md:text-3xl font-extrabold neon tracking-tight">Instagram Growth</h1>
+      </div>
+      <p class="muted text-sm" id="lastFetched">
+        {% if overview.fetched_at %}Date actualizate: {{ overview.fetched_at[:16]|replace("T"," ") }} UTC{% else %}Nu există date încă{% endif %}
+      </p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <button class="btn-ghost" onclick="window.open('https://www.instagram.com/{{ overview.username or "elitemargindesk" }}','_blank')">
+        ↗ Profil IG
+      </button>
+      <button class="btn" id="refreshBtn" onclick="doRefresh()">
+        ⟳ Actualizează date
+      </button>
+    </div>
+  </header>
+
+  {% if not overview.username %}
+  <!-- No IG credentials alert -->
+  <div class="card p-5 border-orange-500/30" style="border-color:rgba(251,146,60,.3)">
+    <div class="flex gap-3 items-start">
+      <span class="text-2xl">⚠️</span>
+      <div>
+        <div class="font-bold orange mb-1">Conectează contul Instagram</div>
+        <p class="text-sm muted mb-3">
+          Setează <code class="text-cyan-400 bg-black/30 px-1 rounded">IG_USER_ID</code> și
+          <code class="text-cyan-400 bg-black/30 px-1 rounded">IG_ACCESS_TOKEN</code> în <b>Settings</b>
+          pentru a activa analytics-ul în timp real.
+          Rulează <code class="text-cyan-400 bg-black/30 px-1 rounded">python src/agents/instagram_oauth_setup.py</code>
+          pentru a obține token-ul.
+        </p>
+        <a href="/settings" class="btn" style="font-size:.8rem;padding:.4rem 1rem;">⚙️ Mergi la Settings</a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- KPI Stats Row -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="statsGrid">
+
+    <div class="stat-card">
+      <div class="glow" style="background:var(--neon)"></div>
+      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Urmăritori</div>
+      <div class="text-2xl md:text-3xl font-extrabold neon" id="statFollowers">
+        {{ "{:,}".format(overview.followers or 0) }}
+      </div>
+      <div class="text-xs muted mt-1" id="statFollowersDelta">—</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="glow" style="background:var(--pink)"></div>
+      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Engagement Rate</div>
+      <div class="text-2xl md:text-3xl font-extrabold pink" id="statER">
+        {{ overview.engagement_rate or 0 }}%
+      </div>
+      <div class="text-xs muted mt-1">Medie per post (like+com/reach)</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="glow" style="background:var(--cyan)"></div>
+      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Reach 30 zile</div>
+      <div class="text-2xl md:text-3xl font-extrabold cyan" id="statReach">
+        {{ "{:,}".format(overview.reach_30d or 0) }}
+      </div>
+      <div class="text-xs muted mt-1">Conturi unice atinse</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="glow" style="background:var(--orange)"></div>
+      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Impresii 30 zile</div>
+      <div class="text-2xl md:text-3xl font-extrabold orange" id="statImpressions">
+        {{ "{:,}".format(overview.impressions_30d or 0) }}
+      </div>
+      <div class="text-xs muted mt-1">Total afișări</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="glow" style="background:var(--purple)"></div>
+      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Vizite profil 30d</div>
+      <div class="text-2xl md:text-3xl font-extrabold purple" id="statPV">
+        {{ "{:,}".format(overview.profile_views_30d or 0) }}
+      </div>
+      <div class="text-xs muted mt-1">Vizitatori profil unici</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="glow" style="background:var(--neon)"></div>
+      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Postări totale</div>
+      <div class="text-2xl md:text-3xl font-extrabold neon">
+        {{ overview.media_count or 0 }}
+      </div>
+      <div class="text-xs muted mt-1">Pe cont</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="glow" style="background:var(--cyan)"></div>
+      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Click-uri website 30d</div>
+      <div class="text-2xl md:text-3xl font-extrabold cyan">
+        {{ "{:,}".format(overview.website_clicks_30d or 0) }}
+      </div>
+      <div class="text-xs muted mt-1">Din bio link</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="glow" style="background:var(--pink)"></div>
+      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">IG Score</div>
+      <div class="text-2xl md:text-3xl font-extrabold" id="igScore" style="color:var(--neon)">—</div>
+      <div class="text-xs muted mt-1">Scor general cont (0-100)</div>
+    </div>
+  </div>
+
+  <!-- Growth Chart + Audience -->
+  <div class="grid md:grid-cols-3 gap-5">
+
+    <!-- Growth Chart -->
+    <div class="card p-5 md:col-span-2">
+      <div class="section-title">
+        📈 Evoluție urmăritori
+        <span class="ml-auto">
+          <select id="chartMetric" class="card text-sm px-2 py-1 cursor-pointer"
+                  onchange="renderChart()" style="font-size:.8rem;padding:4px 8px;">
+            <option value="followers">Urmăritori</option>
+            <option value="reach">Reach zilnic</option>
+            <option value="impressions">Impresii zilnice</option>
+          </select>
+        </span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="growthChart"></canvas>
+      </div>
+      <p class="text-xs muted mt-2">Snapshot-ul zilnic se salvează automat. Date IG: ultimele 30 zile.</p>
+    </div>
+
+    <!-- Audience demographics -->
+    <div class="card p-5">
+      <div class="section-title">🌍 Top Țări</div>
+      <div id="countriesList" class="space-y-2">
+        {% if audience.countries %}
+          {% set max_c = audience.countries[0].count if audience.countries else 1 %}
+          {% for c in audience.countries[:8] %}
+          <div>
+            <div class="flex justify-between text-sm mb-1">
+              <span class="font-semibold">{{ c.code }}</span>
+              <span class="muted text-xs">{{ "{:,}".format(c.count) }}</span>
+            </div>
+            <div class="bar" style="width:{{ [(c.count / max_c * 100)|int, 100]|min }}%"></div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="muted text-sm">Conectează contul IG pentru date demografice.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Gender & Age + Best posting time -->
+  <div class="grid md:grid-cols-2 gap-5">
+
+    <!-- Age & Gender -->
+    <div class="card p-5">
+      <div class="section-title">👥 Gen & Vârstă</div>
+      {% if audience.gender and (audience.gender.male or audience.gender.female) %}
+      {% set total_g = audience.gender.male + audience.gender.female %}
+      {% set male_pct = (audience.gender.male / total_g * 100)|int if total_g > 0 else 50 %}
+      {% set female_pct = 100 - male_pct %}
+
+      <div class="mb-4">
+        <div class="flex justify-between text-sm mb-1">
+          <span>♂ Masculin</span>
+          <span class="neon font-bold">{{ male_pct }}%</span>
+        </div>
+        <div class="relative h-2 rounded-full overflow-hidden" style="background:rgba(0,255,120,.08)">
+          <div class="absolute left-0 top-0 h-full bar" style="width:{{ male_pct }}%"></div>
+        </div>
+        <div class="flex justify-between text-sm mb-1 mt-2">
+          <span>♀ Feminin</span>
+          <span class="pink font-bold">{{ female_pct }}%</span>
+        </div>
+        <div class="relative h-2 rounded-full overflow-hidden" style="background:rgba(244,114,182,.08)">
+          <div class="absolute left-0 top-0 h-full" style="background:linear-gradient(90deg,var(--pink),var(--purple));border-radius:3px;width:{{ female_pct }}%;height:100%"></div>
+        </div>
+      </div>
+
+      {% if audience.age_groups %}
+      <div class="mt-4">
+        <div class="muted text-xs font-semibold uppercase tracking-widest mb-2">Distribuție vârstă</div>
+        {% set max_ag = audience.age_groups[0].count if audience.age_groups else 1 %}
+        {% for ag in audience.age_groups[:6] %}
+        <div class="flex items-center gap-2 mb-1">
+          <span class="text-xs w-14 text-right muted">{{ ag.range }}</span>
+          <div class="flex-1 relative h-2 rounded-full" style="background:rgba(0,255,120,.05)">
+            <div class="absolute left-0 top-0 h-full bar" style="width:{{ [(ag.count / max_ag * 100)|int, 100]|min }}%"></div>
+          </div>
+          <span class="text-xs muted w-12">{{ "{:,}".format(ag.count) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% else %}
+      <p class="muted text-sm">Datele demografice apar după conectarea contului IG Business.</p>
+      {% endif %}
+    </div>
+
+    <!-- Best Posting Times Heatmap -->
+    <div class="card p-5">
+      <div class="section-title">⏰ Cel mai bun moment de postare</div>
+      <p class="text-xs muted mb-3">Bazat pe engagement-ul postărilor tale recente (ora locală).</p>
+      <div id="heatmapWrap">
+        <div class="muted text-sm">Se calculează din datele postărilor…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Posts -->
+  <div class="card p-5">
+    <div class="section-title">
+      🏆 Top postări (după impresii)
+      <span class="ml-auto muted text-xs font-normal">Ultimele {{ posts|length }} postări</span>
+    </div>
+    {% if posts %}
+    <div class="overflow-x-auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Previzualizare</th>
+            <th>Tip</th>
+            <th>Data</th>
+            <th class="text-right">❤️ Like</th>
+            <th class="text-right">💬 Com.</th>
+            <th class="text-right">🔖 Save</th>
+            <th class="text-right">👁 Impresii</th>
+            <th class="text-right">📊 ER%</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in posts %}
+          <tr>
+            <td>
+              {% if p.thumbnail %}
+              <img src="{{ p.thumbnail }}" alt="" class="w-12 h-12 rounded-lg object-cover"
+                   style="border:1px solid var(--border)">
+              {% else %}
+              <div class="w-12 h-12 rounded-lg flex items-center justify-center"
+                   style="background:rgba(0,255,120,.06);font-size:1.5rem">
+                {{ "🎬" if p.media_type in ("VIDEO","REEL") else "🖼" }}
+              </div>
+              {% endif %}
+            </td>
+            <td>
+              {% if p.media_type == "REEL" or p.media_type == "VIDEO" %}
+              <span class="pill pill-pink">🎬 Reel</span>
+              {% elif p.media_type == "CAROUSEL_ALBUM" %}
+              <span class="pill pill-purple">🎠 Carusel</span>
+              {% else %}
+              <span class="pill pill-green">🖼 Imagine</span>
+              {% endif %}
+            </td>
+            <td class="text-sm muted">{{ p.date }}</td>
+            <td class="text-right font-bold neon">{{ "{:,}".format(p.like_count) }}</td>
+            <td class="text-right text-sm">{{ p.comments_count }}</td>
+            <td class="text-right text-sm cyan">{{ "{:,}".format(p.saved or 0) }}</td>
+            <td class="text-right text-sm orange">{{ "{:,}".format(p.impressions or 0) }}</td>
+            <td class="text-right font-bold {{ 'neon' if p.engagement_rate >= 3 else ('orange' if p.engagement_rate >= 1 else 'muted') }}">
+              {{ p.engagement_rate }}%
+            </td>
+            <td>
+              <a href="{{ p.permalink }}" target="_blank"
+                 class="btn-ghost" style="font-size:.7rem;padding:3px 8px;">↗</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted text-sm">Conectează contul Instagram pentru a vedea performanța postărilor.</p>
+    {% endif %}
+  </div>
+
+  <!-- Growth Recommendations -->
+  <div class="card p-5">
+    <div class="section-title">
+      🤖 Recomandări AI pentru creștere
+      <button class="ml-auto btn-ghost text-xs" onclick="loadRecommendations(true)">↻ Regenerează</button>
+    </div>
+    <div id="tipsGrid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% if tips %}
+        {% for tip in tips %}
+        <div class="card p-4 pri-{{ tip.priority or 'medium' }}">
+          <div class="flex items-start justify-between mb-2 gap-2">
+            <div class="font-bold text-sm">{{ tip.title }}</div>
+            <span class="pill pill-{{ 'green' if tip.priority == 'high' else ('orange' if tip.priority == 'medium' else 'cyan') }} shrink-0">
+              {{ tip.priority or 'medium' }}
+            </span>
+          </div>
+          <p class="text-xs muted leading-relaxed">{{ tip.description }}</p>
+          <div class="mt-2">
+            <span class="pill" style="font-size:.65rem;padding:1px 7px;background:rgba(0,255,120,.04);color:var(--muted);border:1px solid var(--border)">
+              {{ tip.category or '' }}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="md:col-span-3 skeleton h-24"></div>
+        <div class="md:col-span-3">
+          <p class="muted text-sm">Se generează recomandări AI… <button class="btn-ghost text-xs ml-2" onclick="loadRecommendations()">Generează acum</button></p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Content Kit -->
+  <div class="card p-5">
+    <div class="section-title">
+      🎬 Content Kit — EliteMarginDesk
+      <span class="ml-auto muted text-xs font-normal">{{ content_kit|length }} asset-uri gata de postat</span>
+    </div>
+    <p class="text-xs muted mb-4">Asset-urile tale pregătite — videoclipuri, carusele și imagini cu branding. Dă click pe oricare pentru a-l adăuga în coadă.</p>
+
+    {% if content_kit %}
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      {% for item in content_kit %}
+      <div class="card p-3 cursor-pointer hover:border-[rgba(0,255,120,.35)] transition-all"
+           onclick="queueContent('{{ item.path|e }}', '{{ item.name|e }}', '{{ item.media_type }}')"
+           title="{{ item.file }}">
+        <div class="text-center mb-2">
+          <span style="font-size:2rem">
+            {% if item.media_type == "REEL" %}🎬
+            {% elif item.media_type == "CAROUSEL_ALBUM" %}🎠
+            {% else %}🖼{% endif %}
+          </span>
+        </div>
+        <div class="text-xs font-semibold text-center mb-1 truncate" title="{{ item.name }}">{{ item.name }}</div>
+        <div class="flex items-center justify-between">
+          <span class="pill ck-badge-{{ item.media_type }}" style="font-size:.6rem;padding:1px 6px">
+            {{ item.media_type.replace("_ALBUM","") }}
+          </span>
+          <span class="text-xs muted">{{ item.size_kb }}KB</span>
+        </div>
+        {% if item.slides is defined %}
+        <div class="text-xs muted text-center mt-1">{{ item.slides }} slide-uri</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted text-sm">Niciun asset găsit în <code class="text-cyan-400">data/content_kit/</code>.</p>
+    {% endif %}
+  </div>
+
+  <!-- Footer tips -->
+  <div class="card p-4" style="background:rgba(0,255,120,.02)">
+    <div class="text-xs muted">
+      <span class="neon font-bold">Sfaturi rapide:</span>
+      Postează Reels cu muzică trending pentru reach maxim •
+      Folosește Stories zilnic pentru a rămâne în feed •
+      Programează postările la 18:00–21:00 pentru audiența din România •
+      Angajamentul în primele 30 min după postare este crucial pentru algoritm
+    </div>
+  </div>
+
+</main>
+</div><!-- /main-wrap -->
+
+<div id="toast"></div>
+
+<!-- Minimal Chart.js bundled inline -->
+<script>
+/* ---- tiny chart engine (no external CDN needed) ---- */
+function drawLineChart(canvasId, labels, datasets) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.offsetWidth;
+  const H = canvas.height = canvas.offsetHeight;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const PAD = { top: 20, right: 20, bottom: 40, left: 55 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+
+  if (!labels || labels.length === 0) {
+    ctx.fillStyle = 'rgba(61,122,85,.6)';
+    ctx.font = '13px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Nicio dată disponibilă — conectează contul IG', W/2, H/2);
+    return;
+  }
+
+  // Compute scale
+  const allVals = datasets.flatMap(d => d.data.filter(v => v !== null && v !== undefined));
+  const minV = Math.min(...allVals) * 0.97;
+  const maxV = Math.max(...allVals) * 1.03 || 1;
+
+  function xPos(i) { return PAD.left + (i / (labels.length - 1 || 1)) * cW; }
+  function yPos(v) { return PAD.top + cH - ((v - minV) / (maxV - minV || 1)) * cH; }
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(0,255,120,.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.top + (cH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
+    const v = maxV - ((maxV - minV) / 4) * i;
+    ctx.fillStyle = 'rgba(61,122,85,.7)';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(v >= 1000 ? (v/1000).toFixed(1)+'K' : Math.round(v), PAD.left - 6, y + 3);
+  }
+
+  // X axis labels (every nth)
+  const step = Math.max(1, Math.floor(labels.length / 8));
+  ctx.fillStyle = 'rgba(61,122,85,.7)';
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'center';
+  labels.forEach((lbl, i) => {
+    if (i % step !== 0 && i !== labels.length - 1) return;
+    ctx.fillText(lbl.slice(5), xPos(i), H - PAD.bottom + 14);
+  });
+
+  // Datasets
+  datasets.forEach(ds => {
+    const points = ds.data;
+    // Fill area
+    ctx.beginPath();
+    ctx.moveTo(xPos(0), yPos(points[0] ?? minV));
+    points.forEach((v, i) => { if (v !== null) ctx.lineTo(xPos(i), yPos(v)); });
+    ctx.lineTo(xPos(points.length - 1), PAD.top + cH);
+    ctx.lineTo(PAD.left, PAD.top + cH);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+    grad.addColorStop(0, ds.color + '33');
+    grad.addColorStop(1, ds.color + '00');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.moveTo(xPos(0), yPos(points[0] ?? minV));
+    points.forEach((v, i) => { if (v !== null) ctx.lineTo(xPos(i), yPos(v)); });
+    ctx.strokeStyle = ds.color;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Dots on last point
+    const lastIdx = points.length - 1;
+    ctx.beginPath();
+    ctx.arc(xPos(lastIdx), yPos(points[lastIdx]), 5, 0, Math.PI * 2);
+    ctx.fillStyle = ds.color;
+    ctx.fill();
+  });
+}
+
+/* ---- Data from server ---- */
+const _growth = {{ growth_history | tojson }};
+const _overview = {{ overview | tojson }};
+const _reachSeries = {{ (overview.reach_series or []) | tojson }};
+const _impressionsSeries = {{ (overview.impressions_series or []) | tojson }};
+const _posts = {{ posts | tojson }};
+
+function renderChart() {
+  const metric = document.getElementById('chartMetric')?.value || 'followers';
+  let labels = [], data = [], color = '#00ff7a';
+
+  if (metric === 'followers') {
+    labels = _growth.map(g => g.date);
+    data   = _growth.map(g => g.followers);
+    color  = '#00ff7a';
+  } else if (metric === 'reach') {
+    labels = _reachSeries.map(g => g.date);
+    data   = _reachSeries.map(g => g.value);
+    color  = '#06d6a0';
+  } else {
+    labels = _impressionsSeries.map(g => g.date);
+    data   = _impressionsSeries.map(g => g.value);
+    color  = '#fb923c';
+  }
+
+  drawLineChart('growthChart', labels, [{ data, color }]);
+}
+
+/* ---- Heatmap (best posting times) ---- */
+function buildHeatmap() {
+  const hours = Array(24).fill(null).map(() => Array(7).fill(0));
+  const days  = ['Lu', 'Ma', 'Mi', 'Jo', 'Vi', 'Sâ', 'Du'];
+
+  _posts.forEach(p => {
+    if (!p.timestamp) return;
+    const d = new Date(p.timestamp);
+    const h = d.getHours();
+    const day = (d.getDay() + 6) % 7; // Mon=0
+    const score = (p.like_count || 0) + (p.comments_count || 0) * 3 + (p.saved || 0) * 2;
+    hours[h][day] += score;
+  });
+
+  const maxScore = Math.max(1, ...hours.flatMap(r => r));
+  const wrap = document.getElementById('heatmapWrap');
+
+  let html = '<div class="overflow-x-auto"><div style="display:grid;grid-template-columns:28px repeat(7,28px);gap:3px;min-width:240px">';
+  html += '<div></div>' + days.map(d => `<div class="text-center muted" style="font-size:.65rem;line-height:28px">${d}</div>`).join('');
+
+  const showHours = [7,8,9,10,12,14,16,18,19,20,21,22];
+  showHours.forEach(h => {
+    const row = hours[h];
+    const lbl = h < 10 ? '0'+h+':00' : h+':00';
+    html += `<div class="muted text-right" style="font-size:.6rem;line-height:28px;padding-right:2px">${lbl}</div>`;
+    row.forEach((v, di) => {
+      const ratio = v / maxScore;
+      let bg = 'rgba(0,255,120,.04)';
+      let textColor = 'rgba(61,122,85,.4)';
+      if (ratio > .7) { bg = 'rgba(0,255,120,.55)'; textColor = '#000'; }
+      else if (ratio > .4) { bg = 'rgba(0,255,120,.3)'; textColor = '#00ff7a'; }
+      else if (ratio > .15) { bg = 'rgba(0,255,120,.12)'; textColor = '#3d7a55'; }
+      html += `<div class="heatmap-cell" style="background:${bg};color:${textColor}" title="${days[di]} ${lbl}: ${Math.round(v)} engagement">
+        ${v > 0 ? '●' : ''}
+      </div>`;
+    });
+  });
+  html += '</div></div>';
+  html += '<p class="text-xs muted mt-2">● = engagement ridicat la acea oră</p>';
+  wrap.innerHTML = html;
+}
+
+/* ---- IG Score ---- */
+function calcIgScore() {
+  const f  = _overview.followers || 0;
+  const er = _overview.engagement_rate || 0;
+  const r  = _overview.reach_30d || 0;
+
+  // Weighted score: ER (40%), follower count (30%), reach/followers ratio (30%)
+  let score = 0;
+  score += Math.min(40, er * 10); // ER 4%+ = full 40pts
+  score += Math.min(30, Math.log10(Math.max(f, 1)) / Math.log10(100000) * 30);
+  const rr = f > 0 ? (r / f) : 0;
+  score += Math.min(30, rr * 10); // reach ratio 3x+ followers = full 30pts
+
+  const rounded = Math.round(Math.max(0, Math.min(100, score)));
+  const el = document.getElementById('igScore');
+  if (el) {
+    el.textContent = rounded;
+    if (rounded >= 70) el.style.color = 'var(--neon)';
+    else if (rounded >= 40) el.style.color = 'var(--orange)';
+    else el.style.color = 'var(--pink)';
+  }
+}
+
+/* ---- Follower delta ---- */
+function calcFollowerDelta() {
+  if (_growth.length < 2) return;
+  const latest = _growth[_growth.length - 1].followers;
+  const prev   = _growth[_growth.length - 2].followers;
+  const delta  = latest - prev;
+  const el = document.getElementById('statFollowersDelta');
+  if (el) {
+    const sign = delta >= 0 ? '+' : '';
+    el.textContent = `${sign}${delta.toLocaleString()} față de ieri`;
+    el.style.color = delta >= 0 ? 'var(--neon)' : 'var(--pink)';
+  }
+}
+
+/* ---- Refresh ---- */
+async function doRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  btn.textContent = '⟳ Se actualizează…';
+  try {
+    const r = await fetch('/api/instagram/refresh', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✓ Date actualizate! Se reîncarcă...');
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      showToast('⚠️ ' + (d.errors?.join(', ') || 'Eroare necunoscută'), true);
+      btn.disabled = false;
+      btn.textContent = '⟳ Actualizează date';
+    }
+  } catch(e) {
+    showToast('Eroare de rețea', true);
+    btn.disabled = false;
+    btn.textContent = '⟳ Actualizează date';
+  }
+}
+
+/* ---- Load tips async ---- */
+async function loadRecommendations(force = false) {
+  const grid = document.getElementById('tipsGrid');
+  grid.innerHTML = '<div class="md:col-span-3 skeleton h-24"></div><div class="md:col-span-3 muted text-sm">Se generează cu AI…</div>';
+  try {
+    const r = await fetch('/api/instagram/recommendations' + (force ? '?force=1' : ''));
+    const d = await r.json();
+    renderTips(d.tips || []);
+  } catch(e) {
+    grid.innerHTML = '<div class="md:col-span-3 muted text-sm">Eroare la generarea recomandărilor.</div>';
+  }
+}
+
+function renderTips(tips) {
+  const grid = document.getElementById('tipsGrid');
+  if (!tips.length) { grid.innerHTML = '<div class="md:col-span-3 muted text-sm">Nu s-au generat recomandări.</div>'; return; }
+  const pillColor = p => p === 'high' ? 'green' : (p === 'medium' ? 'orange' : 'cyan');
+  grid.innerHTML = tips.map(tip => `
+    <div class="card p-4 pri-${tip.priority||'medium'}">
+      <div class="flex items-start justify-between mb-2 gap-2">
+        <div class="font-bold text-sm">${escHtml(tip.title)}</div>
+        <span class="pill pill-${pillColor(tip.priority)} shrink-0" style="font-size:.65rem">
+          ${tip.priority||'medium'}
+        </span>
+      </div>
+      <p class="text-xs muted leading-relaxed">${escHtml(tip.description)}</p>
+      <div class="mt-2">
+        <span class="pill" style="font-size:.65rem;padding:1px 7px;background:rgba(0,255,120,.04);color:var(--muted);border:1px solid var(--border)">
+          ${tip.category||''}
+        </span>
+      </div>
+    </div>`).join('');
+}
+
+/* ---- Content kit action ---- */
+function queueContent(path, name, type) {
+  showToast(`📋 "${name}" adăugat în coadă! (${type})`);
+  // Optionally POST to an endpoint to add to schedule
+  fetch('/api/instagram/queue-content', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ path, name, media_type: type })
+  }).catch(() => {});
+}
+
+/* ---- Helpers ---- */
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = isError ? 'var(--pink)' : 'var(--neon)';
+  t.style.color       = isError ? 'var(--pink)' : 'var(--neon)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ---- Init ---- */
+window.addEventListener('DOMContentLoaded', () => {
+  renderChart();
+  buildHeatmap();
+  calcIgScore();
+  calcFollowerDelta();
+  {% if not tips %}
+  // Auto-load tips if not pre-rendered
+  // loadRecommendations();
+  {% endif %}
+});
+
+window.addEventListener('resize', () => { renderChart(); });
+</script>
+
+<script src="/static/i18n.js"></script>
+</body>
+</html>

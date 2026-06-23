@@ -949,6 +949,16 @@ def start_scheduler(publish: bool = True) -> None:
     schedule.every(1).hours.do(_run_feedback_loop)
     schedule.every(4).hours.do(_run_platform_timing)
 
+    # Daily Instagram follower snapshot for growth chart
+    def _run_ig_snapshot():
+        try:
+            from src.agents.instagram_analytics import record_daily_snapshot
+            record_daily_snapshot()
+            log.info("[ig_snapshot] follower count recorded")
+        except Exception as _e:
+            log.warning(f"[ig_snapshot] non-fatal: {_e}")
+    schedule.every().day.at("23:55").do(_run_ig_snapshot)
+
     # Start live health monitor (Telegram alerts + interactive fixes)
     try:
         from src.agents.live_monitor import start_live_monitor
