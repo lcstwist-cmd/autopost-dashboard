@@ -34,7 +34,7 @@ try:
 except ImportError:
     pass
 
-GRAPH = "https://graph.facebook.com/v21.0"
+GRAPH = "https://graph.facebook.com/v22.0"
 
 
 def main() -> int:

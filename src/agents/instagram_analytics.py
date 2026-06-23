@@ -26,7 +26,7 @@ from typing import Any
 
 _ROOT = Path(__file__).resolve().parent.parent.parent
 _CACHE_DIR = _ROOT / "data" / "ig_analytics"
-_GRAPH = "https://graph.facebook.com/v21.0"
+_GRAPH = "https://graph.facebook.com/v22.0"
 
 CACHE_TTL = 3600  # 1 hour
 
@@ -98,6 +98,8 @@ def fetch_account_overview(force: bool = False) -> dict[str, Any]:
     }, token=tok)
 
     # 30-day insights
+    # NOTE: impressions + profile_views + website_clicks deprecated Jan 2025 (v21+)
+    # Use: views (replaced impressions), reach, accounts_engaged, follower_count
     since = int((datetime.now(timezone.utc) - timedelta(days=30)).timestamp())
     until = int(datetime.now(timezone.utc).timestamp())
 
@@ -113,10 +115,10 @@ def fetch_account_overview(force: bool = False) -> dict[str, Any]:
         except Exception:
             return []
 
-    impressions_data = _insight("impressions")
-    reach_data       = _insight("reach")
-    pv_data          = _insight("profile_views")
-    ws_data          = _insight("website_clicks")
+    views_data        = _insight("views")          # replaces impressions (deprecated)
+    reach_data        = _insight("reach")
+    engaged_data      = _insight("accounts_engaged")
+    follower_data     = _insight("follower_count")
 
     def _sum_values(items: list[dict]) -> int:
         total = 0
@@ -134,19 +136,25 @@ def fetch_account_overview(force: bool = False) -> dict[str, Any]:
         return []
 
     result = {
-        "username":       profile.get("username", ""),
-        "name":           profile.get("name", ""),
-        "bio":            profile.get("biography", ""),
-        "followers":      profile.get("followers_count", 0),
-        "media_count":    profile.get("media_count", 0),
-        "profile_pic":    profile.get("profile_picture_url", ""),
-        "website":        profile.get("website", ""),
-        "impressions_30d": _sum_values(impressions_data),
-        "reach_30d":       _sum_values(reach_data),
-        "profile_views_30d": _sum_values(pv_data),
-        "website_clicks_30d": _sum_values(ws_data),
-        "impressions_series": _daily_series(impressions_data),
+        "username":          profile.get("username", ""),
+        "name":              profile.get("name", ""),
+        "bio":               profile.get("biography", ""),
+        "followers":         profile.get("followers_count", 0),
+        "media_count":       profile.get("media_count", 0),
+        "profile_pic":       profile.get("profile_picture_url", ""),
+        "website":           profile.get("website", ""),
+        # v22+ metrics (impressions/profile_views/website_clicks deprecated)
+        "views_30d":          _sum_values(views_data),
+        "reach_30d":          _sum_values(reach_data),
+        "accounts_engaged_30d": _sum_values(engaged_data),
+        "follower_growth_30d":  _sum_values(follower_data),
+        "views_series":       _daily_series(views_data),
         "reach_series":       _daily_series(reach_data),
+        # Legacy aliases for templates (mapped from new metrics)
+        "impressions_30d":    _sum_values(views_data),    # views replaces impressions
+        "profile_views_30d":  _sum_values(engaged_data),  # best available replacement
+        "website_clicks_30d": 0,                           # no replacement in v22
+        "impressions_series": _daily_series(views_data),
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -198,11 +206,12 @@ def fetch_recent_posts(limit: int = 20, force: bool = False) -> list[dict[str, A
             "comments_count": m.get("comments_count", 0),
         }
 
-        # Per-post insights
+        # Per-post insights — v22+ API (impressions + video_views deprecated)
+        # Use: views (replaces both), reach, saved, total_interactions
         try:
-            metrics = "impressions,reach,saved"
-            if m.get("media_type") in ("VIDEO", "REEL"):
-                metrics += ",video_views"
+            metrics = "views,reach,saved,total_interactions"
+            if m.get("media_type") in ("REEL",):
+                metrics += ",ig_reels_avg_watch_time"
             ins = _get(f"{m['id']}/insights", {"metric": metrics}, token=tok)
             for item in ins.get("data", []):
                 name = item.get("name", "")
@@ -211,10 +220,14 @@ def fetch_recent_posts(limit: int = 20, force: bool = False) -> list[dict[str, A
         except Exception:
             pass
 
-        post.setdefault("impressions", 0)
+        post.setdefault("views", 0)
         post.setdefault("reach", 0)
         post.setdefault("saved", 0)
-        post.setdefault("video_views", 0)
+        post.setdefault("total_interactions", 0)
+        post.setdefault("ig_reels_avg_watch_time", 0)
+        # Legacy alias so templates can use either name
+        post["impressions"] = post["views"]
+        post["video_views"] = post["views"]
 
         # Engagement rate per post
         if post.get("reach", 0) > 0:

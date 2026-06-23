@@ -239,11 +239,11 @@
 
     <div class="stat-card">
       <div class="glow" style="background:var(--purple)"></div>
-      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Vizite profil 30d</div>
+      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Conturi angajate 30d</div>
       <div class="text-2xl md:text-3xl font-extrabold purple" id="statPV">
-        {{ "{:,}".format(overview.profile_views_30d or 0) }}
+        {{ "{:,}".format(overview.accounts_engaged_30d or 0) }}
       </div>
-      <div class="text-xs muted mt-1">Vizitatori profil unici</div>
+      <div class="text-xs muted mt-1">Conturi care au interacționat</div>
     </div>
 
     <div class="stat-card">
@@ -257,11 +257,11 @@
 
     <div class="stat-card">
       <div class="glow" style="background:var(--cyan)"></div>
-      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Click-uri website 30d</div>
+      <div class="muted text-xs font-semibold uppercase tracking-widest mb-1">Views totale 30d</div>
       <div class="text-2xl md:text-3xl font-extrabold cyan">
-        {{ "{:,}".format(overview.website_clicks_30d or 0) }}
+        {{ "{:,}".format(overview.views_30d or 0) }}
       </div>
-      <div class="text-xs muted mt-1">Din bio link</div>
+      <div class="text-xs muted mt-1">Total vizualizări (v22 API)</div>
     </div>
 
     <div class="stat-card">
