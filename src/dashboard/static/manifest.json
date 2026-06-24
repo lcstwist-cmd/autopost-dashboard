@@ -1,0 +1,40 @@
+{
+  "name": "EliteMarginDesk",
+  "short_name": "EMD",
+  "description": "AutoPost AI — Instagram Growth & Social Media Manager",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#020806",
+  "theme_color": "#00ff7a",
+  "categories": ["business", "finance", "social"],
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Instagram Growth",
+      "short_name": "IG Growth",
+      "url": "/instagram-growth",
+      "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Viral Scout",
+      "short_name": "Viral",
+      "url": "/viral",
+      "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,6 +1,16 @@
 {% set _u = current_user if current_user is defined else user %}
+<!-- PWA meta tags (inject în <head> via JS dacă lipsesc) -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#00ff7a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EMD">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+
 <style>
-/* Sidebar — self-contained, always applied */
+/* ─── Sidebar ─────────────────────────────────────── */
 body { display:flex !important; min-height:100vh; }
 #app-sidebar {
   width:200px; flex-shrink:0; position:fixed; top:0; left:0; bottom:0;
@@ -28,7 +38,8 @@ body { display:flex !important; min-height:100vh; }
 #app-sidebar .snav-badge {
   margin-left:auto; font-size:11px; font-weight:800; color:#fbbf24;
 }
-/* Mobile sidebar */
+
+/* ─── Mobile hamburger ────────────────────────────── */
 #mob-menu-btn {
   display:none; position:fixed; top:10px; left:10px; z-index:10001;
   padding:8px 11px; border-radius:8px; cursor:pointer; line-height:1;
@@ -40,15 +51,101 @@ body { display:flex !important; min-height:100vh; }
   display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
   z-index:9998; backdrop-filter:blur(2px);
 }
+
+/* ─── Mobile bottom navigation ───────────────────── */
+#mob-bottom-nav {
+  display:none;
+  position:fixed; bottom:0; left:0; right:0; z-index:9997;
+  background:rgba(2,8,6,.98);
+  border-top:1px solid rgba(0,255,120,.15);
+  padding:6px 0 calc(6px + env(safe-area-inset-bottom));
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  box-shadow:0 -4px 20px rgba(0,0,0,.5);
+}
+#mob-bottom-nav .bnav-items {
+  display:grid; grid-template-columns:repeat(5,1fr);
+}
+#mob-bottom-nav .bnav-item {
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  padding:6px 4px; text-decoration:none; color:#3d7a55;
+  font-size:9px; font-weight:700; letter-spacing:.02em;
+  transition:color .15s; position:relative;
+  -webkit-tap-highlight-color:transparent;
+}
+#mob-bottom-nav .bnav-item .bnav-icon { font-size:20px; line-height:1; }
+#mob-bottom-nav .bnav-item:hover,
+#mob-bottom-nav .bnav-item.active { color:#00ff7a; }
+#mob-bottom-nav .bnav-item.active::before {
+  content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
+  width:32px; height:2px; border-radius:2px; background:#00ff7a;
+}
+#mob-bottom-nav .bnav-badge {
+  position:absolute; top:4px; right:50%; transform:translateX(10px);
+  background:#fbbf24; color:#000; font-size:9px; font-weight:900;
+  border-radius:10px; padding:0 4px; min-width:16px; text-align:center;
+  line-height:16px; height:16px;
+}
+/* More button */
+#mob-bottom-nav .bnav-item.bnav-more { color:#3d7a55; cursor:pointer; }
+
+/* ─── Mobile responsive ───────────────────────────── */
 @media (max-width: 767px) {
   #app-sidebar { transform:translateX(-210px); }
   #app-sidebar.mob-open { transform:translateX(0); box-shadow:8px 0 32px rgba(0,0,0,.7); }
-  .main-wrap { margin-left:0 !important; }
-  #mob-menu-btn { display:flex !important; }
+  .main-wrap { margin-left:0 !important; padding-bottom:80px !important; }
+  #mob-menu-btn { display:none !important; }
   #mob-overlay.mob-open { display:block !important; }
+  #mob-bottom-nav { display:block !important; }
 }
+
+/* ─── PWA install banner ──────────────────────────── */
+#pwa-install-banner {
+  display:none; position:fixed; bottom:76px; left:12px; right:12px;
+  z-index:9996; padding:12px 14px; border-radius:12px;
+  background:rgba(0,255,120,.12); border:1px solid rgba(0,255,120,.35);
+  backdrop-filter:blur(12px); color:#dff7e8;
+  align-items:center; gap:10px; font-size:13px;
+  box-shadow:0 4px 20px rgba(0,255,120,.12);
+}
+#pwa-install-banner.show { display:flex !important; }
+#pwa-install-banner button {
+  margin-left:auto; padding:6px 14px; border-radius:8px;
+  background:#00ff7a; color:#000; font-weight:800; font-size:12px;
+  border:0; cursor:pointer; white-space:nowrap; flex-shrink:0;
+}
+#pwa-install-banner .banner-close {
+  background:transparent; color:#3d7a55; padding:4px; font-size:16px;
+}
+
+/* ─── More drawer (mobile) ────────────────────────── */
+#mob-more-drawer {
+  display:none; position:fixed; bottom:68px; left:0; right:0;
+  background:rgba(2,8,6,.98); border-top:1px solid rgba(0,255,120,.12);
+  padding:12px 8px; z-index:9996; backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+}
+#mob-more-drawer.open { display:block !important; }
+#mob-more-drawer .drawer-grid {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+}
+#mob-more-drawer .drawer-item {
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  padding:10px 4px; border-radius:10px; text-decoration:none;
+  color:#3d7a55; font-size:11px; font-weight:700;
+  background:rgba(0,255,120,.03); border:1px solid rgba(0,255,120,.08);
+  transition:all .15s; -webkit-tap-highlight-color:transparent;
+}
+#mob-more-drawer .drawer-item .di-icon { font-size:24px; }
+#mob-more-drawer .drawer-item:hover,
+#mob-more-drawer .drawer-item.active { color:#00ff7a; background:rgba(0,255,120,.08); border-color:rgba(0,255,120,.2); }
+#mob-more-drawer-overlay {
+  display:none; position:fixed; inset:0; z-index:9995;
+}
+#mob-more-drawer-overlay.open { display:block !important; }
 </style>
 
+<!-- ─── Desktop sidebar ───────────────────────────── -->
 <aside id="app-sidebar">
   <div style="padding:18px 16px 10px;">
     <div style="font-size:13px;font-weight:900;letter-spacing:.07em;color:#00ff7a;text-shadow:0 0 16px rgba(0,255,120,.45);line-height:1.2;">ELITEMARGINDESK</div>
@@ -70,6 +167,7 @@ body { display:flex !important; min-height:100vh; }
     <a href="/pricing" class="snav-item" data-path="/pricing">💎 <span data-i18n="nav.plans">Plans</span></a>
     <a href="/history" class="snav-item" data-path="/history">📋 <span data-i18n="nav.history">History</span></a>
     <a href="/viral" class="snav-item" data-path="/viral">📊 <span data-i18n="nav.viral">Viral Scout</span></a>
+    <a href="/instagram-growth" class="snav-item" data-path="/instagram-growth">📸 <span data-i18n="nav.ig_growth">IG Growth</span></a>
     <a href="/competitor-tracker" class="snav-item" data-path="/competitor-tracker">🕵️ <span data-i18n="nav.competitors">Competitors</span></a>
     <a href="/avatar-studio" class="snav-item" data-path="/avatar-studio">🎭 <span data-i18n="nav.avatar">Avatar Studio</span></a>
     <a href="/ad-studio" class="snav-item" data-path="/ad-studio">📢 <span data-i18n="nav.ad_studio">Ad Studio</span></a>
@@ -100,22 +198,134 @@ body { display:flex !important; min-height:100vh; }
     </form>
   </div>
 </aside>
-<button id="mob-menu-btn" onclick="mobileSidebarToggle()" aria-label="Menu">☰</button>
+
+<!-- ─── Mobile: bottom navigation ─────────────────── -->
+<nav id="mob-bottom-nav" role="navigation" aria-label="Mobile navigation">
+  <div class="bnav-items">
+    <a href="/" class="bnav-item" data-path="/">
+      <span class="bnav-icon">🏠</span>
+      <span>Home</span>
+    </a>
+    <a href="/instagram-growth" class="bnav-item" data-path="/instagram-growth">
+      <span class="bnav-icon">📸</span>
+      <span>IG Growth</span>
+    </a>
+    <a href="/viral" class="bnav-item" data-path="/viral">
+      <span class="bnav-icon">📊</span>
+      <span>Viral</span>
+    </a>
+    <a href="/settings" class="bnav-item" data-path="/settings">
+      <span class="bnav-icon">⚙️</span>
+      <span>Settings</span>
+    </a>
+    <button class="bnav-item bnav-more" onclick="toggleMoreDrawer()" aria-label="More">
+      <span class="bnav-icon">⋯</span>
+      <span>Mai mult</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ─── More drawer ───────────────────────────────── -->
+<div id="mob-more-drawer-overlay" onclick="toggleMoreDrawer()"></div>
+<div id="mob-more-drawer">
+  <div class="drawer-grid">
+    <a href="/history"           class="drawer-item" data-path="/history"><span class="di-icon">📋</span>History</a>
+    <a href="/competitor-tracker" class="drawer-item" data-path="/competitor-tracker"><span class="di-icon">🕵️</span>Competitors</a>
+    <a href="/avatar-studio"     class="drawer-item" data-path="/avatar-studio"><span class="di-icon">🎭</span>Avatar</a>
+    <a href="/ad-studio"         class="drawer-item" data-path="/ad-studio"><span class="di-icon">📢</span>Ad Studio</a>
+    <a href="/pricing"           class="drawer-item" data-path="/pricing"><span class="di-icon">💎</span>Plans</a>
+    {% if _u.is_admin %}
+    <a href="/admin/users"       class="drawer-item" data-path="/admin/users">
+      <span class="di-icon">👥</span>Users
+      {% if pending_count is defined and pending_count > 0 %}
+      <span class="bnav-badge">{{ pending_count }}</span>
+      {% endif %}
+    </a>
+    {% endif %}
+  </div>
+  <form method="post" action="/logout" style="margin:10px 8px 0;">
+    <button type="submit" style="width:100%;padding:9px;border-radius:8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.18);color:#f87171;font-size:13px;font-weight:700;cursor:pointer;">🚪 Logout</button>
+  </form>
+</div>
+
+<!-- ─── PWA install banner ────────────────────────── -->
+<div id="pwa-install-banner">
+  <span>📲</span>
+  <span style="flex:1">Instalează EMD pe ecranul de start!</span>
+  <button onclick="pwaInstall()" style="background:#00ff7a;color:#000;font-weight:800;border:0;border-radius:8px;padding:7px 14px;cursor:pointer">Instalează</button>
+  <button class="banner-close" onclick="pwaDismiss()">✕</button>
+</div>
+
 <div id="mob-overlay" onclick="mobileSidebarToggle()"></div>
 
 <script>
+/* ─── Active nav highlighting ─── */
 (function(){
   var path = window.location.pathname;
-  document.querySelectorAll('#app-sidebar .snav-item').forEach(function(a){
+  var allItems = document.querySelectorAll('[data-path]');
+  allItems.forEach(function(a){
     var dp = a.getAttribute('data-path');
     if (!dp) return;
-    if (dp === '/' ? path === '/' : path === dp || path.startsWith(dp + '/')) {
-      a.classList.add('active');
-    }
+    var isActive = dp === '/' ? path === '/' : (path === dp || path.startsWith(dp + '/'));
+    if (isActive) a.classList.add('active');
   });
 })();
+
+/* ─── Mobile sidebar (desktop fallback) ─── */
 function mobileSidebarToggle() {
   document.getElementById('app-sidebar').classList.toggle('mob-open');
   document.getElementById('mob-overlay').classList.toggle('mob-open');
 }
+
+/* ─── More drawer ─── */
+function toggleMoreDrawer() {
+  document.getElementById('mob-more-drawer').classList.toggle('open');
+  document.getElementById('mob-more-drawer-overlay').classList.toggle('open');
+}
+
+/* ─── Service Worker registration ─── */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js')
+      .then(function(reg) { console.log('[PWA] SW registered', reg.scope); })
+      .catch(function(err) { console.warn('[PWA] SW failed:', err); });
+  });
+}
+
+/* ─── PWA install prompt ─── */
+var _deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  _deferredPrompt = e;
+  // Show banner only if not already installed and not dismissed
+  if (!localStorage.getItem('pwa-dismissed')) {
+    document.getElementById('pwa-install-banner').classList.add('show');
+  }
+});
+window.addEventListener('appinstalled', function() {
+  _deferredPrompt = null;
+  document.getElementById('pwa-install-banner').classList.remove('show');
+  console.log('[PWA] App installed!');
+});
+function pwaInstall() {
+  if (!_deferredPrompt) return;
+  _deferredPrompt.prompt();
+  _deferredPrompt.userChoice.then(function(result) {
+    if (result.outcome === 'accepted') {
+      document.getElementById('pwa-install-banner').classList.remove('show');
+    }
+    _deferredPrompt = null;
+  });
+}
+function pwaDismiss() {
+  document.getElementById('pwa-install-banner').classList.remove('show');
+  localStorage.setItem('pwa-dismissed', '1');
+}
+
+/* ─── Viewport height fix for iOS (100vh bug) ─── */
+function fixVH() {
+  document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
+}
+fixVH();
+window.addEventListener('resize', fixVH);
 </script>

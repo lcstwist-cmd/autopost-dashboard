@@ -754,6 +754,21 @@ def get_slot_detail(name: str, queue_root: Path) -> dict[str, Any]:
 # Health check route (fast, for Railway)
 # ---------------------------------------------------------------------------
 
+@app.get("/manifest.json")
+async def serve_manifest():
+    """PWA manifest — served at root so SW scope works."""
+    return FileResponse(str(_HERE / "static" / "manifest.json"),
+                        media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+async def serve_sw():
+    """Service worker — must be at root for full-scope caching."""
+    return FileResponse(str(_HERE / "static" / "sw.js"),
+                        media_type="application/javascript",
+                        headers={"Service-Worker-Allowed": "/"})
+
+
 @app.get("/health")
 async def health_check():
     """Minimal health check — just verify the app is running."""
@@ -4900,6 +4915,126 @@ async def api_publish_history(request: Request, limit: int = 50):
     uid = request.state.user["id"]
     limit = max(1, min(int(limit), 200))
     return JSONResponse({"history": get_publish_history(uid, limit=limit)})
+
+
+# ---------------------------------------------------------------------------
+# Instagram Growth Analytics
+# ---------------------------------------------------------------------------
+
+def _ig_niche_and_competitors(settings: dict) -> tuple[str, list[str] | None]:
+    """Extract niche and competitor handles from user settings."""
+    niche = (settings.get("ig_niche") or "crypto").strip()
+    raw = (settings.get("ig_competitor_handles") or "").strip()
+    competitors = [h.strip() for h in raw.split(",") if h.strip()] or None
+    return niche, competitors
+
+
+def _ig_load_all(settings: dict, force: bool = False) -> dict:
+    """Load all IG analytics via the unified growth engine."""
+    from src.agents import ig_growth_engine as _ige
+    niche, competitors = _ig_niche_and_competitors(settings)
+    with _uenv(settings):
+        if force:
+            _ige.full_refresh(niche, competitors)
+        return _ige.load_dashboard_data(niche, competitors)
+
+
+@app.get("/instagram-growth", response_class=HTMLResponse)
+async def instagram_growth_page(request: Request):
+    settings = get_user_settings(request.state.user["id"])
+    data = await asyncio.get_event_loop().run_in_executor(
+        _publish_executor,
+        lambda: _ig_load_all(settings, force=False),
+    )
+    return _render(
+        "instagram_growth.html",
+        **data,
+        **_user_ctx(request),
+    )
+
+
+@app.get("/api/instagram/overview")
+async def api_ig_overview(request: Request):
+    from src.agents.ig_growth_engine import get_own_account
+    settings = get_user_settings(request.state.user["id"])
+    with _uenv(settings):
+        return JSONResponse(get_own_account(force=False))
+
+
+@app.get("/api/instagram/posts")
+async def api_ig_posts(request: Request):
+    from src.agents.ig_growth_engine import get_own_posts
+    settings = get_user_settings(request.state.user["id"])
+    with _uenv(settings):
+        return JSONResponse({"posts": get_own_posts(force=False)})
+
+
+@app.get("/api/instagram/audience")
+async def api_ig_audience(request: Request):
+    from src.agents.ig_growth_engine import get_audience
+    settings = get_user_settings(request.state.user["id"])
+    with _uenv(settings):
+        return JSONResponse(get_audience(force=False))
+
+
+@app.get("/api/instagram/growth-chart")
+async def api_ig_growth(request: Request):
+    from src.agents.ig_growth_engine import get_growth_history
+    return JSONResponse({"history": get_growth_history()})
+
+
+@app.get("/api/instagram/recommendations")
+async def api_ig_recommendations(request: Request, force: int = 0):
+    from src.agents.ig_growth_engine import (
+        get_own_account, get_own_posts, get_niche_viral_reels,
+        analyze_viral_patterns, generate_content_briefs,
+    )
+    settings = get_user_settings(request.state.user["id"])
+    niche, _ = _ig_niche_and_competitors(settings)
+    loop = asyncio.get_event_loop()
+    def _do():
+        with _uenv(settings):
+            acc     = get_own_account(force=False)
+            posts   = get_own_posts(force=False)
+            reels   = get_niche_viral_reels(niche, force=bool(force))
+            pats    = analyze_viral_patterns(reels)
+            briefs  = generate_content_briefs(acc, reels, pats, force=bool(force))
+        return briefs
+    briefs = await loop.run_in_executor(_publish_executor, _do)
+    return JSONResponse({"briefs": briefs})
+
+
+@app.post("/api/instagram/refresh")
+async def api_ig_refresh(request: Request):
+    from src.agents.ig_growth_engine import full_refresh
+    settings = get_user_settings(request.state.user["id"])
+    niche, competitors = _ig_niche_and_competitors(settings)
+    loop = asyncio.get_event_loop()
+    def _do():
+        with _uenv(settings):
+            return full_refresh(niche, competitors)
+    result = await loop.run_in_executor(_publish_executor, _do)
+    return JSONResponse(result)
+
+
+@app.post("/api/instagram/queue-content")
+async def api_ig_queue_content(request: Request):
+    """Accept a content-kit item and log it for manual posting."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    path = body.get("path", "")
+    name = body.get("name", "")
+    media_type = body.get("media_type", "")
+    log_publish_history(
+        user_id=request.state.user["id"],
+        slot_name="content_kit",
+        title=name,
+        platforms=["instagram"],
+        results={"path": path, "media_type": media_type, "status": "queued"},
+    )
+    return JSONResponse({"ok": True, "queued": name})
 
 
 # ---------------------------------------------------------------------------
