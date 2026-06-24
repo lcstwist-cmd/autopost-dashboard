@@ -754,6 +754,21 @@ def get_slot_detail(name: str, queue_root: Path) -> dict[str, Any]:
 # Health check route (fast, for Railway)
 # ---------------------------------------------------------------------------
 
+@app.get("/manifest.json")
+async def serve_manifest():
+    """PWA manifest — served at root so SW scope works."""
+    return FileResponse(str(_HERE / "static" / "manifest.json"),
+                        media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+async def serve_sw():
+    """Service worker — must be at root for full-scope caching."""
+    return FileResponse(str(_HERE / "static" / "sw.js"),
+                        media_type="application/javascript",
+                        headers={"Service-Worker-Allowed": "/"})
+
+
 @app.get("/health")
 async def health_check():
     """Minimal health check — just verify the app is running."""
